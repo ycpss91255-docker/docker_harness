@@ -1,3 +1,8 @@
+---
+name: semver-bump
+description: Cut a release tag (X / Y / patch / RC) via the canonical release-tag.sh primitive, with X-bump consent gating (RELEASE_X_BUMP_ACK env) and RC tag enforcement. Use when ready to publish a version, never raw git tag.
+---
+
 # semver-bump
 
 Cut version tags via the canonical script with X consent + RC enforcement.
