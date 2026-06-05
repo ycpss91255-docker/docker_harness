@@ -6,6 +6,17 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Removed
+- **`remind_subtree_init.sh` deleted as redundant (closes #182).** The
+  reminder fired on `git subtree pull --prefix=.base/template`, but
+  that exact surface is already DENIED upstream by
+  `enforce_make_first_upgrade.sh` (PreToolUse Bash deny + checkpoint
+  ack). By the time the reminder fired the user had explicitly ack'd
+  the deny, so the nudge was always too late to redirect behaviour.
+  Hook + smoke spec removed; `chain_spec.bats` integration row
+  dropped; `settings.json` wiring removed; CONTEXT.md tree synced;
+  TEST.md totals 887 -> 882 (879 smoke + 3 integration).
+
 ### Added
 - **`wait-pr-ci` family emits JSON event log on every terminal exit
   (refs #175 Phase 1).** `wait-pr-ci.sh`, `wait-pr-ci-batch.sh`, and
