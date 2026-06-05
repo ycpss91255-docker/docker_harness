@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **887 tests** (883 smoke + 4 integration) plus shellcheck (36 hook
+Total: **882 tests** (879 smoke + 3 integration) plus shellcheck (36 hook
 scripts + 30 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -247,14 +247,6 @@ sleep-polling. Refs #154.
 | silent on gh workflow view | inspecting only → SILENT |
 | silent on unrelated command | `echo hello` → SILENT |
 | silent on empty command | empty input → SILENT |
-
-### test/smoke/remind_subtree_init_spec.bats (4)
-| Test | Scenario |
-|------|----------|
-| fires on git subtree pull ... template | template subtree pull → FIRE |
-| silent on git subtree pull without template keyword | other subtree → SILENT |
-| silent on git pull (not subtree) | non-subtree git pull → SILENT |
-| silent on make upgrade (recommended path) | `make ... upgrade` → SILENT |
 
 ### test/smoke/remind_tdd_categories_spec.bats (12)
 | Test | Scenario |
@@ -1461,13 +1453,12 @@ until a tag matching `--tag-pattern` (POSIX ERE) appears as stable (no
 
 ## Integration specs
 
-### test/integration/chain_spec.bats (4)
+### test/integration/chain_spec.bats (3)
 | Test | Scenario |
 |------|----------|
 | git commit with Co-Authored-By: Claude AND code-only stage fires both pre-tool hooks | `remind_no_ai_attribution` + `check_changelog_drift` both FIRE on the same input |
 | gh pr create with attribution body fires both pre-tool hooks | `remind_pr_wait_ci` + `remind_no_ai_attribution` both FIRE |
 | editing a Dockerfile fires only the TDD reminder, not content-scan hooks | `remind_tdd_categories` FIRE; emoji/AI-attribution/coverage-excl SILENT |
-| subtree pull command does not trigger PR-wait or attribution hooks | `remind_subtree_init` FIRE; PR-wait + attribution SILENT |
 
 ## Lint
 
