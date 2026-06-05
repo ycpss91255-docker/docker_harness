@@ -1,3 +1,8 @@
+---
+name: rebase-pr
+description: Rebase and force-push a PR whose base branch moved so its CI re-runs against the updated main. Use when gh reports mergeStateStatus BEHIND (auto-merge stalled) or CONFLICTING (manual resolution required).
+---
+
 # rebase-pr
 
 One-shot rebase + force-push for a PR whose base branch has moved
