@@ -2,9 +2,8 @@
 # checkpoint.sh — /tmp checkpoint protocol helper (ADR-00000002).
 #
 # Sourced by Tier 2 E2 enforcement hooks (enforce_make_first_upgrade /
-# enforce_batch_via_script / enforce_worktree_for_branch /
-# enforce_slash_command_first). When a hook detects a command it wants
-# to gate, it calls:
+# enforce_batch_via_script / enforce_worktree_for_branch). When a hook
+# detects a command it wants to gate, it calls:
 #
 #   write_checkpoint <hook_slug> <cmd> <reason> <canonical> <ack_hint>
 #
