@@ -4,9 +4,9 @@
 # Auto-allow `touch <TMPDIR-or-/tmp>/claude-checkpoint-*.ack` invocations
 # emitted by the /tmp checkpoint protocol (ADR-00000002). Without this,
 # every ack would land in the generic Bash(touch:*) ask flow, defeating
-# the one-click ack design that the four Tier 2 E2 enforcement hooks
+# the one-click ack design that the three Tier 2 E2 enforcement hooks
 # (enforce_make_first_upgrade / enforce_batch_via_script /
-# enforce_worktree_for_branch / enforce_slash_command_first) rely on.
+# enforce_worktree_for_branch) rely on.
 #
 # Decision matrix:
 #   - command not starting with `touch`          → silent
