@@ -178,3 +178,14 @@
     - decide which apply based on the change shape (see CLAUDE.md table)
     - TEST.md is the single source of truth -- update counts when adding / removing @test
   refs: CLAUDE.md > 測試分類（TDD 必須涵蓋的 4 個面向）
+
+- name: structured-data-use-jq
+  trigger:
+    kind: bash_command
+  guidance:
+    - parse JSON / JSONL with `jq`, never `awk` / `sed` / line-oriented text tools -- a record can span lines and embed }, backticks, heredoc bodies, so a line matcher silently miscounts (observed 2026-06-08 tallying transcript tool-calls; the awk pass was wrong and had to be redone with jq)
+    - count / frequency over JSONL -> `jq -r '...' | sort | uniq -c | sort -rn`, not awk field hacks
+    - search code with the Grep tool, not `grep`-piped-into-`awk` over source files
+    - `awk` / `sed` / `cat` pipelines are fine for genuinely clean tabular / column data (e.g. `jq ... | awk '{print $1}'` after jq has already extracted)
+    - safety net - warn_structured_data_text_tools.sh (PreToolUse) nudges when awk/sed touch a .json/.jsonl path with no jq present; non-blocking
+  refs: ycpss91255-docker/docker_harness PR (warn_structured_data_text_tools hook)

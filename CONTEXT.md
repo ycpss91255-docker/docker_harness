@@ -168,6 +168,7 @@ docker/
     │   ├── remind_skillification_candidates.sh # Stop hook：偵測 /tmp/*.sh 反覆呼叫 (>=3 次) 或 parser-fallback Bash pattern 重複 (>=3 次) 且 session 未提任何 skillification 候選時 remind 配 [[skillification-candidates]] skill,configurable via SKILLIFICATION_REMIND_DISABLE + SKILLIFICATION_{TMP,PARSER}_THRESHOLD;refs #125
     │   ├── remind_parallel_when_bulk.sh # UserPromptSubmit hook：scan user prompt 偵測 bulk-work 訊號 (N >= 4 + plural noun / all|every + noun / 逗號分隔 4+ tokens / CJK 量詞) 且 prompt 未提 parallel/agent 時 remind 配 [[parallel-agents]] skill,configurable via PARALLEL_REMIND_{DISABLE,THRESHOLD};refs #126
     │   ├── remind_log_helper.sh        # PostToolUse hook：Edit/Write .claude/scripts/*.sh 後 delegate 到 check-log-helper-usage.sh,若該檔案有 bare printf|echo (usage()/allowlist marker 外) 則 systemMessage nudge 提醒走 _log_*,refs #148 M5
+    │   ├── warn_structured_data_text_tools.sh # PreToolUse hook：bash 指令用 awk/sed 處理 .json/.jsonl 且無 jq 時 systemMessage nudge 改用 jq / Grep 工具(line-oriented 解析 JSONL 會誤計);non-blocking,配 structured-data-use-jq instinct
     │   └── test/                       # bats specs (smoke + integration) — 跑法見 Makefile
     ├── skills/
     │   ├── rebase-pr/SKILL.md          # PR 因 BEHIND/CONFLICTING 需 rebase 時的 one-shot 流程,配 rebase-pr.sh + wait-pr-ci FAIL hint,refs #87
