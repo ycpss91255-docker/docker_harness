@@ -70,3 +70,45 @@ mk_input() {
   local log="${HOME}/.claude/log/worktree-leak-events.jsonl"
   [[ ! -f "${log}" ]] || { echo "log should not exist; got:"; cat "${log}"; return 1; }
 }
+
+@test "throttle: stops logging after 5 events per session (count increments)" {
+  local repo
+  repo="$(mktemp_repo)"
+  echo "leaked" > "${repo}/script/foo.sh"
+
+  local i
+  for i in 1 2 3 4 5 6 7; do
+    CLAUDE_PROJECT_DIR="${repo}" run "$(hook forensic_worktree_leak.sh)" <<< "$(mk_input s-throttle)"
+    assert_success
+  done
+
+  local log="${HOME}/.claude/log/worktree-leak-events.jsonl"
+  [[ -f "${log}" ]] || { echo "log not at ${log}"; return 1; }
+  local lines
+  lines="$(wc -l < "${log}")"
+  [[ "${lines}" == "5" ]] || { echo "want 5 log lines, got ${lines}"; cat "${log}"; return 1; }
+  # First entry has throttle_count 1; last has 5.
+  jq -e 'select(.throttle_count == 1)' < <(head -1 "${log}") >/dev/null \
+    || { echo "first line throttle_count != 1"; head -1 "${log}"; return 1; }
+  jq -e 'select(.throttle_count == 5)' < <(tail -1 "${log}") >/dev/null \
+    || { echo "last line throttle_count != 5"; tail -1 "${log}"; return 1; }
+}
+
+@test "throttle: counter per-session (different session re-baselines)" {
+  local repo
+  repo="$(mktemp_repo)"
+  echo "leaked" > "${repo}/script/foo.sh"
+
+  # Burn session A throttle.
+  local i
+  for i in 1 2 3 4 5 6; do
+    CLAUDE_PROJECT_DIR="${repo}" run "$(hook forensic_worktree_leak.sh)" <<< "$(mk_input sess-A)"
+  done
+  # Session B should still log (fresh marker).
+  CLAUDE_PROJECT_DIR="${repo}" run "$(hook forensic_worktree_leak.sh)" <<< "$(mk_input sess-B)"
+  assert_success
+
+  local log="${HOME}/.claude/log/worktree-leak-events.jsonl"
+  jq -e 'select(.session_id == "sess-B" and .throttle_count == 1)' < <(tail -1 "${log}") >/dev/null \
+    || { echo "sess-B fresh counter expected; got:"; tail -1 "${log}"; return 1; }
+}
