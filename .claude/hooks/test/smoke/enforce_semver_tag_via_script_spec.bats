@@ -121,3 +121,52 @@ run_hook() {
   run "$(hook enforce_semver_tag_via_script.sh)" <<< "{\"tool_input\":{\"command\":\"\"}}"
   assert_silent
 }
+
+# ---- gh release create coverage (refs #181) ----
+#
+# The git-side matchers above do not see `gh release create vX.Y.Z` --
+# gh constructs the tag server-side without ever invoking `git tag` /
+# `git push`, so it bypassed every release-tag.sh integrity guarantee
+# before this hook was extended.
+
+@test "denies gh release create vX.Y.Z" {
+  run_hook "gh release create v1.3.0 --notes 'release'"
+  assert_permission_decision "deny"
+  assert_message_contains "release-tag flow gate"
+  assert_message_contains ".claude/scripts/release-tag.sh"
+}
+
+@test "denies gh release create vX.Y.Z-rcN" {
+  run_hook "gh release create v1.3.0-rc1 --notes 'rc'"
+  assert_permission_decision "deny"
+}
+
+@test "denies gh release create with --repo flag" {
+  run_hook "gh release create v1.3.0 --repo ycpss91255-docker/base --notes ok"
+  assert_permission_decision "deny"
+}
+
+@test "silent for gh release list" {
+  run_hook "gh release list"
+  assert_silent
+}
+
+@test "silent for gh release view <tag>" {
+  run_hook "gh release view v1.3.0"
+  assert_silent
+}
+
+@test "silent for gh release delete <tag>" {
+  run_hook "gh release delete v1.3.0 --yes"
+  assert_silent
+}
+
+@test "silent for gh release create non-version tag (release-2026)" {
+  run_hook "gh release create release-2026 --notes yearly"
+  assert_silent
+}
+
+@test "silent for gh release edit <tag> (metadata edit, tag already exists)" {
+  run_hook "gh release edit v1.3.0 --notes updated"
+  assert_silent
+}

@@ -52,6 +52,15 @@ main() {
   # `git push --tags` (bulk).
   elif [[ "${cmd}" =~ git[[:space:]]+(-[A-Za-z]+[[:space:]]+[^[:space:]]+[[:space:]]+)*push[[:space:]]+([^[:space:]]+[[:space:]]+)*--tags([[:space:]]|$) ]]; then
     matched=1
+  # `gh release create v<digit>...` (refs #181). gh builds the tag
+  # server-side, so the git matchers above never fire on this path.
+  # Allows gh global flags (`gh -R x/y release create v1.0.0`) and
+  # zero-or-more tokens between `create` and the v-tag (`gh release
+  # create v1.0.0 --notes ok`, `gh release create --draft v1.0.0`).
+  # Listing / view / edit / delete forms have no `create`, so they
+  # pass through silently.
+  elif [[ "${cmd}" =~ gh([[:space:]]+(-[A-Za-z]+|--[A-Za-z]+)([[:space:]]+[^[:space:]]+)?)*[[:space:]]+release[[:space:]]+create[[:space:]]+([^[:space:]]+[[:space:]]+)*v[0-9] ]]; then
+    matched=1
   fi
 
   (( matched )) || return 0
