@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **891 tests** (888 smoke + 3 integration) plus shellcheck (38 hook
+Total: **899 tests** (896 smoke + 3 integration) plus shellcheck (38 hook
 scripts + 30 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -544,11 +544,12 @@ printed by `batch-template-upgrade.sh` works for both scripts.
 | empty repo in pair exits 2 | empty-repo guard |
 | empty PR in pair exits 2 | empty-pr guard |
 
-### test/smoke/enforce_semver_tag_via_script_spec.bats (21)
+### test/smoke/enforce_semver_tag_via_script_spec.bats (29)
 
 Covers `.claude/hooks/enforce_semver_tag_via_script.sh` — the boundary
-guard that BLOCKs raw `git tag v*` / `git push.*v[0-9]` and forces the
-caller through `.claude/scripts/release-tag.sh` (issue #106).
+guard that BLOCKs raw `git tag v*` / `git push.*v[0-9]` /
+`gh release create v*` and forces the caller through
+`.claude/scripts/release-tag.sh` (issue #106 + #181).
 
 | Test | Scenario |
 |------|----------|
@@ -573,6 +574,14 @@ caller through `.claude/scripts/release-tag.sh` (issue #106).
 | denies git -C \<dir\> tag vX.Y.Z (global -C flag) | -C global flag detected |
 | denies git tag -f vX.Y.Z (force re-tag) | -f flag detected |
 | silent on empty command (defensive) | empty input handled |
+| denies gh release create vX.Y.Z | gh CLI bypass closed (issue #181) |
+| denies gh release create vX.Y.Z-rcN | gh CLI bypass for RC tags |
+| denies gh release create with --repo flag | flags interleaved before / after tag |
+| silent for gh release list | non-create subcommand passes |
+| silent for gh release view \<tag\> | view passes |
+| silent for gh release delete \<tag\> | delete passes |
+| silent for gh release create non-version tag (release-2026) | non-v tag passes via gh too |
+| silent for gh release edit \<tag\> (metadata edit, tag already exists) | edit on existing tag passes |
 
 ### test/smoke/release_tag_spec.bats (25)
 

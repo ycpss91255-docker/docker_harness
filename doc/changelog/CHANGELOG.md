@@ -7,6 +7,15 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **`enforce_semver_tag_via_script.sh` blocks `gh release create v*`
+  (closes #181).** Before this PR, the boundary guard only matched
+  `git tag v*` / `git push <v-tag>` / `git push --tags`. `gh release
+  create v1.0.0` (which builds the tag server-side) bypassed every
+  `.version` / RC / X-bump ACK check inside `release-tag.sh`. The
+  hook now denies the gh path too, while `gh release list / view /
+  edit / delete` and non-version tags (`release-2026`) still pass
+  through. Spec adds 8 cases (3 deny + 5 silent) under
+  `enforce_semver_tag_via_script_spec.bats`.
 - **Forensic + auto-clean hooks for the worktree leak (closes #167).**
   Two new hooks observe and recover from the still-unidentified leak
   where files modified inside a `worktree/` branch surface as `M`
