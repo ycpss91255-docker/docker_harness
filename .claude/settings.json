@@ -93,7 +93,8 @@
       "./run.sh *",
       "./exec.sh *",
       "./stop.sh *",
-      ".claude/scripts/*"
+      ".claude/scripts/*",
+      "git *"
     ],
     "filesystem": {
       "allowWrite": [
