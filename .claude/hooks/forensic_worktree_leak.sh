@@ -71,6 +71,16 @@ main() {
 
   (( ${#leaked[@]} == 0 )) && return 0
 
+  # Throttle: max 5 log entries per session.
+  local tmp_dir="${TMPDIR:-/tmp}"
+  local marker="${tmp_dir}/worktree-leak-fire-count-${session_id}"
+  local count=0
+  [[ -f "${marker}" ]] && count="$(<"${marker}")"
+  [[ "${count}" =~ ^[0-9]+$ ]] || count=0
+  (( count >= 5 )) && return 0
+  count=$((count + 1))
+  printf '%s' "${count}" > "${marker}" 2>/dev/null || true
+
   local log_dir="${HOME}/.claude/log"
   mkdir -p "${log_dir}" 2>/dev/null || return 0
   local log_file="${log_dir}/worktree-leak-events.jsonl"
@@ -89,8 +99,8 @@ main() {
     done | jq -cs '.'
   )"
 
-  ( printf '{"ts":"%s","session_id":"%s","event":"detected","main_head":"%s","leaked_files":%s,"throttle_count":1}\n' \
-      "${ts}" "${session_id}" "${main_head}" "${files_json}" \
+  ( printf '{"ts":"%s","session_id":"%s","event":"detected","main_head":"%s","leaked_files":%s,"throttle_count":%d}\n' \
+      "${ts}" "${session_id}" "${main_head}" "${files_json}" "${count}" \
       >> "${log_file}" ) 2>/dev/null || true
 }
 
