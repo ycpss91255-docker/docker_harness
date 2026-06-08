@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **882 tests** (879 smoke + 3 integration) plus shellcheck (36 hook
+Total: **891 tests** (888 smoke + 3 integration) plus shellcheck (38 hook
 scripts + 30 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -1139,6 +1139,40 @@ and portable. Tests use `mktemp` workspaces + `--home` /
 | --dry-run does not modify anything | dry-run safety |
 | encoded path replaces every / with - | path encoding |
 | trailing slash on workspace is normalised | path normalisation |
+
+### test/smoke/forensic_worktree_leak_spec.bats (5)
+
+Covers `.claude/hooks/forensic_worktree_leak.sh` — Stop hook that
+scans the main checkout for tracked-modified files outside the
+whitelist (`.claude/instincts.yaml` + `.claude/memory/**`) and
+appends a JSONL `detected` event to
+`~/.claude/log/worktree-leak-events.jsonl` so the still-unidentified
+worktree leak (#167) has forensic material the next time it
+appears. Throttled to 5 events per session via TMPDIR marker file.
+
+| Test | Scenario |
+|------|----------|
+| writes JSONL entry when M file outside whitelist exists in main checkout | leak detected -> event written |
+| silent when only whitelisted M files modified (.claude/memory/**) | whitelist prefix match silence |
+| silent when only whitelisted M file modified (.claude/instincts.yaml) | whitelist exact match silence |
+| throttle: stops logging after 5 events per session (count increments) | throttle marker enforced |
+| throttle: counter per-session (different session re-baselines) | marker keyed by session_id |
+
+### test/smoke/auto_clean_worktree_leak_spec.bats (4)
+
+Covers `.claude/hooks/auto_clean_worktree_leak.sh` — PreToolUse Bash
+hook that fires on main-checkout sync commands
+(`git pull *`, `git checkout origin/*`, `git merge origin/*`),
+detects unwhitelisted M files, writes a `cleaned` event to the same
+log, then `git checkout HEAD -- <files>` to restore tracked content
+before the sync runs.
+
+| Test | Scenario |
+|------|----------|
+| git pull with unwhitelisted M triggers checkout HEAD + cleaned log entry | trigger + clean + log all wired |
+| silent when git pull but no M files at all | no-leak passthrough |
+| silent when only whitelisted M (no checkout HEAD, no log) | whitelist preserved on sync |
+| non-trigger command passes through (git status, git log, etc.) | matcher silence on non-sync git cmds |
 
 ### test/smoke/remind_strategic_compact_spec.bats (24)
 

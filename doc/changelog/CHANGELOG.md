@@ -6,6 +6,28 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **Forensic + auto-clean hooks for the worktree leak (closes #167).**
+  Two new hooks observe and recover from the still-unidentified leak
+  where files modified inside a `worktree/` branch surface as `M`
+  entries in the main checkout (blocking `git pull --ff-only` until
+  manually `git checkout HEAD --`'d).
+  - `forensic_worktree_leak.sh` (Stop hook): scans the main checkout
+    every turn for tracked-modified files outside the whitelist
+    (`.claude/instincts.yaml` + `.claude/memory/**`) and appends a
+    JSON line to `~/.claude/log/worktree-leak-events.jsonl` with
+    `event:"detected"`, the `main_head` SHA, and per-file
+    diff_head (first 30 lines). Throttled to 5 entries per session
+    via `$TMPDIR` marker so noisy leaks do not flood the log.
+  - `auto_clean_worktree_leak.sh` (PreToolUse Bash): fires on
+    `git pull *`, `git checkout origin/*`, `git merge origin/*`,
+    detects the same leak, appends a `cleaned` event to the same
+    log, and runs `git checkout HEAD -- <files>` to restore tracked
+    content before the sync command runs. The user no longer has to
+    remember the manual recipe.
+  Phase 2 (root-cause hunt) reads the accumulated log; design issue
+  to follow once N>=5 anomalous events have been classified.
+
 ### Removed
 - **`remind_subtree_init.sh` deleted as redundant (closes #182).** The
   reminder fired on `git subtree pull --prefix=.base/template`, but
