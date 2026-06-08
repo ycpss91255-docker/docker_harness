@@ -39,3 +39,51 @@ mk_input() {
   jq -e '.event == "cleaned" and (.leaked_files[0].path == "script/foo.sh")' "${log}" >/dev/null \
     || { echo "schema mismatch:"; cat "${log}"; return 1; }
 }
+
+@test "silent when git pull but no M files at all" {
+  local repo
+  repo="$(mktemp_repo)"
+
+  CLAUDE_PROJECT_DIR="${repo}" run "$(hook auto_clean_worktree_leak.sh)" \
+    <<< "$(mk_input "git pull --ff-only origin main" "${repo}" s-2)"
+  assert_success
+
+  local log="${HOME}/.claude/log/worktree-leak-events.jsonl"
+  [[ ! -f "${log}" ]] || { echo "log should not exist; got:"; cat "${log}"; return 1; }
+}
+
+@test "silent when only whitelisted M (no checkout HEAD, no log)" {
+  local repo
+  repo="$(mktemp_repo)"
+  mkdir -p "${repo}/.claude/memory"
+  echo "v1" > "${repo}/.claude/memory/feedback.md"
+  git -C "${repo}" add .claude/memory/feedback.md
+  git -C "${repo}" commit -q -m "add memory"
+  echo "v2 user-edit" > "${repo}/.claude/memory/feedback.md"
+
+  CLAUDE_PROJECT_DIR="${repo}" run "$(hook auto_clean_worktree_leak.sh)" \
+    <<< "$(mk_input "git pull --ff-only origin main" "${repo}" s-3)"
+  assert_success
+
+  # Memory file preserved (not checkout'd).
+  [[ "$(cat "${repo}/.claude/memory/feedback.md")" == "v2 user-edit" ]] \
+    || { echo "whitelist file should not be reset"; return 1; }
+  local log="${HOME}/.claude/log/worktree-leak-events.jsonl"
+  [[ ! -f "${log}" ]] || { echo "log should not exist; got:"; cat "${log}"; return 1; }
+}
+
+@test "non-trigger command passes through (git status, git log, etc.)" {
+  local repo
+  repo="$(mktemp_repo)"
+  echo "leaked" > "${repo}/script/foo.sh"
+
+  CLAUDE_PROJECT_DIR="${repo}" run "$(hook auto_clean_worktree_leak.sh)" \
+    <<< "$(mk_input "git status" "${repo}" s-4)"
+  assert_success
+
+  # File NOT restored: the hook should not fire on git status.
+  [[ "$(cat "${repo}/script/foo.sh")" == "leaked" ]] \
+    || { echo "file should be untouched for git status; got: $(cat "${repo}/script/foo.sh")"; return 1; }
+  local log="${HOME}/.claude/log/worktree-leak-events.jsonl"
+  [[ ! -f "${log}" ]] || { echo "log should not exist; got:"; cat "${log}"; return 1; }
+}
