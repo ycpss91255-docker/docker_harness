@@ -47,7 +47,8 @@
       "Bash(.claude/scripts/wait-tag-ci.sh:*)",
       "Bash(.claude/scripts/check-template-versions.sh:*)",
       "Bash(.claude/scripts/run-bats-in-compose.sh:*)",
-      "Bash(.claude/scripts/fix-compose-copy-line.sh:*)"
+      "Bash(.claude/scripts/fix-compose-copy-line.sh:*)",
+      "Bash(shellcheck:*)"
     ],
     "ask": [
       "Bash(docker build:*)",

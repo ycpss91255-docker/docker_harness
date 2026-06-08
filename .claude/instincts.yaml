@@ -189,3 +189,13 @@
     - `awk` / `sed` / `cat` pipelines are fine for genuinely clean tabular / column data (e.g. `jq ... | awk '{print $1}'` after jq has already extracted)
     - safety net - warn_structured_data_text_tools.sh (PreToolUse) nudges when awk/sed touch a .json/.jsonl path with no jq present; non-blocking
   refs: ycpss91255-docker/docker_harness PR (warn_structured_data_text_tools hook)
+
+- name: verify-via-bats-not-bash-c
+  trigger:
+    kind: bash_command
+  guidance:
+    - verify repo / base behaviour with a bats spec run through the already-allowlisted `ci.sh` (`./script/ci/ci.sh ...`; base #523 single-file mode gives the fast inner loop), NOT an ad-hoc `bash -c '...'` snippet
+    - `bash -c '...'` hits the `Bash(bash -c:*)` ask rule every time -- that rule is correct (arbitrary code execution cannot be safely allowlisted), so the fix is to stop reaching for `bash -c`, not to widen permissions
+    - an inline source-and-assert snippet (source lib, build fixture, call fn, assert output) IS a unit test in disguise -- write it as a `test/unit/*_spec.bats` and it becomes a permanent regression test with zero prompts
+    - genuinely one-off host diagnostics that recur belong in a committed `.claude/scripts/<name>.sh` (allowlist the path); a true single-use check can take the one manual approval
+  refs: ycpss91255-docker/docker_harness#190 + base#523 (ci.sh single-file mode)
