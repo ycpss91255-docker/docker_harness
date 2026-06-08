@@ -169,6 +169,18 @@
     - allowlist markers - `# log-allow:script` (file-wide) / `# log-allow:start` ... `# log-allow:end` (block) for data-product output (markdown tables, copy-paste hints, Monitor protocol)
   refs: ycpss91255-docker/docker_harness#148 + ycpss91255-docker/base#423 + base#438
 
+- name: lib-defensive-unset-vars
+  trigger:
+    kind: file_edit
+    glob: '**/script/docker/lib/*.sh'
+  guidance:
+    - lib files are sourced from multiple wrappers (run / build / exec / stop / prune / setup / setup_tui) AND from `init.sh` / `upgrade.sh`; each caller exports a different set of globals
+    - lib code that references a caller-specific variable MUST use `${VAR:-default}` or guard with `[[ -n "${VAR:-}" ]]`; bare `${VAR}` or `${VAR:?}` will blow up under `set -u` when the var-less caller sources the lib
+    - canonical breakage example - `_collect_logging` referencing `${_SETUP_SCRIPT_DIR}` works when setup.sh sources it but explodes from init.sh / upgrade.sh (refs base#402 PR-B CI fix in #486)
+    - decide per call - if the var is truly required, refuse cleanly via explicit `[[ -z "${VAR:-}" ]] && return 0` instead of `${VAR:?}` so the helper degrades to no-op instead of aborting the sourcing chain
+    - test surface - unit specs for shared libs MUST cover both "called from wrapper with VAR set" and "called from init.sh with VAR unset" branches
+  refs: ycpss91255-docker/base#402 PR-B follow-up fix (commit e146c91 in #486)
+
 - name: tdd-four-categories
   trigger:
     kind: file_edit
