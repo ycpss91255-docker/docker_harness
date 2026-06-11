@@ -7,6 +7,21 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Vendor-in 11 Matt Pocock skills (closes #185).** `.agents/skills/`
+  + `skills-lock.json` + 11 `.claude/skills/<name>` symlinks are now
+  tracked in git, so fresh clones receive the full skill set without
+  running an installer. Adopted: `caveman`, `diagnose`, `grill-me`,
+  `grill-with-docs`, `handoff`, `improve-codebase-architecture`,
+  `prototype`, `tdd`, `to-issues`, `write-a-skill`, `zoom-out`.
+  Three Matt-Pocock-specific skills (`to-prd`, `triage`,
+  `setup-matt-pocock-skills`) were excluded because they hard-depend
+  on a 5-role triage label vocabulary this repo does not use.
+  `to-issues/SKILL.md` has one line removed
+  (the dangling `setup-matt-pocock-skills` reference); its lock
+  `computedHash` is recomputed. CLAUDE.md Workflows table extended
+  with 9 new rows (`tdd` was already listed) and a footnote naming
+  `skills-lock.json` + `.agents/skills/` as the source of truth.
+  Full decision recorded in ADR-00000010.
 - **`enforce_semver_tag_via_script.sh` blocks `gh release create v*`
   (closes #181).** Before this PR, the boundary guard only matched
   `git tag v*` / `git push <v-tag>` / `git push --tags`. `gh release

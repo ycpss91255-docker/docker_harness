@@ -106,4 +106,21 @@ from prose.
   `[[skillification-candidates]]` (Stop hook reminds)
 - Parallel-Agent dispatch for bulk work (N>=4 independent items, cap
   3): `[[parallel-agents]]` (UserPromptSubmit hook reminds)
+- Stress-test plan / design before commit: `[[grill-me]]` (Q&A) or
+  `[[grill-with-docs]]` (Q&A that also updates CONTEXT.md / ADR
+  inline as decisions crystallise)
+- Break a plan / PRD into independently-grabbable issues: `[[to-issues]]`
+- Diagnose hard bugs / performance regressions (reproduce → minimise
+  → instrument → fix → regression-test): `[[diagnose]]`
+- Throwaway prototype to flesh out a design before committing:
+  `[[prototype]]`
+- Audit codebase for architecture / refactoring opportunities:
+  `[[improve-codebase-architecture]]`
+- Re-perspective on a stuck big design: `[[zoom-out]]`
+- Compact current conversation into a handoff document: `[[handoff]]`
+- Author a new skill (skill scaffolding + progressive disclosure):
+  `[[write-a-skill]]`
+- Caveman mode (low-token communication): `[[caveman]]`
+- Vendored skill source of truth: [`skills-lock.json`](skills-lock.json)
+  + `.agents/skills/` (upstream: `mattpocock/skills`)
 - Memory portability across machines: `.claude/scripts/setup-memory-link.sh`
