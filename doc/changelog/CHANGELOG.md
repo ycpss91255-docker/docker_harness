@@ -7,6 +7,22 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **`remind_monitor_on_git_push.sh` completes the CI-watch umbrella
+  (closes #157).** A `git push` that re-pushes / force-pushes an
+  existing PR branch re-runs CI on the new head, but no `gh pr create`
+  event fires to re-trigger `remind_pr_wait_ci`. This new PreToolUse
+  Bash reminder fills that gap: it fires on `git push` (including
+  `--force` / `--force-with-lease` / `git -C <dir> push` / explicit
+  `git push origin <branch>`) when the command does NOT carry
+  `-u` / `--set-upstream`, does NOT target `main`, and is NOT a tag
+  push -- nudging to re-invoke `/wait-pr-ci` on the same PR. Initial
+  `-u` pushes stay silent (the following `gh pr create` reminder
+  covers them); main / tag pushes stay silent (no PR CI / owned by
+  `enforce_semver_tag_via_script`). With this, all three
+  CI-triggering surfaces are covered: `gh pr create`
+  (`remind_pr_wait_ci`), `gh run rerun` / `gh workflow run`
+  (`remind_monitor_on_ci_trigger`, #154), and `git push` (this, #157).
+  11 new spec cases.
 - **`enforce_gh_body_file.sh` enforces a decision record on issue
   close (closes #196).** Two new checks make the decision/resolution
   of a closed issue discoverable without spelunking. **Check A**: a
