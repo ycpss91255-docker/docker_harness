@@ -284,3 +284,29 @@ stub_gh_fail() {
   run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh pr create --title T --body-file ${bf}\"}}"
   assert_permission_decision "deny"
 }
+
+@test "#196 A: pr create closing #N WITH ## Resolution allowed" {
+  local bf="${TMP}/body.md"
+  printf '## Summary\n\nDid a thing.\n\n## Resolution\n\nChose X.\n\nCloses #5\n' > "${bf}"
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh pr create --title T --body-file ${bf}\"}}"
+  assert_silent
+}
+
+@test "#196 A: pr create closing #N WITH ## Decision allowed" {
+  local bf="${TMP}/body.md"
+  printf '## Decision\n\nWent with Y because Z.\n\nFixes #9\n' > "${bf}"
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh pr create --title T --body-file ${bf}\"}}"
+  assert_silent
+}
+
+@test "#196 A: pr create NOT closing any issue needs no decision record" {
+  local bf="${TMP}/body.md"
+  printf '## Summary\n\nRefactor only, refs #5.\n' > "${bf}"
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh pr create --title T --body-file ${bf}\"}}"
+  assert_silent
+}
+
+@test "#196 A: pr create with unreadable body-file fails open (silent)" {
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh pr create --title T --body-file ${TMP}/does-not-exist.md\"}}"
+  assert_silent
+}
