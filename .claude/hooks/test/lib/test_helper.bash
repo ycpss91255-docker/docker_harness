@@ -140,14 +140,7 @@ mktemp_test_md_repo() {
   local dir
   dir="$(mktemp -d)"
   mkdir -p "${dir}/test/unit" "${dir}/doc/test"
-  {
-    echo '#!/usr/bin/env bats'
-    local i=0
-    while (( i < bats_count )); do
-      echo "@test \"t${i}\" { :; }"
-      i=$((i + 1))
-    done
-  } > "${dir}/test/unit/setup_spec.bats"
+  write_bats_stanzas "${dir}/test/unit/setup_spec.bats" "${bats_count}"
   cat > "${dir}/doc/test/TEST.md" <<EOF
 # Tests
 
