@@ -1,6 +1,6 @@
 ---
 name: gh-artifact-format
-description: Format guidance for GitHub artifacts (issue title / body / close comment / PR / non-closing comment) and the cross-ref keyword vocabulary that goes in commit messages and PR bodies. Pair the format rules here with the `enforce_gh_body_file.sh` PreToolUse hook, which BLOCKS the routing violations.
+description: Format rules for GitHub artifacts (issue title / body / close comment / PR / comment) plus the cross-ref keyword vocabulary for commit messages and PR bodies. Paired with the `enforce_gh_body_file.sh` PreToolUse hook that BLOCKS routing violations.
 ---
 
 # gh-artifact-format

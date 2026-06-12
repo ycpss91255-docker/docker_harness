@@ -1,6 +1,6 @@
 ---
 name: parallel-agents
-description: When a task targets 4+ independent repos / PRs / files / similar work units, dispatch parallel Agent tool calls instead of running serially. Use this when the `remind_parallel_when_bulk.sh` UserPromptSubmit hook nudges, or whenever you see "process all repos / N items / every X" in the user prompt.
+description: Dispatch parallel Agent calls when a task targets 4+ independent repos / PRs / files instead of running serially. Use when the `remind_parallel_when_bulk.sh` UserPromptSubmit hook nudges, or on "process all repos / every X" prompts.
 ---
 
 # parallel-agents

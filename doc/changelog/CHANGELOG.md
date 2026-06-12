@@ -52,6 +52,22 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Phase 2 (root-cause hunt) reads the accumulated log; design issue
   to follow once N>=5 anomalous events have been classified.
 
+### Changed
+- **Trimmed 4 native SKILL.md `description:` fields under ~250 chars
+  (closes #173).** A skill manifest's `description` ships in the
+  system prompt every turn, so verbose descriptions are a recurring
+  token tax. Trimmed `skillification-candidates` (339->244),
+  `proactive-optimization` (320->239), `parallel-agents` (299->232),
+  `gh-artifact-format` (297->248) while preserving the
+  what-it-does + when-to-use shape. Vendored skills (from
+  `mattpocock/skills`) were intentionally left untouched to stay 1:1
+  with upstream and avoid `skills-lock.json` `computedHash` drift;
+  `prototype` (426, the remaining outlier) is upstream's and would
+  need a separate per-install override mechanism, tracked separately.
+  Empty descriptions (`rebase-pr` / `semver-bump`) and the worst
+  offender (`setup-matt-pocock-skills`, 438) were already handled by
+  #178 and #185.
+
 ### Removed
 - **`remind_subtree_init.sh` deleted as redundant (closes #182).** The
   reminder fired on `git subtree pull --prefix=.base/template`, but
