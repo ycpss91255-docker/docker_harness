@@ -80,6 +80,28 @@ has_real_body_file() {
   return 1
 }
 
+# Decision-record marker (refs #196): a closing PR body or a manual
+# issue-close comment must carry one of these section headings.
+readonly DECISION_MARKER_RE='^## (Resolution|Decision)'
+readonly CLOSING_KEYWORD_RE='(closes|fixes|resolves)[: ]+#[0-9]+'
+
+# body_file_path <cmd> — echo the --body-file path (space or = form);
+# empty if none or stdin (`-`).
+body_file_path() {
+  local cmd="$1"
+  if [[ "${cmd}" =~ --body-file[[:space:]]+([^[:space:]]+) ]]; then
+    [[ "${BASH_REMATCH[1]}" == "-" ]] && return 1
+    printf '%s' "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  if [[ "${cmd}" =~ --body-file=([^[:space:]]+) ]]; then
+    [[ "${BASH_REMATCH[1]}" == "-" ]] && return 1
+    printf '%s' "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  return 1
+}
+
 has_label() {
   # Rule 9 (#91): require `--label <non-empty>` (or `-l`, or `--label=`).
   # Empty value (--label "" / --label '' / --label= ) does not count.
@@ -177,6 +199,22 @@ main() {
       if [[ "${subcmd}" == "issue create" ]] && ! has_label "${cmd}"; then
         deny "gh issue create needs --label <name> (Rule 9 of #91). Map the title type prefix to a stock GitHub label per .claude/skills/gh-artifact-format/SKILL.md Section 6: feat/refactor/chore/track -> enhancement, fix -> bug, docs -> documentation. Example: gh issue create ... --body-file /tmp/x.md --label enhancement"
         return 0
+      fi
+      # #196 Check A: a PR that closes an issue must record the
+      # decision / resolution in its body. Read the body-file; if it
+      # carries a closing keyword but no `## Resolution` / `## Decision`
+      # heading, deny. Fail open if the file is unreadable (do not block
+      # on a transient path issue). PRs that do not close anything are
+      # unaffected (future-only behaviour).
+      if [[ "${subcmd}" == "pr create" ]]; then
+        local bf
+        if bf="$(body_file_path "${cmd}")" && [[ -r "${bf}" ]]; then
+          if grep -qiE "${CLOSING_KEYWORD_RE}" "${bf}" \
+             && ! grep -qE "${DECISION_MARKER_RE}" "${bf}"; then
+            deny "This PR closes an issue but its body records no decision / resolution. Add a \`## Resolution\` or \`## Decision\` section to ${bf} stating what was decided and how it was resolved, then re-run. The PR body is the canonical decision record for PR-closed issues (refs #196)."
+            return 0
+          fi
+        fi
       fi
       return 0
       ;;
