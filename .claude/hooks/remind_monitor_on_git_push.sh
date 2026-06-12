@@ -42,6 +42,9 @@ main() {
   # Version-tag push: owned by enforce_semver_tag_via_script.sh.
   [[ "${cmd}" =~ (^|[[:space:]:/])v[0-9]+\.[0-9]+\.[0-9]+ ]] && return 0
 
+  # Bulk tag push (`git push --tags`): not a PR branch.
+  [[ "${cmd}" =~ (^|[[:space:]])--tags([[:space:]]|$) ]] && return 0
+
   msg="git push 提醒：這是對既有 branch 的 re-push / force-push，CI 會在新 head 重跑。對同一個 PR 重新 invoke /wait-pr-ci skill（.claude/skills/wait-pr-ci/SKILL.md）追 CI，別用 sleep 輪詢。(初次 -u push 由 gh pr create 提醒接手；推 main / tag 不在此列)"
 
   jq -n --arg m "${msg}" '{
