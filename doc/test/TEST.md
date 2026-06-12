@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **899 tests** (896 smoke + 3 integration) plus shellcheck (38 hook
+Total: **911 tests** (908 smoke + 3 integration) plus shellcheck (38 hook
 scripts + 30 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -144,6 +144,20 @@ stdin and asserts one of three behaviours:
 | silent when file is binary | binary file detected → SILENT |
 | silent on meta-doc CLAUDE.md (legitimate emoji quoting) | rule-describing CLAUDE.md → SILENT |
 | silent on .claude/commands/*.md meta-doc (rule description) | command markdown → SILENT |
+
+### test/smoke/test_helper_stanzas_spec.bats (2)
+
+Covers the `write_bats_stanzas <file> <count>` helper in
+`test_helper.bash` (refs #166). The helper writes a `.bats` fixture
+with `count` trivial `@test` stanzas via `printf` (never a heredoc),
+sidestepping the bats preprocessor trap where literal `@test` at
+column 0 inside a `<<'EOF'` heredoc is rewritten before bash sees it,
+silently truncating the fixture.
+
+| Test | Scenario |
+|------|----------|
+| write_bats_stanzas writes count real @test stanzas + shebang | core: 3 stanzas + shebang, grep-able |
+| write_bats_stanzas count=0 yields shebang only, zero @test | edge: empty fixture |
 
 ### test/smoke/check_test_md_drift_spec.bats (9)
 

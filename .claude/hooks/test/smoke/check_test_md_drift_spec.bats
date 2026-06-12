@@ -52,14 +52,7 @@ mktemp_base_drift_repo() {
   local base_count="$1" repo
   repo="$(mktemp -d)"
   mkdir -p "${repo}/test/smoke" "${repo}/.base/test/smoke" "${repo}/doc/test"
-  {
-    printf '#!/usr/bin/env bats\n'
-    local i=0
-    while (( i < base_count )); do
-      printf '@test "t%d" { :; }\n' "${i}"
-      i=$((i + 1))
-    done
-  } > "${repo}/.base/test/smoke/script_help.bats"
+  write_bats_stanzas "${repo}/.base/test/smoke/script_help.bats" "${base_count}"
   echo "${repo}"
 }
 
