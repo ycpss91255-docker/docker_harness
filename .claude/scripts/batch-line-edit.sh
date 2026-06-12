@@ -84,6 +84,10 @@ main() {
   # has the exact line (no-op), non-zero on a real error.
   local mut
   mut="$(mktemp)"
+  # The single-quoted printf formats below intentionally do NOT expand
+  # -- they emit literal shell ($1 / ${repo} / ${f}) into the generated
+  # mutation script that runs later in each repo.
+  # shellcheck disable=SC2016
   {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'

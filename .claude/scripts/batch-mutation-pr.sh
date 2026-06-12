@@ -256,6 +256,7 @@ process_one() {
   git push "${url}" "${branch}" || return 1
 
   local body
+  # shellcheck disable=SC2016  # backticks in single-quoted printf format are intentional literal markdown code spans
   body="$(printf '## Why\n\n%s\n\n## What\n\nApplied via `batch-mutation-pr.sh` with a caller-supplied mutation. See the linked tracking issue for the mutation logic.\n\n## Test plan\n\n- [x] CI green on this PR\n' "${why}")"
 
   local pr_url
