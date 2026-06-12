@@ -1,77 +1,45 @@
-Create a new Docker container repo under the ycpss91255-docker GitHub organization.
+Create a new Docker container repo under the ycpss91255-docker GitHub organization, bootstrapped from the `ycpss91255-docker/template` GitHub Template repo.
 
-**Scope: workspace cwd only.** This command creates `${CLAUDE_PROJECT_DIR}/<category>/<repo>/` (sibling to the existing 17 sub-repos) and updates `${CLAUDE_PROJECT_DIR}/org-profile/profile/README.md`. If running from a per-repo session, refuse and instruct the user to re-open Claude from the docker workspace root before running `/new-repo` again.
+**Scope: workspace cwd only.** This command creates a new repo under `${CLAUDE_PROJECT_DIR}/<repo>/` (sibling to the existing sub-repos) and updates `${CLAUDE_PROJECT_DIR}/org-profile/profile/README.md`. If running from a per-repo session, refuse and instruct the user to re-open Claude from the docker workspace root.
 
-Follow the standard workflow defined in CLAUDE.md. The user will specify the repo type and name.
+All downstream repos share one architecture: a `.base/` subtree pulled from `ycpss91255-docker/base`, driven by `just` recipes (`just build` / `run` / `exec` / `stop` / `setup` / `upgrade`). There is **no** env/agent/app type distinction — every repo is the same shape; per-repo differences live in `config/setup.conf`, the repo `Dockerfile`, and `test/smoke/`.
 
-Repo types:
-- **env**: ROS development environment (has `.base/` subtree)
-- **agent**: AI Agent with DinD (has `.base/` subtree, post_setup.sh, encrypt_env.sh)
-- **app**: Pre-compiled application runtime (has `.base/` subtree)
+The heavy lifting is done by the template repo's self-deleting `bootstrap.sh` (re-establishes the `.base/` subtree history, which a GitHub Template clone does not carry, then runs `init.sh` and removes itself). See `ycpss91255-docker/template` + ADR-00000010 for the rationale.
 
-All repos must use the same architecture (`.base/` subtree pulled from `ycpss91255-docker/base`).
+## Workflow
 
-Workflow:
-
-1. **Create directory**: `mkdir ${CLAUDE_PROJECT_DIR}/<category>/<repo_name>`
-
-2. **Add `.base/` subtree**:
+1. **Create the repo from the template + clone into the workspace**:
    ```
-   git subtree add --prefix=.base \
-       git@github.com:ycpss91255-docker/base.git <latest_tag> --squash
+   gh repo create ycpss91255-docker/<repo> \
+     --template ycpss91255-docker/template \
+     --private --description "<desc>" --clone
+   ```
+   Clone lands at `${CLAUDE_PROJECT_DIR}/<repo>/`. Set git identity if not inherited:
+   ```
+   git -C <repo> config user.name "<name>" && git -C <repo> config user.email "<email>"
    ```
 
-3. **Create all required files** using existing repos as templates:
-   - Dockerfile (multi-stage: bats-src, bats-extensions, lint-tools, sys, base, devel, test)
-   - compose.yaml (services: devel, test; optionally devel-gpu, runtime)
-   - script/entrypoint.sh (container-internal script)
-   - .env.example (IMAGE_NAME=<repo_name>)
-   - .hadolint.yaml (custom rules if needed, otherwise symlink to .base/)
-   - `.base/.version` is the version tracker (managed by the subtree pull / upgrade flow; no need to write a root-level file)
-   - .gitignore (.env, coverage/)
-   - test/smoke/<name>_env.bats (repo-specific smoke tests)
-   - .github/workflows/main.yaml (calls base's reusable workflows)
-   - README.md (English, root directory)
-   - doc/README.zh-TW.md + doc/README.zh-CN.md + doc/README.ja.md
-
-4. **Create symlinks**:
+2. **Bootstrap** (re-establish `.base/` subtree, run init, self-delete):
    ```
-   ln -sf .base/build.sh build.sh
-   ln -sf .base/run.sh run.sh
-   ln -sf .base/exec.sh exec.sh
-   ln -sf .base/stop.sh stop.sh
-   ln -sf .base/Makefile Makefile
+   cd <repo> && ./bootstrap.sh [<base-tag>]
    ```
+   - No argument -> bootstrap resolves the latest `base` `vX.Y.Z` tag automatically.
+   - Pass an explicit tag to pin (e.g. `./bootstrap.sh v0.41.0`).
+   - bootstrap removes the template-only files (`README.md` / `doc/` / `.github/` / `test/` placeholders), removes the snapshot `.base/`, re-adds it as a real subtree at the chosen tag, runs `./.base/init.sh` (regenerates Dockerfile / symlinks / config scaffolding), then `git rm bootstrap.sh` and commits. The repo is left on `main` with a clean subtree history; `just upgrade` works from here on.
 
-5. **Dockerfile smoke test COPY pattern**:
-   ```dockerfile
-   COPY .base/test/smoke/ /smoke_test/
-   COPY test/smoke/ /smoke_test/
+3. **Post-setup** (the steps the template cannot do for you):
+   - **Repo-specific content**: edit `config/setup.conf` (image name + build args), the repo `Dockerfile` (workload layers), and add `test/smoke/<name>_env.bats`. Use an existing downstream repo as reference.
+   - **Topic taxonomy**: open a PR in `ycpss91255-docker/.github` adding the repo to `topics.yaml` under `repos:` (tags from `allowed.*` only — the lint job rejects unknown tags). Do NOT `gh repo edit --add-topic` directly; `topics.yaml` is the single source of truth. After merge, run `script/sync-topics.sh --apply` from a `.github` checkout. The weekly drift cron fails if skipped.
+   - **Branch protection**: enable required status checks + PR-before-merge via `gh api` (match the settings of an existing org repo).
+   - **Org profile README**: add the new repo to `${CLAUDE_PROJECT_DIR}/org-profile/profile/README.md`.
+
+4. **Verify locally**:
    ```
-   Note: For headless apps (no GUI), selectively COPY only script_help.bats + test_helper.bash from `.base/` (skip display_env.bats).
-
-   Note: Docker COPY does not follow symlinks. Lint COPY must reference .base/ directly:
-   ```dockerfile
-   COPY .base/build.sh .base/run.sh .base/exec.sh .base/stop.sh /lint/
-   COPY script/entrypoint.sh /lint/
+   just build test
    ```
+   must pass (ShellCheck + Hadolint + Bats), same gate CI runs.
 
-6. **Verify locally**: `./build.sh test` must pass (ShellCheck + Hadolint + Bats)
-
-7. **Create GitHub repo and push**:
-   ```
-   gh repo create ycpss91255-docker/<repo_name> --public --description "<desc>"
-   git remote add origin git@github.com:ycpss91255-docker/<repo_name>.git
-   git push -u origin main
-   ```
-
-8. **Add to org topic taxonomy**: open a PR in `ycpss91255-docker/.github` that adds the new repo to `topics.yaml` under `repos:`. Pick tags from `allowed.*` only (the lint job will reject unknown tags). Do NOT call `gh repo edit --add-topic` directly — `topics.yaml` is the single source of truth, and after the PR merges run `script/sync-topics.sh --apply` from a `.github` checkout to push the topics live. The weekly drift cron will fail on Monday if this step is skipped.
-
-9. **Enable branch protection**
-
-10. **Update org profile README** at `${CLAUDE_PROJECT_DIR}/org-profile/profile/README.md`
-
-NOTE: All code changes must go through PR workflow (/pr).
+NOTE: After bootstrap, all further code changes go through the PR workflow (`/pr`). Container ops use `just` recipes first; the `script/*.sh` wrappers are the fallback when `just` is unavailable.
 
 Context from user: $ARGUMENTS
 

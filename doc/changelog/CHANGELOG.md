@@ -67,6 +67,20 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Empty descriptions (`rebase-pr` / `semver-bump`) and the worst
   offender (`setup-matt-pocock-skills`, 438) were already handled by
   #178 and #185.
+- **`/new-repo` rewritten to a template-based 4-step flow
+  (closes #151).** The old 10-step manual workflow (manual
+  `git subtree add`, hardwired `ln -sf .base/build.sh` symlinks,
+  `make upgrade` refs, env/agent/app repo-type classification) is
+  replaced by: `gh repo create --template ycpss91255-docker/template`
+  -> `./bootstrap.sh [<base-tag>]` (the template's self-deleting
+  script re-establishes the `.base/` subtree history a Template
+  clone cannot carry, runs `init.sh`, then removes itself) ->
+  post-setup (topics.yaml / branch protection / org profile README)
+  -> `just build test`. The env/agent/app distinction is dropped
+  (all downstream repos share one architecture). The
+  `ycpss91255-docker/template` GitHub Template repo + its
+  `bootstrap.sh` already exist; this change is the docker_harness-side
+  skill rewrite only.
 
 ### Removed
 - **`remind_subtree_init.sh` deleted as redundant (closes #182).** The
