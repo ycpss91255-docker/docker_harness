@@ -28,6 +28,16 @@
 #   7. `gh pr review --body "<long>"` (same threshold as rule 2)
 #   8. `--body "$(cat ...)"` or `--body-file - <<EOF` heredoc on any gh
 #      subcommand -- both trigger Claude bash AST parser fallback
+#  10. (#196 Check A) `gh pr create` whose --body-file closes an issue
+#      (`closes|fixes|resolves #N`) but lacks a `## Resolution` /
+#      `## Decision` heading. The PR body is the canonical decision
+#      record. Fails open if the body-file is unreadable.
+#  11. (#196 Check B) `gh issue close N` when the issue has no comment
+#      carrying a `## Resolution` / `## Decision` heading (queried via
+#      `gh issue view N --json comments`). Manual closes need the
+#      record on the issue itself since there is no PR body. Fails
+#      open if gh is unreachable. PR-merge auto-close does not run
+#      `gh issue close`, so PR-closed issues are unaffected.
 #
 # Threshold: SHORT_LIMIT = 80 chars, single line. Decided in #64
 # discussion to keep the rule uniform across review / comment / trivial-
@@ -76,6 +86,28 @@ has_real_body_file() {
   if [[ "${cmd}" =~ --body-file=([^[:space:]]+) ]]; then
     [[ "${BASH_REMATCH[1]}" != "-" ]]
     return $?
+  fi
+  return 1
+}
+
+# Decision-record marker (refs #196): a closing PR body or a manual
+# issue-close comment must carry one of these section headings.
+readonly DECISION_MARKER_RE='^## (Resolution|Decision)'
+readonly CLOSING_KEYWORD_RE='(closes|fixes|resolves)[: ]+#[0-9]+'
+
+# body_file_path <cmd> — echo the --body-file path (space or = form);
+# empty if none or stdin (`-`).
+body_file_path() {
+  local cmd="$1"
+  if [[ "${cmd}" =~ --body-file[[:space:]]+([^[:space:]]+) ]]; then
+    [[ "${BASH_REMATCH[1]}" == "-" ]] && return 1
+    printf '%s' "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  if [[ "${cmd}" =~ --body-file=([^[:space:]]+) ]]; then
+    [[ "${BASH_REMATCH[1]}" == "-" ]] && return 1
+    printf '%s' "${BASH_REMATCH[1]}"
+    return 0
   fi
   return 1
 }
@@ -178,12 +210,45 @@ main() {
         deny "gh issue create needs --label <name> (Rule 9 of #91). Map the title type prefix to a stock GitHub label per .claude/skills/gh-artifact-format/SKILL.md Section 6: feat/refactor/chore/track -> enhancement, fix -> bug, docs -> documentation. Example: gh issue create ... --body-file /tmp/x.md --label enhancement"
         return 0
       fi
+      # #196 Check A: a PR that closes an issue must record the
+      # decision / resolution in its body. Read the body-file; if it
+      # carries a closing keyword but no `## Resolution` / `## Decision`
+      # heading, deny. Fail open if the file is unreadable (do not block
+      # on a transient path issue). PRs that do not close anything are
+      # unaffected (future-only behaviour).
+      if [[ "${subcmd}" == "pr create" ]]; then
+        local bf
+        if bf="$(body_file_path "${cmd}")" && [[ -r "${bf}" ]]; then
+          if grep -qiE "${CLOSING_KEYWORD_RE}" "${bf}" \
+             && ! grep -qE "${DECISION_MARKER_RE}" "${bf}"; then
+            deny "This PR closes an issue but its body records no decision / resolution. Add a \`## Resolution\` or \`## Decision\` section to ${bf} stating what was decided and how it was resolved, then re-run. The PR body is the canonical decision record for PR-closed issues (refs #196)."
+            return 0
+          fi
+        fi
+      fi
       return 0
       ;;
     "issue close")
       if printf '%s' "${cmd}" | grep -qE -e '(--comment|-c)([[:space:]]+|=)'; then
         deny "gh issue close --comment is denied. Use two-step close: gh issue comment N --body-file X (or short --body \"<le 80 chars>\"), then gh issue close N [--reason completed|not\\ planned]. Rule 3 of #64."
         return 0
+      fi
+      # #196 Check B: a manual issue close (no PR) must be preceded by
+      # a decision / resolution comment carrying a `## Resolution` or
+      # `## Decision` heading. Query the issue's comments; deny if none
+      # carries the marker. Fail open if gh errors (network / not
+      # installed) -- never block a close on a transient gh failure.
+      # PR-merge auto-close does NOT run `gh issue close`, so PR-closed
+      # issues are unaffected (the PR body is their decision record).
+      if [[ "${cmd}" =~ gh[[:space:]]+issue[[:space:]]+close[[:space:]]+([0-9]+) ]]; then
+        local close_num="${BASH_REMATCH[1]}"
+        local issue_comments
+        if issue_comments="$(gh issue view "${close_num}" --json comments --jq '.comments[].body' 2>/dev/null)"; then
+          if ! printf '%s' "${issue_comments}" | grep -qE "${DECISION_MARKER_RE}"; then
+            deny "Manual close of #${close_num} needs a decision / resolution comment first. Write the record to /tmp/issue-${close_num}-close.md with a \`## Resolution\` or \`## Decision\` section, then: gh issue comment ${close_num} --body-file /tmp/issue-${close_num}-close.md && gh issue close ${close_num}. The issue itself must carry the decision record when there is no closing PR (refs #196)."
+            return 0
+          fi
+        fi
       fi
       return 0
       ;;

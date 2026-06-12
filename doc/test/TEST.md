@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **911 tests** (908 smoke + 3 integration) plus shellcheck (38 hook
+Total: **921 tests** (918 smoke + 3 integration) plus shellcheck (38 hook
 scripts + 30 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -326,7 +326,7 @@ exempt from `--body-file` scanning.
 | silent when Dockerfile.test-tools has no final-stage apk add | no final apk → SILENT |
 | handles empty smoke step gracefully | YAML run block empty → no crash |
 
-### test/smoke/enforce_gh_body_file_spec.bats (41)
+### test/smoke/enforce_gh_body_file_spec.bats (51)
 
 Covers `.claude/hooks/enforce_gh_body_file.sh` -- the PreToolUse hook
 that BLOCKS gh routing violations from issue #64. Renamed + upgraded
@@ -377,6 +377,16 @@ threshold for short inline bodies.
 | silent on non-Bash tool_input shape (e.g. Edit) | wrong tool → SILENT |
 | rule 2: gh issue comment --body "<exactly 80 chars>" allowed | boundary lower side → SILENT |
 | rule 2: gh issue comment --body "<81 chars>" denied | boundary upper side → DENY |
+| #196 A: pr create closing #N without decision record denied | closing PR needs ## Resolution/Decision (issue #196) |
+| #196 A: pr create closing #N WITH ## Resolution allowed | marker present → SILENT |
+| #196 A: pr create closing #N WITH ## Decision allowed | Decision marker equivalent |
+| #196 A: pr create NOT closing any issue needs no decision record | non-closing PR unaffected |
+| #196 A: pr create with unreadable body-file fails open (silent) | fail-open on missing file |
+| #196 B: issue close with no marker comment denied | manual close needs marker comment |
+| #196 B: issue close WITH ## Resolution comment allowed | marker comment present → SILENT |
+| #196 B: issue close WITH ## Decision comment allowed | Decision marker equivalent |
+| #196 B: issue close fails open when gh errors (network) | fail-open on gh failure |
+| #196 B: issue close N --reason still passes Check B with marker comment | reason flag + marker → SILENT |
 
 ### test/smoke/wait_pr_ci_spec.bats (32)
 

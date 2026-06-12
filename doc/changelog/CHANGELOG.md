@@ -7,6 +7,22 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **`enforce_gh_body_file.sh` enforces a decision record on issue
+  close (closes #196).** Two new checks make the decision/resolution
+  of a closed issue discoverable without spelunking. **Check A**: a
+  `gh pr create` whose `--body-file` closes an issue
+  (`closes`/`fixes`/`resolves #N`) is denied unless the body carries
+  a `## Resolution` or `## Decision` heading -- the PR body is the
+  canonical record. **Check B**: a manual `gh issue close N` is denied
+  unless the issue already has a comment carrying that marker
+  (queried via `gh issue view`); PR-merge auto-close is unaffected
+  since it does not run `gh issue close`. Both checks fail open if the
+  body-file is unreadable / gh is unreachable, so transient issues
+  never block work. Future-only (existing closed issues are not
+  backfilled -- their PR bodies already hold the decisions). 10 new
+  spec cases; `gh-artifact-format` SKILL.md documents the rule and the
+  Trivial-tier consequence (short closes now need a structured
+  `--body-file`, not inline `--body`).
 - **Vendor-in 11 Matt Pocock skills (closes #185).** `.agents/skills/`
   + `skills-lock.json` + 11 `.claude/skills/<name>` symlinks are now
   tracked in git, so fresh clones receive the full skill set without
