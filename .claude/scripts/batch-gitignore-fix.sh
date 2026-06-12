@@ -42,7 +42,7 @@ readonly DEFAULT_REPOS=(
   agent/claude_code
   agent/codex_cli
   agent/gemini_cli
-  app/realsense_humble
+  app/realsense_ros2
   app/realsense_noetic
   app/ros1_bridge
   app/sick_humble

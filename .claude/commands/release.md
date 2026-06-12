@@ -18,7 +18,7 @@ Parse the argument for both VERSION and TARGET:
 - **Target repo(s)**:
   - `env` — ros_distro, ros2_distro
   - `agent` — ai_agent, claude_code, gemini_cli, codex_cli
-  - `app` — ros1_bridge, urg_node_humble, urg_node_noetic, realsense_humble, realsense_noetic, sick_humble, sick_noetic
+  - `app` — ros1_bridge, urg_node_humble, urg_node_noetic, realsense_ros2, realsense_noetic, sick_humble, sick_noetic
   - `base` — base repo (its own `.version` line, separate from the rest)
   - Or specify individual repos
 
