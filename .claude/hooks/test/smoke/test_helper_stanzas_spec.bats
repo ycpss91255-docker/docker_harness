@@ -28,3 +28,15 @@ teardown() {
   grep -q '^@test "t0" { :; }$' "${f}" || { echo "missing t0 stanza"; cat "${f}"; return 1; }
   grep -q '^@test "t2" { :; }$' "${f}" || { echo "missing t2 stanza"; cat "${f}"; return 1; }
 }
+
+@test "write_bats_stanzas count=0 yields shebang only, zero @test" {
+  local f="${TMP}/empty.bats"
+  write_bats_stanzas "${f}" 0
+  [[ -f "${f}" ]] || { echo "file not created"; return 1; }
+  local lines
+  lines="$(wc -l < "${f}")"
+  [[ "${lines}" == "1" ]] || { echo "want 1 line (shebang), got ${lines}"; cat "${f}"; return 1; }
+  local n
+  n="$(grep -c '^@test' "${f}" || true)"
+  [[ "${n}" == "0" ]] || { echo "want 0 @test, got ${n}"; cat "${f}"; return 1; }
+}
