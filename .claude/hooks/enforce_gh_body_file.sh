@@ -223,6 +223,23 @@ main() {
         deny "gh issue close --comment is denied. Use two-step close: gh issue comment N --body-file X (or short --body \"<le 80 chars>\"), then gh issue close N [--reason completed|not\\ planned]. Rule 3 of #64."
         return 0
       fi
+      # #196 Check B: a manual issue close (no PR) must be preceded by
+      # a decision / resolution comment carrying a `## Resolution` or
+      # `## Decision` heading. Query the issue's comments; deny if none
+      # carries the marker. Fail open if gh errors (network / not
+      # installed) -- never block a close on a transient gh failure.
+      # PR-merge auto-close does NOT run `gh issue close`, so PR-closed
+      # issues are unaffected (the PR body is their decision record).
+      if [[ "${cmd}" =~ gh[[:space:]]+issue[[:space:]]+close[[:space:]]+([0-9]+) ]]; then
+        local close_num="${BASH_REMATCH[1]}"
+        local issue_comments
+        if issue_comments="$(gh issue view "${close_num}" --json comments --jq '.comments[].body' 2>/dev/null)"; then
+          if ! printf '%s' "${issue_comments}" | grep -qE "${DECISION_MARKER_RE}"; then
+            deny "Manual close of #${close_num} needs a decision / resolution comment first. Write the record to /tmp/issue-${close_num}-close.md with a \`## Resolution\` or \`## Decision\` section, then: gh issue comment ${close_num} --body-file /tmp/issue-${close_num}-close.md && gh issue close ${close_num}. The issue itself must carry the decision record when there is no closing PR (refs #196)."
+            return 0
+          fi
+        fi
+      fi
       return 0
       ;;
     "pr edit")
