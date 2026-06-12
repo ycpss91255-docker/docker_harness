@@ -1,6 +1,6 @@
 ---
 name: skillification-candidates
-description: At task wrap-up, surface candidates that should be promoted into a `.claude/scripts/<name>.sh` / slash command / skill instead of being retyped next session. Use this when the `remind_skillification_candidates.sh` Stop hook nudges, or whenever you finish a multi-step task and noticed something that you (or a future agent) will redo soon.
+description: At task wrap-up, surface candidates to promote into a `.claude/scripts/<name>.sh` / slash command / skill instead of retyping. Use when the `remind_skillification_candidates.sh` Stop hook nudges, or after a task with something you'll redo soon.
 ---
 
 # skillification-candidates

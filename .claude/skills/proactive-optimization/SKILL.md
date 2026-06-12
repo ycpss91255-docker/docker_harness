@@ -1,6 +1,6 @@
 ---
 name: proactive-optimization
-description: When a task wraps up at a boundary, surface optimisation candidates -- workflow ergonomics, cross-repo inconsistency, doc drift, repeated manual steps. Use this skill when the `remind_proactive_optimization.sh` Stop hook nudges, or whenever you're about to declare a task done and have spotted something worth proposing.
+description: At a task boundary, surface optimisation candidates -- workflow ergonomics, cross-repo inconsistency, doc drift, repeated manual steps. Use when the `remind_proactive_optimization.sh` Stop hook nudges, or just before declaring a task done.
 ---
 
 # proactive-optimization
