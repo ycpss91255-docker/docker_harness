@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **921 tests** (918 smoke + 3 integration) plus shellcheck (38 hook
+Total: **932 tests** (929 smoke + 3 integration) plus shellcheck (39 hook
 scripts + 30 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -261,6 +261,30 @@ sleep-polling. Refs #154.
 | silent on gh workflow view | inspecting only → SILENT |
 | silent on unrelated command | `echo hello` → SILENT |
 | silent on empty command | empty input → SILENT |
+
+### test/smoke/remind_monitor_on_git_push_spec.bats (11)
+
+Covers `.claude/hooks/remind_monitor_on_git_push.sh` — PreToolUse on
+Bash matcher. Completes the CI-watch umbrella (#157): fires when a
+`git push` re-pushes / force-pushes an existing PR branch (CI re-runs
+on the new head, no `gh pr create` event covers it), reminding to
+re-invoke `/wait-pr-ci` on the same PR. Silent on initial `-u` pushes
+(the following `gh pr create` reminder covers them), main pushes
+(doc-only), and tag pushes (owned by `enforce_semver_tag_via_script`).
+
+| Test | Scenario |
+|------|----------|
+| fires on git push --force-with-lease | rebase re-push → FIRE |
+| silent on git push -u origin feat/x (initial push) | initial push, gh pr create covers → SILENT |
+| silent on git push --set-upstream origin feat/x | long-form -u → SILENT |
+| silent on git push origin main (doc-only direct) | main target → SILENT |
+| fires on plain git push (re-push to existing upstream) | bare re-push → FIRE |
+| fires on git push origin feat/x without -u (re-push) | branch re-push → FIRE |
+| fires on git -C <dir> push --force-with-lease | -C global flag form → FIRE |
+| silent on version-tag push (git push origin vX.Y.Z) | tag push, semver hook owns → SILENT |
+| silent on non-push git command (git status) | non-push git → SILENT |
+| silent on non-git command (ls) | non-git → SILENT |
+| silent on bulk tag push variant | --tags bulk → SILENT |
 
 ### test/smoke/remind_tdd_categories_spec.bats (12)
 | Test | Scenario |
