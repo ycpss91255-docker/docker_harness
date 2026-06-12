@@ -30,6 +30,7 @@ stub_gh_view_comments() {
     printf 'exit 0\n'
   } > "${GH_STUB_DIR}/gh"
   chmod +x "${GH_STUB_DIR}/gh"
+  export PATH="${GH_STUB_DIR}:${PATH}"
 }
 
 # stub_gh_fail — install a `gh` shim that exits non-zero (network
@@ -37,6 +38,7 @@ stub_gh_view_comments() {
 stub_gh_fail() {
   printf '#!/usr/bin/env bash\nexit 1\n' > "${GH_STUB_DIR}/gh"
   chmod +x "${GH_STUB_DIR}/gh"
+  export PATH="${GH_STUB_DIR}:${PATH}"
 }
 
 # Rule 8 -- parser-fallback patterns deny everywhere.
@@ -308,5 +310,35 @@ stub_gh_fail() {
 
 @test "#196 A: pr create with unreadable body-file fails open (silent)" {
   run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh pr create --title T --body-file ${TMP}/does-not-exist.md\"}}"
+  assert_silent
+}
+
+@test "#196 B: issue close with no marker comment denied" {
+  stub_gh_view_comments "Just a +1 comment" "another note"
+  run "$(hook enforce_gh_body_file.sh)" <<< '{"tool_input":{"command":"gh issue close 5"}}'
+  assert_permission_decision "deny"
+}
+
+@test "#196 B: issue close WITH ## Resolution comment allowed" {
+  stub_gh_view_comments "## Resolution"$'\n'"Closed by PR #9."
+  run "$(hook enforce_gh_body_file.sh)" <<< '{"tool_input":{"command":"gh issue close 5"}}'
+  assert_silent
+}
+
+@test "#196 B: issue close WITH ## Decision comment allowed" {
+  stub_gh_view_comments "## Decision"$'\n'"Went with X."
+  run "$(hook enforce_gh_body_file.sh)" <<< '{"tool_input":{"command":"gh issue close 5"}}'
+  assert_silent
+}
+
+@test "#196 B: issue close fails open when gh errors (network)" {
+  stub_gh_fail
+  run "$(hook enforce_gh_body_file.sh)" <<< '{"tool_input":{"command":"gh issue close 5"}}'
+  assert_silent
+}
+
+@test "#196 B: issue close N --reason still passes Check B with marker comment" {
+  stub_gh_view_comments "## Resolution"$'\n'"done"
+  run "$(hook enforce_gh_body_file.sh)" <<< '{"tool_input":{"command":"gh issue close 5 --reason completed"}}'
   assert_silent
 }
