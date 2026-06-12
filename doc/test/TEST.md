@@ -15,8 +15,8 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **942 tests** (939 smoke + 3 integration) plus shellcheck (40 hook
-scripts + 30 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
+Total: **958 tests** (955 smoke + 3 integration) plus shellcheck (40 hook
+scripts + 32 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
 CLAUDE.md) plus a CLAUDE.md ceiling audit (`make ceiling-check`
@@ -826,6 +826,45 @@ without network.
 | --expect matches all → exit 0 | release-verify happy path |
 | --expect mismatch → exit 1 | release-verify partial-rollout failure |
 | --skip removes listed repo from default iteration | exclusion filter |
+
+### test/smoke/batch_mutation_pr_spec.bats (12)
+
+Covers `.claude/scripts/batch-mutation-pr.sh` (refs #169) — the generic
+cross-repo fanout engine. Tests the deterministic surface (arg
+validation + `--dry-run` plan); real worktree/push/PR is not exercised
+(mirrors `batch_gitignore_add_line_spec`). The engine runs a
+caller-supplied `--mutation <script>` per repo (exit 0 = changed,
+3 = no-op, other = error) and owns the worktree → commit → push → PR
+plumbing.
+
+| Test | Scenario |
+|------|----------|
+| --help prints usage and exits 0 | help path |
+| missing --mutation exits 2 | required arg |
+| non-executable --mutation exits 2 | executable precondition |
+| missing --pr-title exits 2 | required arg |
+| missing --why-file and --why exits 2 | required arg |
+| invalid --commit-type exits 2 | enum validation (fix/feat/chore) |
+| unknown arg exits 2 | arg validation |
+| --dry-run prints a plan line per repo without mutating | dry-run plan |
+| --skip excludes a repo in dry-run | repo-set filtering |
+| branch derives from --commit-type + --pr-title slug | branch derivation |
+| explicit --branch overrides the derived slug | branch override |
+| valid --commit-type fix accepted in dry-run | enum positive |
+
+### test/smoke/batch_line_edit_spec.bats (4)
+
+Covers `.claude/scripts/batch-line-edit.sh` (refs #169) — the first
+preset over the engine: append a line to a file across repos if absent.
+It generates an append-line-if-missing mutation (idempotent: exit 3 if
+the line is already present) and delegates to `batch-mutation-pr.sh`.
+
+| Test | Scenario |
+|------|----------|
+| --help prints usage and exits 0 | help path |
+| missing --file exits 2 | required arg |
+| missing --line exits 2 | required arg |
+| --dry-run delegates to the engine (shows repos + plan) | delegation |
 
 ### test/smoke/batch_gitignore_add_line_spec.bats (7)
 
