@@ -37,25 +37,26 @@ source "${SCRIPT_DIR}/lib/log.sh"
 readonly ORG="ycpss91255-docker"
 
 readonly DEFAULT_REPOS=(
-  # NOTE: 11 downstream repos parked pending follow-up.
+  # NOTE: 10 downstream repos parked pending follow-up.
   #   - 4 agent repos: archive pending (no concrete container plan)
   #   - 3 app repos (ros1_bridge, sick_humble, sick_noetic): archive pending
   #     (functionally covered by env/ros_distro + env/ros2_distro)
-  #   - 4 sensor repos (urg_node_humble/noetic, realsense_humble/noetic):
-  #     pending template->base subtree migration + repo rename to
-  #     urg_node_ros{,2} / realsense_ros{,2}
+  #   - 3 sensor repos still parked (urg_node_humble/noetic,
+  #     realsense_noetic): pending template->base subtree migration +
+  #     repo rename to urg_node_ros{,2} / realsense_ros.
+  #     realsense_humble migrated + renamed -> realsense_ros2 (active below).
   # Uncomment a repo's line once its prerequisite work merges.
   # agent/ai_agent
   # agent/claude_code
   # agent/codex_cli
   # agent/gemini_cli
-  # app/realsense_humble
   # app/realsense_noetic
   # app/ros1_bridge
   # app/sick_humble
   # app/sick_noetic
   # app/urg_node_humble
   # app/urg_node_noetic
+  app/realsense_ros2
   env/ros2_distro
   env/ros_distro
   template
