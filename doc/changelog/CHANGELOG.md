@@ -53,6 +53,18 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   to follow once N>=5 anomalous events have been classified.
 
 ### Changed
+- **Extracted `write_bats_stanzas` test helper (closes #166).** The
+  `@test`-stanza-writing loop that two fixture factories
+  (`mktemp_test_md_repo`, `mktemp_base_drift_repo`) hand-rolled is
+  now a single `write_bats_stanzas <file> <count>` helper in
+  `test_helper.bash`, carrying a one-paragraph comment documenting
+  the bats preprocessor heredoc trap (literal `@test` at column 0
+  inside a `<<'EOF'` heredoc is rewritten before bash sees it,
+  silently truncating the fixture -- the trap that produced
+  `((: 0 0: syntax error` in #156). 2 new helper smoke tests added.
+  TEST.md total also reconciled 899 -> 911 (the 908 smoke + 3
+  integration reflects actual `@test` counts; the prior 899 had
+  drifted ~10 below reality across intervening PRs).
 - **Trimmed 4 native SKILL.md `description:` fields under ~250 chars
   (closes #173).** A skill manifest's `description` ships in the
   system prompt every turn, so verbose descriptions are a recurring
