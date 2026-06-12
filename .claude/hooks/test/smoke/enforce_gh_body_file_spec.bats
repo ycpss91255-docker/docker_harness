@@ -2,6 +2,43 @@
 
 load '../lib/test_helper'
 
+setup() {
+  TMP="$(mktemp -d)"
+  GH_STUB_DIR="${TMP}/bin"
+  mkdir -p "${GH_STUB_DIR}"
+}
+
+teardown() {
+  rm -rf "${TMP}"
+}
+
+# stub_gh_view_comments <body...> — install a `gh` shim whose
+# `gh issue view ... --json comments` prints the given comment
+# bodies (one per arg, newline-joined). Any other gh subcommand
+# exits 0 with no output. Used for Check B (refs #196).
+stub_gh_view_comments() {
+  local out=""
+  local b
+  for b in "$@"; do
+    out+="${b}"$'\n'
+  done
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'if [[ "$*" == *"issue view"* ]]; then\n'
+    printf '  cat <<'\''BODYEOF'\''\n%sBODYEOF\n' "${out}"
+    printf 'fi\n'
+    printf 'exit 0\n'
+  } > "${GH_STUB_DIR}/gh"
+  chmod +x "${GH_STUB_DIR}/gh"
+}
+
+# stub_gh_fail — install a `gh` shim that exits non-zero (network
+# failure simulation for the Check B fail-open path).
+stub_gh_fail() {
+  printf '#!/usr/bin/env bash\nexit 1\n' > "${GH_STUB_DIR}/gh"
+  chmod +x "${GH_STUB_DIR}/gh"
+}
+
 # Rule 8 -- parser-fallback patterns deny everywhere.
 
 @test "rule 8: gh issue close --comment \"\$(cat path)\" denied" {
@@ -233,5 +270,17 @@ load '../lib/test_helper'
   local body81="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   # body81 = 81 'a' chars (boundary upper, just over)
   run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh issue comment 1 --body \\\"${body81}\\\"\"}}"
+  assert_permission_decision "deny"
+}
+
+# Decision-record enforcement (refs #196).
+# Check A: a PR whose body-file closes #N must carry a ## Resolution
+# or ## Decision section. Check B: a manual `gh issue close N` needs
+# an existing comment carrying that marker.
+
+@test "#196 A: pr create closing #N without decision record denied" {
+  local bf="${TMP}/body.md"
+  printf '## Summary\n\nDid a thing.\n\nCloses #5\n' > "${bf}"
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh pr create --title T --body-file ${bf}\"}}"
   assert_permission_decision "deny"
 }
