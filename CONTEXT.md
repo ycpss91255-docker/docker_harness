@@ -96,6 +96,8 @@ docker/
     │   ├── batch-base-pr-body.template.md   # 對應 PR body 模板（envsubst 格式;renamed from batch-template-pr-body.template.md in #146）
     │   ├── batch-gitignore-fix.sh           # 一次性 .gitignore `.claude/` -> `.claude` 17 repo fanout（PR #21）
     │   ├── batch-gitignore-add-line.sh      # 通用 .gitignore 追加任意行的 17 repo fanout（PR #23）
+    │   ├── batch-mutation-pr.sh             # 通用跨 repo fanout 引擎：--mutation <script> 套到每個 repo,worktree->mutate->commit->push->PR;取代 one-shot batch-*.sh sprawl(refs #169,配 [[batch-mutation-pr]] skill)
+    │   ├── batch-line-edit.sh               # batch-mutation-pr 的第一個 preset:--file/--line 跨 repo append-line-if-missing,delegate 給引擎(refs #169)
     │   ├── batch-pr-merge.sh                # 批次 squash-merge 多個 <repo>:<pr>（接 short / full repo 名都可）
     │   ├── batch-pr-close.sh                # 批次 close 多個 <repo>:<pr>，--reason 必填（superseded-by 場景，例如 hotfix 後重 fanout 取代既有批次 PR）
     │   ├── check-template-versions.sh       # HTTPS curl 13 repo `.base/.version` 對齊檢查（release 後驗證）

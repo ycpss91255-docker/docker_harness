@@ -7,6 +7,22 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **`batch-mutation-pr.sh` generic fanout engine + `batch-line-edit`
+  preset (closes #169).** The 10+ historical one-shot `batch-*.sh` /
+  `fix-*.sh` / `migrate-*.sh` scripts all repeat identical plumbing
+  (per repo: fetch main → branch → mutate → commit → push → open PR)
+  and differ only in a 5-10 line mutate step. That plumbing is now
+  `batch-mutation-pr.sh`, which takes a caller-supplied
+  `--mutation <script>` (exit 0 = changed → PR; 3 = no-op → skip;
+  other = error) and owns the rest, with `--pr-title` / `--why[-file]`
+  / `--commit-type` / `--branch` / `--only` / `--skip` / `--dry-run` /
+  `--continue-on-error`. `batch-line-edit.sh` is the first preset
+  (append-line-if-missing across repos, idempotent). New
+  `[[batch-mutation-pr]]` skill documents the mutation contract and
+  the "evaluate the engine before writing a new batch-*.sh" norm
+  (also added to the `batch-via-script` instinct). 16 new spec cases.
+  Existing one-shot scripts are not retroactively rewritten
+  (out of scope per the issue).
 - **`enforce_local_full_ci_before_pr.sh` gates PR open on local CI
   (closes #176).** Two PRs in the base v0.40.0 release reached PR-open
   with code GH CI then rejected, each forcing a rebase + force-push +
