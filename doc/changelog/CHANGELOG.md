@@ -7,6 +7,22 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **`enforce_local_full_ci_before_pr.sh` gates PR open on local CI
+  (closes #176).** Two PRs in the base v0.40.0 release reached PR-open
+  with code GH CI then rejected, each forcing a rebase + force-push +
+  full re-run cycle. This new blocking PreToolUse hook denies
+  `gh pr create` / `gh pr ready` unless local CI passed on HEAD --
+  proven by a `.claude/state/local-ci-pass/<sha>.ok` marker that
+  `make -C .claude/test test` now writes on green. To avoid
+  false-blocks on the common "ran tests green, then committed a
+  CHANGELOG / TEST.md bump" flow, the hook allows the PR when every
+  path changed since the last green marker is documentation
+  (`doc/`, `*.md`, `CHANGELOG*`, `TEST.md`, `README*`). Escape hatch:
+  `LOCAL_CI_ACK=<HEAD-sha> gh pr create ...` for the exact HEAD. Fails
+  safe (silent) outside a git repo. `.claude/state/` is gitignored
+  (machine-local). 10 new spec cases; `/verify` skill documents the
+  gate. (CLAUDE.md「變更完成 checklist」mention deferred — needs
+  separate user ack per the no-CLAUDE.md-edit-in-sandbox rule.)
 - **`remind_monitor_on_git_push.sh` completes the CI-watch umbrella
   (closes #157).** A `git push` that re-pushes / force-pushes an
   existing PR branch re-runs CI on the new head, but no `gh pr create`

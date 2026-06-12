@@ -26,6 +26,11 @@ build:  ## Build the test docker image
 
 test: build  ## Run bats specs (smoke + integration) inside docker
 	docker run --rm $(IMAGE)
+	@# On green, write the local-CI marker for HEAD so
+	@# enforce_local_full_ci_before_pr.sh (refs #176) lets the PR open.
+	@# Runs only if the docker run above exited 0 (make stops on error).
+	@mkdir -p $(REPO_ROOT)/.claude/state/local-ci-pass && \
+	  touch $(REPO_ROOT)/.claude/state/local-ci-pass/$$(git -C $(REPO_ROOT) rev-parse HEAD).ok
 
 lint: build  ## Run shellcheck against all hook + helper scripts inside docker
 	docker run --rm --entrypoint sh $(IMAGE) -c \

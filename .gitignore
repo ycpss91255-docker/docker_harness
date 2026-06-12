@@ -30,6 +30,8 @@ org-profile/   # local checkout of ycpss91255-docker/.github (org profile)
 .claude/shell-snapshots/
 .claude/statsig/
 .claude/ide/
+# local-CI-pass markers (enforce_local_full_ci_before_pr, #176)
+.claude/state/
 
 # ── Editor / OS noise ────────────────────────────────────────────────────────
 .DS_Store

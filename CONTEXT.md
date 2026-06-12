@@ -156,6 +156,7 @@ docker/
     │   ├── enforce_make_first_upgrade.sh # 三個 surface (./.base/upgrade.sh / ./template/upgrade.sh / git subtree pull --prefix=.base|template) 前 BLOCK,改走 make -f Makefile.ci upgrade(checkpoint ack 可解,refs #36 / ADR-00000002)
     │   ├── enforce_batch_via_script.sh   # 跨 repo for-loop + mutation (git push|reset|tag|branch -D / gh issue|pr close|merge|comment --body) 前 BLOCK,改走 .claude/scripts/<name>.sh(checkpoint ack 可解,refs #121 / ADR-00000002)
     │   ├── enforce_worktree_for_branch.sh # 主 checkout 內 git checkout -b|-B 前 BLOCK,要求改走 git worktree add <path> -b <branch> main(內部 worktree 自動放行,checkpoint ack 可解,refs #122 / PR #89 / ADR-00000006)
+    │   ├── enforce_local_full_ci_before_pr.sh # gh pr create/ready 前 BLOCK：HEAD 無 local-CI marker(.claude/state/local-ci-pass/<sha>.ok,由 make -C .claude/test test 綠時寫)且非「綠後只動 doc」則 deny;LOCAL_CI_ACK=<sha> 可 override(refs #176)
     │   ├── check_prefer_dot_sh.sh       # docker build/run/exec/stop/compose 前：cwd 有對應 .sh wrapper 則 deny,沒有則 ask
     │   ├── remind_topics_yaml_on_new_repo.sh # gh repo create ycpss91255-docker/* 前提醒去 .github topics.yaml 加 repos.* 條目
     │   ├── auto_clean_worktree_leak.sh  # PreToolUse Bash：git pull / git checkout origin/* / git merge origin/* 前掃 main checkout 非 whitelist M(`.claude/instincts.yaml` + `.claude/memory/**`)→ 寫 cleaned event 到 ~/.claude/log/worktree-leak-events.jsonl + git checkout HEAD -- <files> 還原後放行；refs #167

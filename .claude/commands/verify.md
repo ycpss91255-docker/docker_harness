@@ -28,6 +28,18 @@ Each phase prints `### <phase>` header then its raw output. At the end, a `## Ve
 - `/doc-sync` is the broader 4-language README + emoji scan. `/verify` covers the mechanical CI subset (shellcheck / hadolint / bats / tree audit) plus TEST.md per-file drift; the two overlap on emoji + AI attribution scans but `/verify` only scans changed files vs `origin/main`, while `/doc-sync` walks every repo under the workspace.
 - `/pr` step 3 ("Verify locally") is exactly this — invoke `/verify` instead of running `make` manually.
 
+## Local-CI gate before PR (refs #176)
+
+`enforce_local_full_ci_before_pr.sh` BLOCKS `gh pr create` / `gh pr ready`
+unless local CI passed on the current HEAD. Running `make -C .claude/test test`
+to green writes the marker `.claude/state/local-ci-pass/<HEAD-sha>.ok`
+that satisfies the gate, so the canonical flow is: **verify green →
+commit → open PR**. Committing docs (CHANGELOG / TEST.md / `doc/**` /
+`*.md`) after the green run does NOT re-trigger the gate — the hook
+allows a PR when only documentation changed since the last marker. To
+skip the gate deliberately (accepting the GH-CI round-trip risk),
+override for the exact HEAD: `LOCAL_CI_ACK=<sha> gh pr create ...`.
+
 ## Exit-code contract
 
 The shell script `.claude/scripts/verify.sh` exits:

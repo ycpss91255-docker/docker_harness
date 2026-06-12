@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **932 tests** (929 smoke + 3 integration) plus shellcheck (39 hook
+Total: **942 tests** (939 smoke + 3 integration) plus shellcheck (40 hook
 scripts + 30 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -1125,6 +1125,29 @@ mutating commands pass through silently. Lift mechanism is the same
 | silent on empty command | empty-input guard |
 | allows same for-loop after ack file exists | ack-bypass |
 | ack for different command does NOT bypass deny | hash isolation |
+
+### test/smoke/enforce_local_full_ci_before_pr_spec.bats (10)
+
+Covers `.claude/hooks/enforce_local_full_ci_before_pr.sh` — BLOCKING
+PreToolUse hook that DENIES `gh pr create` / `gh pr ready` unless
+local CI passed on HEAD (a `.claude/state/local-ci-pass/<sha>.ok`
+marker exists, written by `make -C .claude/test test` on green) or
+only documentation changed since the last green. `LOCAL_CI_ACK=<sha>`
+overrides for the exact HEAD. Fails safe (silent) outside a git repo.
+Refs #176.
+
+| Test | Scenario |
+|------|----------|
+| denies gh pr create when HEAD has no local-ci marker | missing marker → DENY |
+| allows gh pr create when marker for exact HEAD exists | green marker → ALLOW |
+| silent on non-trigger gh pr view | non-trigger → SILENT |
+| allows when only CHANGELOG.md changed since the green marker | doc-only-since-green → ALLOW |
+| denies when a .sh file changed since the green marker | testable change → DENY |
+| allows with LOCAL_CI_ACK matching HEAD | override match → ALLOW |
+| denies with LOCAL_CI_ACK not matching HEAD | override mismatch → DENY |
+| gh pr ready also gated (no marker -> deny) | ready trigger → DENY |
+| silent (fail safe) when cwd is not a git repo | non-repo → SILENT |
+| allows when only doc/ + TEST.md changed since the green marker | multi-doc-only → ALLOW |
 
 ### test/smoke/enforce_worktree_for_branch_spec.bats (14)
 
