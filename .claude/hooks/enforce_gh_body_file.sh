@@ -28,6 +28,16 @@
 #   7. `gh pr review --body "<long>"` (same threshold as rule 2)
 #   8. `--body "$(cat ...)"` or `--body-file - <<EOF` heredoc on any gh
 #      subcommand -- both trigger Claude bash AST parser fallback
+#  10. (#196 Check A) `gh pr create` whose --body-file closes an issue
+#      (`closes|fixes|resolves #N`) but lacks a `## Resolution` /
+#      `## Decision` heading. The PR body is the canonical decision
+#      record. Fails open if the body-file is unreadable.
+#  11. (#196 Check B) `gh issue close N` when the issue has no comment
+#      carrying a `## Resolution` / `## Decision` heading (queried via
+#      `gh issue view N --json comments`). Manual closes need the
+#      record on the issue itself since there is no PR body. Fails
+#      open if gh is unreachable. PR-merge auto-close does not run
+#      `gh issue close`, so PR-closed issues are unaffected.
 #
 # Threshold: SHORT_LIMIT = 80 chars, single line. Decided in #64
 # discussion to keep the rule uniform across review / comment / trivial-

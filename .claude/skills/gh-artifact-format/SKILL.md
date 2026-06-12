@@ -75,9 +75,21 @@ Small issues (one-line bug, trivial doc tweak) may collapse Proposal into Proble
 
 Pick a tier based on the issue's history. The hook enforces two-step close (`gh issue comment N --body-file X && gh issue close N [--reason ...]`); the tier dictates how long X is.
 
+### Decision record is mandatory (refs #196)
+
+**The PR body is the canonical decision record.** A PR that closes an issue (`Closes`/`Fixes`/`Resolves #N` in its body) MUST contain a `## Resolution` or `## Decision` section stating what was decided and how it was resolved. `enforce_gh_body_file.sh` reads the `--body-file` content at `gh pr create` time and denies a closing PR that lacks the marker (Check A). It does not require a separate comment on the issue -- the merged PR's body is reachable from the issue via the "closed by PR #N" cross-reference.
+
+**A manual close (no PR) must carry the record on the issue itself.** Because there is no PR body, `gh issue close N` is denied unless the issue already has a comment containing a `## Resolution` or `## Decision` heading (Check B; the hook queries `gh issue view N --json comments` and fails open if gh is unreachable). Consequence for the **Trivial** tier below: even a one-line close reason must now live in a `--body-file` whose first line is `## Resolution` (the inline single-line `--body` form cannot carry the heading). Keep it short, just structured:
+
+```markdown
+## Resolution
+
+Repo description set via gh repo edit (no PR needed).
+```
+
 ### Trivial
 
-1-2 sentences, inline body OK (<= 80 chars, single line). Use when the issue closed without a PR or with one obvious commit. Skip the file; pass `--body "<short text>"` on the `gh issue comment` step.
+1-2 sentences. Since #196 the body must carry a `## Resolution` / `## Decision` heading (see above), so use a short `--body-file` rather than inline `--body`. Use when the issue closed without a PR or with one obvious commit.
 
 Example: closing #45 (set repo description) with `--body "Repo description set via gh repo edit (no PR needed)"`.
 
