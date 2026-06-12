@@ -106,6 +106,31 @@ mktemp_repo() {
   echo "${dir}"
 }
 
+# write_bats_stanzas <file> <count> — write a .bats fixture with <count>
+# trivial passing @test stanzas (t0..t<count-1>) to <file>.
+#
+# WHY printf instead of a heredoc: bats's preprocessor scans every line
+# of a spec for `@test` at column 0 and rewrites it into a
+# `bats_test_function` call BEFORE bash evaluates the surrounding
+# `<<'EOF'` heredoc. So embedding literal `@test` lines inside a heredoc
+# in a spec silently truncates the generated fixture (the `@test`
+# tokens never reach the heredoc body), and `grep -c '^@test'` on the
+# result returns 0. Building each stanza with printf keeps the literal
+# `@test` token off column 0 in the spec SOURCE, so the preprocessor
+# leaves it alone. Refs #156 (where this trap produced
+# `((: 0 0: syntax error`) and #166.
+write_bats_stanzas() {
+  local file="$1" count="$2"
+  {
+    printf '#!/usr/bin/env bats\n'
+    local i=0
+    while (( i < count )); do
+      printf '@test "t%d" { :; }\n' "${i}"
+      i=$((i + 1))
+    done
+  } > "${file}"
+}
+
 # mktemp_test_md_repo <bats_count> <claimed_count> — create a repo with
 # a single bats file holding <bats_count> @test and a TEST.md claiming
 # <claimed_count>. Echoes repo path.
