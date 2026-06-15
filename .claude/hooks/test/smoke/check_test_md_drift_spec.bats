@@ -101,3 +101,34 @@ mktemp_base_drift_repo() {
   assert_message_contains ".base/test/smoke/script_help.bats: TEST.md says 7, actual 3"
   rm -rf "${repo}"
 }
+
+# ---- pytest counting (refs #198) ----
+# A pytest file's count is its number of `def test_` function
+# definitions (top-level + class methods), NOT pytest-collected cases
+# (parametrize expands one def into many; the drift guard compares the
+# def-count on both sides, so it stays consistent).
+
+# write_pytest_defs <file> <count> — write a pytest module with <count>
+# top-level `def test_N` functions.
+write_pytest_defs() {
+  local file="$1" count="$2" i=0
+  {
+    printf 'import pytest\n\n'
+    while (( i < count )); do
+      printf 'def test_%d():\n    assert True\n\n' "${i}"
+      i=$((i + 1))
+    done
+  } > "${file}"
+}
+
+@test "fires when a pytest file's def test_ count drifts from TEST.md" {
+  local repo
+  repo="$(mktemp -d)"
+  mkdir -p "${repo}/test/unit" "${repo}/doc/test"
+  write_pytest_defs "${repo}/test/unit/widget_test.py" 3
+  printf '### test/unit/widget_test.py (5)\n' > "${repo}/doc/test/TEST.md"
+  run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/test/unit/widget_test.py\"}}"
+  assert_message_contains "TEST.md drift"
+  assert_message_contains "test/unit/widget_test.py: TEST.md says 5, actual 3"
+  rm -rf "${repo}"
+}
