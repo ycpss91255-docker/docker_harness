@@ -27,8 +27,18 @@ load '../lib/test_helper'
   assert_silent
 }
 
-@test "silent inside make -f Makefile.ci wrapper" {
+@test "silent inside make -f Makefile.ci wrapper (legacy, transition-tolerated)" {
   run "$(hook remind_docker_for_lint.sh)" <<< '{"tool_input":{"command":"make -f Makefile.ci lint"}}'
+  assert_silent
+}
+
+@test "silent inside just -f justfile.ci wrapper (base#573 make->just, #202)" {
+  run "$(hook remind_docker_for_lint.sh)" <<< '{"tool_input":{"command":"just -f justfile.ci lint"}}'
+  assert_silent
+}
+
+@test "silent inside just test wrapper (downstream container-ops)" {
+  run "$(hook remind_docker_for_lint.sh)" <<< '{"tool_input":{"command":"just test"}}'
   assert_silent
 }
 
