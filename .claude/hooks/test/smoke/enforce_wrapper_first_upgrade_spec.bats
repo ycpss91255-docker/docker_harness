@@ -2,7 +2,7 @@
 
 load '../lib/test_helper'
 
-# enforce_make_first_upgrade.sh -- PreToolUse Bash hook that DENIES direct
+# enforce_wrapper_first_upgrade.sh -- PreToolUse Bash hook that DENIES direct
 # `./.base/upgrade.sh` invocations when the repo has a `Makefile.ci` with an
 # `upgrade` target. Replaces the older remind_make_first_upgrade.sh remind
 # pattern with the `/tmp` checkpoint protocol (ADR-00000002 / #117) so the
@@ -62,7 +62,7 @@ ack_path_for() {
 # ---- positive: detect + deny + write checkpoint ----
 
 @test "denies ./.base/upgrade.sh and writes checkpoint markdown" {
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"./.base/upgrade.sh v0.18.2\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
   # Checkpoint markdown rendered at $TMPDIR/claude-checkpoint-enforce-make-first-upgrade-<session>-<hash>.md
@@ -76,19 +76,19 @@ ack_path_for() {
 }
 
 @test "denies bare .base/upgrade.sh (no leading ./)" {
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\".base/upgrade.sh\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
 }
 
 @test "denies absolute path .base/upgrade.sh" {
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"${REPO}/.base/upgrade.sh v0.18.3\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
 }
 
 @test "deny reason mentions canonical make wrapper" {
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"./.base/upgrade.sh v0.18.2\"},\"cwd\":\"${REPO}\"}"
   assert_success
   local reason
@@ -102,13 +102,13 @@ ack_path_for() {
 # ---- positive (expanded scope): legacy template/upgrade.sh ----
 
 @test "denies ./template/upgrade.sh (legacy folder name)" {
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"./template/upgrade.sh v0.18.2\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
 }
 
 @test "denies bare template/upgrade.sh (legacy, no leading ./)" {
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"template/upgrade.sh\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
 }
@@ -117,35 +117,35 @@ ack_path_for() {
 
 @test "denies git subtree pull --prefix=.base ..." {
   local cmd="git subtree pull --prefix=.base ycpss91255-docker/base.git v0.18.2 --squash"
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"${cmd}\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
 }
 
 @test "denies git subtree pull --prefix=template ... (legacy prefix)" {
   local cmd="git subtree pull --prefix=template ycpss91255-docker/base.git v0.18.2 --squash"
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"${cmd}\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
 }
 
 @test "denies git -C <repo> subtree pull --prefix=.base ... (via -C arg)" {
   local cmd="git -C ${REPO} subtree pull --prefix=.base ycpss91255-docker/base.git v0.18.2 --squash"
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"${cmd}\"},\"cwd\":\"/tmp\"}"
   assert_permission_decision "deny"
 }
 
 @test "silent on git subtree pull with unrelated --prefix=foo" {
   local cmd="git subtree pull --prefix=foo some-remote main --squash"
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"${cmd}\"},\"cwd\":\"${REPO}\"}"
   assert_silent
 }
 
 @test "silent on git subtree push --prefix=.base (push, not pull)" {
   local cmd="git subtree push --prefix=.base origin some-branch"
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"${cmd}\"},\"cwd\":\"${REPO}\"}"
   assert_silent
 }
@@ -153,7 +153,7 @@ ack_path_for() {
 # ---- negative: silent when not applicable ----
 
 @test "silent on make -f Makefile.ci upgrade (already going through wrapper)" {
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"make -f Makefile.ci upgrade VERSION=v0.18.2\"},\"cwd\":\"${REPO}\"}"
   assert_silent
 }
@@ -171,7 +171,7 @@ ack_path_for() {
   git add -A >/dev/null
   git commit -q -m init >/dev/null
   cd - >/dev/null
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"./.base/upgrade.sh v0.18.2\"},\"cwd\":\"${repo}\"}"
   assert_silent
   rm -rf "${repo}"
@@ -184,13 +184,13 @@ ack_path_for() {
 test:
 	echo test
 EOF
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"./.base/upgrade.sh v0.18.2\"},\"cwd\":\"${REPO}\"}"
   assert_silent
 }
 
 @test "silent on unrelated commands (git status)" {
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"git status\"},\"cwd\":\"${REPO}\"}"
   assert_silent
 }
@@ -199,13 +199,13 @@ EOF
   mkdir -p "${REPO}/foo"
   echo "#!/bin/sh" > "${REPO}/foo/upgrade.sh"
   chmod +x "${REPO}/foo/upgrade.sh"
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"./foo/upgrade.sh\"},\"cwd\":\"${REPO}\"}"
   assert_silent
 }
 
 @test "silent on empty command" {
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"\"},\"cwd\":\"${REPO}\"}"
   assert_silent
 }
@@ -217,7 +217,7 @@ EOF
   local ack
   ack="$(ack_path_for "${cmd}")"
   : > "${ack}"
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"${cmd}\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "allow"
   local reason
@@ -233,7 +233,7 @@ EOF
   local other_ack
   other_ack="$(ack_path_for "./.base/upgrade.sh v0.99.99")"
   : > "${other_ack}"
-  run "$(hook enforce_make_first_upgrade.sh)" \
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"./.base/upgrade.sh v0.18.2\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
 }
