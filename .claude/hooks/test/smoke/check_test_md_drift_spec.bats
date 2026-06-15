@@ -132,3 +132,55 @@ write_pytest_defs() {
   assert_message_contains "test/unit/widget_test.py: TEST.md says 5, actual 3"
   rm -rf "${repo}"
 }
+
+@test "silent when pytest def test_ count matches TEST.md" {
+  local repo
+  repo="$(mktemp -d)"
+  mkdir -p "${repo}/test/unit" "${repo}/doc/test"
+  write_pytest_defs "${repo}/test/unit/widget_test.py" 4
+  printf '### test/unit/widget_test.py (4)\n' > "${repo}/doc/test/TEST.md"
+  run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/test/unit/widget_test.py\"}}"
+  assert_silent
+  rm -rf "${repo}"
+}
+
+@test "counts class-method pytest tests (indented def test_)" {
+  local repo
+  repo="$(mktemp -d)"
+  mkdir -p "${repo}/test/unit" "${repo}/doc/test"
+  {
+    printf 'class TestWidget:\n'
+    printf '    def test_a(self):\n        assert True\n'
+    printf '    def test_b(self):\n        assert True\n'
+  } > "${repo}/test/unit/cls_test.py"
+  printf '### test/unit/cls_test.py (2)\n' > "${repo}/doc/test/TEST.md"
+  run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/test/unit/cls_test.py\"}}"
+  assert_silent
+  rm -rf "${repo}"
+}
+
+@test "fires when TEST.md lists a missing pytest file" {
+  local repo
+  repo="$(mktemp -d)"
+  mkdir -p "${repo}/test/unit" "${repo}/doc/test"
+  printf '### test/unit/gone_test.py (3)\n' > "${repo}/doc/test/TEST.md"
+  run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/doc/test/TEST.md\"}}"
+  assert_message_contains "test/unit/gone_test.py: listed in TEST.md but file missing"
+  rm -rf "${repo}"
+}
+
+@test "test_ prefix pytest file (not just _test suffix) triggers the check" {
+  local repo
+  repo="$(mktemp -d)"
+  mkdir -p "${repo}/test/unit" "${repo}/doc/test"
+  write_pytest_defs "${repo}/test/unit/test_widget.py" 2
+  printf '### test/unit/test_widget.py (9)\n' > "${repo}/doc/test/TEST.md"
+  run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/test/unit/test_widget.py\"}}"
+  assert_message_contains "test/unit/test_widget.py: TEST.md says 9, actual 2"
+  rm -rf "${repo}"
+}
+
+@test "silent when edited file is a non-test .py (src module)" {
+  run "$(hook check_test_md_drift.sh)" <<< '{"tool_input":{"file_path":"/tmp/repo/src/widget.py"}}'
+  assert_silent
+}
