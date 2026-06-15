@@ -7,6 +7,21 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **`check_test_md_drift.sh` now counts pytest tests (closes #198).**
+  The TEST.md-drift guard previously saw only `^@test` stanzas in
+  `.bats` files, so repos carrying pytest suites (isaac and future
+  framework repos -- refs isaac#130 + the template-convergence PRD)
+  could silently drop pytest tests while "TEST.md count not decreased"
+  stayed green. The hook now also fires on pytest discovery filenames
+  (`test_*.py` / `*_test.py`), parses `### test/<path>.py (N)`
+  headings, and counts `def test_` function definitions (top-level +
+  class methods), extension-switched against the existing bats path.
+  The count is def-functions, not pytest-collected cases, so
+  `@pytest.mark.parametrize` does not inflate it -- the guard tracks
+  drift, not the absolute collected total. bats-only repos are
+  unaffected. 6 new spec cases. This also defines the
+  `### test/<path>.py (N)` TEST.md convention for pytest-carrying
+  repos to follow.
 - **`batch-mutation-pr.sh` generic fanout engine + `batch-line-edit`
   preset (closes #169).** The 10+ historical one-shot `batch-*.sh` /
   `fix-*.sh` / `migrate-*.sh` scripts all repeat identical plumbing

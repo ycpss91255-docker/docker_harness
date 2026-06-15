@@ -140,7 +140,7 @@ docker/
     │   ├── check_no_ai_attribution.sh  # Edit/Write 後掃 Co-Authored-By/Generated with Claude
     │   ├── check_changelog_drift.sh    # git commit 前比對 staged code vs CHANGELOG.md
     │   ├── remind_readme_on_core_script.sh # git commit 前提醒 base 核心 .sh 改動是否同步 README
-    │   ├── check_test_md_drift.sh      # *.bats / TEST.md 後比對測試數
+    │   ├── check_test_md_drift.sh      # *.bats / test_*.py|*_test.py / TEST.md 後比對測試數(.bats 數 @test、.py 數 def test_,refs #156/#198)
     │   ├── remind_tdd_categories.sh    # 動到 .sh/Dockerfile/compose 等時提醒 4 類測試
     │   ├── remind_pr_wait_ci.sh        # gh pr create 前提醒用 /wait-pr-ci skill
     │   ├── remind_monitor_on_ci_trigger.sh # gh workflow run / gh run rerun 前提醒用 wait-tag-ci.sh / /wait-pr-ci (refs #154)
