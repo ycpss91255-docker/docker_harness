@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **958 tests** (955 smoke + 3 integration) plus shellcheck (40 hook
+Total: **964 tests** (961 smoke + 3 integration) plus shellcheck (40 hook
 scripts + 32 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -159,13 +159,17 @@ silently truncating the fixture.
 | write_bats_stanzas writes count real @test stanzas + shebang | core: 3 stanzas + shebang, grep-able |
 | write_bats_stanzas count=0 yields shebang only, zero @test | edge: empty fixture |
 
-### test/smoke/check_test_md_drift_spec.bats (9)
+### test/smoke/check_test_md_drift_spec.bats (15)
 
 The regex parsing repo-local + `.base/test/` headings is shared:
-`^### ((\.base/)?test/<path>.bats) (<N>)`. The optional `.base/`
+`^### ((\.base/)?test/<path>.(bats|py)) (<N>)`. The optional `.base/`
 prefix (added refs #156) lets downstream repos pin counts on tests
 vendored via the `.base/` subtree -- otherwise a base subtree pull
-that lands new `@test` stanzas drifts TEST.md silently.
+that lands new `@test` stanzas drifts TEST.md silently. Counting is
+extension-switched: `.bats` -> `^@test` stanzas, `.py` -> `def test_`
+function definitions (top-level + class methods, refs #198 -- pytest
+parity; the count tracks def-functions not collected cases, so
+`parametrize` does not inflate it).
 
 | Test | Scenario |
 |------|----------|
@@ -178,6 +182,12 @@ that lands new `@test` stanzas drifts TEST.md silently.
 | silent when .base/test/smoke/*.bats count matches | subtree counts match → SILENT |
 | fires when .base/test/smoke/*.bats heading lists missing file | subtree path in TEST.md but file absent → FIRE |
 | repo-local and .base/ entries both checked in same TEST.md | mixed headings, one drifts → FIRE on the drifted one |
+| fires when a pytest file's def test_ count drifts from TEST.md | pytest def-count drift → FIRE (issue #198) |
+| silent when pytest def test_ count matches TEST.md | pytest counts match → SILENT |
+| counts class-method pytest tests (indented def test_) | class-based pytest counted |
+| fires when TEST.md lists a missing pytest file | pytest file missing → FIRE |
+| test_ prefix pytest file (not just _test suffix) triggers the check | both discovery patterns fire |
+| silent when edited file is a non-test .py (src module) | non-test .py → SILENT |
 
 ### test/smoke/check_readme_framework_spec.bats (20)
 | Test | Scenario |
