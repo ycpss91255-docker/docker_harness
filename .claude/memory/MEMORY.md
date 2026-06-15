@@ -2,8 +2,8 @@
 - [工作流程與品質要求](feedback_workflow.md) — 分支策略、100% 覆蓋率、README 同步、Google style、TEST.md
 - [主動提出優化建議](feedback_proactive_optimization.md) — 發現繁瑣流程或可優化之處時必須主動提出討論
 - [不使用 Emoji](feedback_no_emoji.md) — 所有程式碼、文件、README、section headers 一律不用 emoji
-- [.base subtree 升級走 make wrapper 才會自動跑 init.sh](feedback_base_subtree_upgrade.md) — raw subtree pull / .base/upgrade.sh 被 hook BLOCK; init.sh resync 由 make wrapper 自動跑
-- [.base subtree 升級先用 make](feedback_make_first_upgrade.md) — make -f Makefile.ci upgrade [VERSION=vX.Y.Z] 優先; raw fallback 被 enforce_make_first_upgrade.sh 擋, checkpoint ACK 可解
+- [.base subtree 升級走 CI-runner wrapper 才會自動跑 init.sh](feedback_base_subtree_upgrade.md) — raw subtree pull / .base/upgrade.sh 被 hook BLOCK; init.sh resync 由 wrapper（just 優先）自動跑
+- [.base subtree 升級走 CI-runner wrapper（just 優先）](feedback_wrapper_first_upgrade.md) — just upgrade / just -f justfile.ci upgrade 優先, make -f Makefile.ci 為 legacy 過渡; raw fallback 被 enforce_wrapper_first_upgrade.sh 擋, checkpoint ACK 可解（base#573 / #202）
 - [Consumer Dockerfile 用 *.sh glob](feedback_dockerfile_script_paths.md) — /lint COPY 用 `*.sh` 而非寫死 template/<path>/<script>.sh
 - [Subagent sandbox 比主 session 嚴](feedback_subagent_sandbox_limits.md) — 批次 git/腳本 mutation 用主 session loop,不要派 subagent
 - [ros1_bridge 換成自建支援 Jetson](project_ros1_bridge_jetson.md) — devel 改 ros:foxy-ros-base-focal + snapshot apt，因 osrf 無 arm64
