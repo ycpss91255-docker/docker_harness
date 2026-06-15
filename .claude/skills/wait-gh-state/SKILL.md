@@ -84,7 +84,7 @@ Use the loose form when you want RC visibility; use the strict form when only st
 
 ## Pairing with adoption / fanout
 
-Once `wait-issue-close.sh` exits 0, the downstream PR is now safe to open / `gh pr merge --auto`. Once `wait-release.sh` exits 0 on a stable tag, `/batch-base-upgrade` (or downstream `make -f Makefile.ci upgrade VERSION=<tag>`) can run.
+Once `wait-issue-close.sh` exits 0, the downstream PR is now safe to open / `gh pr merge --auto`. Once `wait-release.sh` exits 0 on a stable tag, `/batch-base-upgrade` (or downstream `just upgrade <tag>`) can run.
 
 ## See also
 

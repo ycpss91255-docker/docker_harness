@@ -24,14 +24,15 @@
 set -uo pipefail
 
 # Walk up from a directory looking for a repo-root marker (Dockerfile,
-# Makefile.ci, .base/, template/, init.sh). Returns the first matching
-# ancestor or empty. Scopes TDD-capability detection to the relevant
-# downstream repo even when the file lives inside a docker_harness
-# subtree (refs #75).
+# justfile.ci / Makefile.ci, .base/, template/, init.sh). Returns the
+# first matching ancestor or empty. Scopes TDD-capability detection to
+# the relevant downstream repo even when the file lives inside a
+# docker_harness subtree (refs #75; justfile.ci added #202 / base#573).
 detect_repo_root() {
   local dir="$1"
   while [[ "${dir}" != "/" && "${dir}" != "." && -n "${dir}" ]]; do
-    if [[ -e "${dir}/Dockerfile" || -e "${dir}/Makefile.ci" \
+    if [[ -e "${dir}/Dockerfile" || -e "${dir}/justfile.ci" \
+          || -e "${dir}/Makefile.ci" \
           || -d "${dir}/.base" || -d "${dir}/template" \
           || -e "${dir}/init.sh" ]]; then
       printf '%s' "${dir}"
@@ -71,7 +72,7 @@ build_reminder() {
       integration="視 multi-container 補 Integration"
       ;;
     hadolint)
-      lint="Lint 必須：跑一次全套（./build.sh test 或 make -f Makefile.ci lint）確認既有檔案沒有新 violation"
+      lint="Lint 必須：跑一次全套（./build.sh test 或 just -f justfile.ci lint）確認既有檔案沒有新 violation"
       smoke="Smoke 通常 N/A"
       unit="Unit 通常 N/A"
       integration="Integration 通常 N/A"

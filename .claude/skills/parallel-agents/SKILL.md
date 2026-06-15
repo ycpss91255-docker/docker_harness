@@ -47,7 +47,7 @@ A parallel-Agent prompt should be reproducible without your context. Include:
 - **Output shape** -- "report a punch list: done / failed-with-reason".
 - **Length cap** -- "under 300 words" to keep the consolidated summary readable.
 
-Bad prompts ("based on your findings, fix the bug") push synthesis onto the Agent; good prompts ("for each repo in [A, B, C, D], run `make -f Makefile.ci upgrade VERSION=v0.32.0`, report PASS / FAIL per repo") keep the agent doing work, not deciding scope.
+Bad prompts ("based on your findings, fix the bug") push synthesis onto the Agent; good prompts ("for each repo in [A, B, C, D], run `just upgrade v0.32.0`, report PASS / FAIL per repo") keep the agent doing work, not deciding scope.
 
 ## Hook integration
 

@@ -135,7 +135,7 @@ Strict TDD (per CLAUDE.md):
 1. Write a regression test FIRST (red). Place it in the right test category per CLAUDE.md "測試分類" table — smoke / unit / integration / lint.
 2. Implement the minimal fix (green).
 3. Verify per the repo's standard runner (always Docker, never bare `bats` / `shellcheck`):
-   - `base` → `make -f Makefile.ci test`
+   - `base` → `just -f justfile.ci test`
    - `docker_harness` → `make -C .claude/test test`
    - container repos (`agent/*` / `app/*` / `env/*`) → `./build.sh test`
 

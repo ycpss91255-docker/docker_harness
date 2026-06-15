@@ -18,7 +18,7 @@ Follow this workflow:
 3. **Verify locally**:
    - Run `shellcheck -S warning *.sh` on changed .sh files
    - Run `./build.sh test` if Dockerfile or smoke tests changed
-   - Run `make -f Makefile.ci test` if working in the base repo
+   - Run `just -f justfile.ci test` if working in the base repo
 
 4. **Commit** with conventional message:
    - Bug fix: `fix: <description>`
