@@ -44,3 +44,47 @@ marker() { echo "${REPO}/.claude/state/local-ci-pass/$(git -C "${REPO}" rev-pars
   assert_success
   [[ -f "$(marker)" ]] || { echo "marker not written: $(marker)"; return 1; }
 }
+
+@test "CI command non-zero -> NO marker, propagates failure" {
+  mkdir -p "${REPO}/.claude/test"
+  echo "check:" > "${REPO}/.claude/test/Makefile"
+  stub_cmd make
+  PATH="${STUB_DIR}:${PATH}" STUB_RC=1 run "$(script ci-and-stamp.sh)" "${REPO}"
+  assert_failure
+  [[ ! -f "$(marker)" ]] || { echo "marker should NOT exist on CI failure"; return 1; }
+}
+
+@test "base-style (justfile.ci) green -> detects just path + stamps" {
+  echo 'test:' > "${REPO}/justfile.ci"
+  stub_cmd just
+  PATH="${STUB_DIR}:${PATH}" STUB_RC=0 run "$(script ci-and-stamp.sh)" "${REPO}"
+  assert_success
+  [[ -f "$(marker)" ]] || { echo "marker not written for base-style"; return 1; }
+}
+
+@test "downstream (root justfile) green -> runs ./build.sh test + stamps" {
+  echo 'build *args:' > "${REPO}/justfile"
+  printf '#!/usr/bin/env bash\nexit ${STUB_RC:-0}\n' > "${REPO}/build.sh"
+  chmod +x "${REPO}/build.sh"
+  git -C "${REPO}" add -A; git -C "${REPO}" commit -q -m wip
+  PATH="${STUB_DIR}:${PATH}" STUB_RC=0 run "$(script ci-and-stamp.sh)" "${REPO}"
+  assert_success
+  [[ -f "$(marker)" ]] || { echo "marker not written for downstream"; return 1; }
+}
+
+@test "no CI mechanism -> no stamp, exit 0, notice" {
+  PATH="${STUB_DIR}:${PATH}" run "$(script ci-and-stamp.sh)" "${REPO}"
+  assert_success
+  [[ ! -f "$(marker)" ]] || { echo "should not stamp a no-CI repo"; return 1; }
+  assert_output --partial "no_ci_mechanism"
+}
+
+@test "marker filename is the exact HEAD sha" {
+  mkdir -p "${REPO}/.claude/test"
+  echo "check:" > "${REPO}/.claude/test/Makefile"
+  stub_cmd make
+  local sha; sha="$(git -C "${REPO}" rev-parse HEAD)"
+  PATH="${STUB_DIR}:${PATH}" STUB_RC=0 run "$(script ci-and-stamp.sh)" "${REPO}"
+  assert_success
+  [[ -f "${REPO}/.claude/state/local-ci-pass/${sha}.ok" ]] || { echo "marker not keyed by HEAD sha"; return 1; }
+}
