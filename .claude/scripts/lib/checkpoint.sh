@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # checkpoint.sh — /tmp checkpoint protocol helper (ADR-00000002).
 #
-# Sourced by Tier 2 E2 enforcement hooks (enforce_make_first_upgrade /
+# Sourced by Tier 2 E2 enforcement hooks (enforce_wrapper_first_upgrade /
 # enforce_batch_via_script / enforce_worktree_for_branch). When a hook
 # detects a command it wants to gate, it calls:
 #

@@ -155,7 +155,7 @@ docker/
     │   ├── auto_allow_touch_ack.sh       # touch $TMPDIR/claude-checkpoint-*.ack 自動 allow（/tmp checkpoint 協定一鍵 ack,refs ADR-00000002 / #117）
     │   ├── check_tag_version_consistency.sh # git tag/push v* 前 BLOCK：repo root 有 .version 且不等於 tag 則 deny（refs #36；defensive 第二層,主要 gate 由 enforce_semver_tag_via_script.sh 接手）
     │   ├── enforce_semver_tag_via_script.sh # git tag/push v* 前 BLOCK：raw 命令一律拒絕,強制走 .claude/scripts/release-tag.sh canonical script(refs #106)
-    │   ├── enforce_make_first_upgrade.sh # 三個 surface (./.base/upgrade.sh / ./template/upgrade.sh / git subtree pull --prefix=.base|template) 前 BLOCK,改走 make -f Makefile.ci upgrade(checkpoint ack 可解,refs #36 / ADR-00000002)
+    │   ├── enforce_wrapper_first_upgrade.sh # 三個 surface (./.base/upgrade.sh / ./template/upgrade.sh / git subtree pull --prefix=.base|template) 前 BLOCK,改走 hook 偵測的 CI-runner wrapper(justfile→just upgrade / justfile.ci→just -f justfile.ci upgrade / Makefile.ci→make -f Makefile.ci upgrade,checkpoint ack 可解,refs #36 / ADR-00000002 / base#573 / #202)
     │   ├── enforce_batch_via_script.sh   # 跨 repo for-loop + mutation (git push|reset|tag|branch -D / gh issue|pr close|merge|comment --body) 前 BLOCK,改走 .claude/scripts/<name>.sh(checkpoint ack 可解,refs #121 / ADR-00000002)
     │   ├── enforce_worktree_for_branch.sh # 主 checkout 內 git checkout -b|-B 前 BLOCK,要求改走 git worktree add <path> -b <branch> main(內部 worktree 自動放行,checkpoint ack 可解,refs #122 / PR #89 / ADR-00000006)
     │   ├── enforce_local_full_ci_before_pr.sh # gh pr create/ready 前 BLOCK：HEAD 無 local-CI marker(.claude/state/local-ci-pass/<sha>.ok,由 make -C .claude/test test 綠時寫)且非「綠後只動 doc」則 deny;LOCAL_CI_ACK=<sha> 可 override(refs #176)
@@ -348,12 +348,14 @@ SHA256 over 模板 + repo setup.conf）。build/run 會比對 hash，若 setup.c
 cd template && git push && git tag -a vX.Y.Z -m "vX.Y.Z: ..."
 git push origin vX.Y.Z
 
-# 2. 各 repo 跑 make upgrade（內部呼叫 upgrade.sh，自動處理 subtree pull
+# 2. 各 repo 跑 just upgrade（內部呼叫 upgrade.sh，自動處理 subtree pull
 #    + integrity check + init.sh symlink resync + main.yaml @tag sed）
 cd <repo>
-make -f Makefile.ci upgrade VERSION=vX.Y.Z   # 指定版本（推薦）
-# 或 make -f Makefile.ci upgrade            # 升到最新 tag
-# Fallback（make 不可用時）: ./.base/upgrade.sh vX.Y.Z
+just upgrade vX.Y.Z                          # 指定版本（推薦；下游 consumer）
+# 或 just upgrade                            # 升到最新 tag
+# base self: just -f justfile.ci upgrade vX.Y.Z
+# Legacy（過渡期，下游 .base 還是 Makefile.ci）: make -f Makefile.ci upgrade VERSION=vX.Y.Z
+# Fallback（wrapper 不可用時，被 hook 擋需 ACK）: ./.base/upgrade.sh vX.Y.Z
 
 # 3. 走 PR merge（branch protection 禁止直接 push main）
 git push origin <branch> && gh pr create
@@ -562,7 +564,7 @@ Status check 名稱依 repo 類型不同：
 | 1 | Smoke test | 確認最基本 path 可運作（腳本能啟動、`-h` 可印出、容器能起來） | `test/smoke/*.bats`、`.base/test/smoke/`（共用：`script_help.bats` / `display_env.bats` / `test_helper.bash`），透過 Dockerfile `test` stage 在 build 時跑 |
 | 2 | Unit test | 隔離單一 shell 函式 / 模組邏輯 | `.base/test/unit/`（如 `setup_spec.bats`），`bats-mock` 隔離外部呼叫；下游 container repo 通常無自己的 unit，重用 base 的 |
 | 3 | System / Integration test | 驗證多元件協同行為（完整流程、跨腳本互動） | `.base/test/integration/`（如 `upgrade_spec.bats`、`init.sh` 流程驗證） |
-| 4 | Lint / static analysis | 編譯期 / commit 期靜態檢查 | ShellCheck（所有 `.sh`）、Hadolint（Dockerfile）、`.hadolint.yaml` 規則；CI 強制，本地透過 `./build.sh test` 或 `make -f Makefile.ci lint` 觸發 |
+| 4 | Lint / static analysis | 編譯期 / commit 期靜態檢查 | ShellCheck（所有 `.sh`）、Hadolint（Dockerfile）、`.hadolint.yaml` 規則；CI 強制，本地透過 `./build.sh test` 或 `just -f justfile.ci lint` 觸發 |
 
 ### 變更類型 → 應該寫哪幾類測試
 
@@ -581,7 +583,7 @@ Status check 名稱依 repo 類型不同：
 - **Lint 也算測試**：雖然不是「跑得起來」型，但同樣在 CI 強制；新檔 / 新規則要先讓 linter 失敗才修，不靠人工檢查
 - **Unit 對 Dockerfile 通常 N/A**：純宣告式內容無邏輯可隔離；改 Dockerfile 改用 smoke + lint 覆蓋
 - **TEST.md 是 single source of truth**：4 類測試的數量與位置都記在 `doc/test/TEST.md`，每次新增 / 刪除 / 改名測試必須同步（hook `check_test_md_drift.sh` 會自動比對）
-- **驗證一律走 Docker**：4 類都透過 `./build.sh test` 或 `make -f Makefile.ci test` 在 Docker image 內執行，不接受本機 bats / shellcheck 通過作為驗證
+- **驗證一律走 Docker**：4 類都透過 `./build.sh test` 或 `just -f justfile.ci test` 在 Docker image 內執行，不接受本機 bats / shellcheck 通過作為驗證
 
 ## 12. Docker-only verification
 
@@ -594,7 +596,7 @@ Status check 名稱依 repo 類型不同：
 
 入口：
 - `./build.sh test` — Dockerfile `test` stage（ShellCheck → Hadolint → Bats smoke）
-- `make -f Makefile.ci test` / `lint` — base 自身的 unit/integration 測試
+- `just -f justfile.ci test` / `lint` — base 自身的 unit/integration 測試
 
 ## 13. Known gotchas
 

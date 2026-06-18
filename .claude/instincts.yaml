@@ -125,17 +125,17 @@
     - lift the gate via `/tmp` checkpoint protocol (ADR-00000002) -- touch the matching `<ack>` file and re-issue the same loop
   refs: CLAUDE.md > 跨 repo 批次 mutation 規範
 
-- name: make-first-upgrade
+- name: wrapper-first-upgrade
   trigger:
     kind: bash_command
   guidance:
-    - never bypass the make upgrade wrapper -- three surfaces DENIED by enforce_make_first_upgrade.sh
+    - never bypass the CI-runner upgrade wrapper -- three surfaces DENIED by enforce_wrapper_first_upgrade.sh
     - surface 1 -- `./.base/upgrade.sh ...` (and absolute / relative variants)
     - surface 2 -- `./template/upgrade.sh ...` (legacy local folder name; rename to .base/ pending)
     - surface 3 -- `git subtree pull --prefix=.base|template ...` (raw subtree pull)
-    - use the canonical wrapper `make -f Makefile.ci upgrade VERSION=vX.Y.Z` instead -- runs the same upgrade.sh PLUS the init.sh symlink resync + main.yaml @tag sed steps that all three surfaces skip (refs issue #36)
+    - use the canonical wrapper the hook detects for the repo: `just upgrade vX.Y.Z` (downstream consumer; the common path), `just -f justfile.ci upgrade vX.Y.Z` (base self), or legacy `make -f Makefile.ci upgrade VERSION=vX.Y.Z` (still accepted until downstream .base flips to justfile.ci) -- all run the same upgrade.sh PLUS the init.sh symlink resync + main.yaml @tag sed that the three raw surfaces skip (refs #36 / base#573 make->just / #202)
     - lift the gate via the `/tmp` checkpoint protocol (ADR-00000002) -- the deny message quotes the matching `touch <ack-file>` command; re-issue the same call after ack to proceed
-  refs: ADR-00000005 prefer-make-over-raw-upgrade-sh
+  refs: ADR-00000005 prefer-make-over-raw-upgrade-sh + base#573 (just runner) + #202
 
 - name: semver-tag-via-script
   trigger:

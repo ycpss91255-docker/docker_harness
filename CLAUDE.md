@@ -48,9 +48,9 @@ make upgrade         # upgrade .base/ subtree (e.g. make upgrade v0.30.0)
 Base self-test (template / docker_harness CI gate):
 
 ```bash
-make -f Makefile.ci test          # bats + shellcheck + kcov
-make -f Makefile.ci lint          # shellcheck only
-make -f Makefile.ci upgrade       # subtree pull to latest tag
+just -f justfile.ci test          # bats + shellcheck + kcov
+just -f justfile.ci lint          # shellcheck only
+just -f justfile.ci upgrade       # subtree pull to latest tag
 ```
 
 For flags and overrides, read `<cmd> -h` or `make help` first.
@@ -85,10 +85,11 @@ from prose.
   `.claude/scripts/batch-pr-{merge,close}.sh`)
 - Version bump + RC + release tag: `[[semver-bump]]` (canonical
   primitive: `.claude/scripts/release-tag.sh`)
-- `.base` subtree upgrade: `make -f Makefile.ci upgrade
-  [VERSION=vX.Y.Z]` (always make-first; raw `./.base/upgrade.sh`
-  and `git subtree pull` are BLOCKed by
-  `enforce_make_first_upgrade.sh`)
+- `.base` subtree upgrade: `just upgrade [vX.Y.Z]` (downstream) /
+  `just -f justfile.ci upgrade` (base self); wrapper-first, raw
+  `./.base/upgrade.sh` and `git subtree pull` are BLOCKed by
+  `enforce_wrapper_first_upgrade.sh` (legacy `make -f Makefile.ci
+  upgrade` still accepted during the make->just transition)
 - New repo creation under the org: `/new-repo`
 - CI monitoring after PR open: `[[wait-pr-ci]]` (PR-scoped) or
   `[[wait-gh-state]]` (issue close / release tag)

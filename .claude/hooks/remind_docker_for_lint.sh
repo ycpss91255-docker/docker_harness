@@ -14,7 +14,9 @@
 # Wrapper list: by default, recognises these substring patterns as
 # "already wrapped, no reminder":
 #   docker run / docker exec / docker compose
-#   make -f Makefile.ci
+#   just -f justfile.ci / just test / just build / just lint
+#   make -f Makefile.ci   (legacy; tolerated during the make->just
+#                          transition until downstream .base flips, #202)
 #   ./build.sh
 #   make -C .claude/test
 #
@@ -51,6 +53,10 @@ main() {
       "docker run"
       "docker exec"
       "docker compose"
+      "just -f justfile.ci"
+      "just test"
+      "just build"
+      "just lint"
       "make -f Makefile.ci"
       "./build.sh"
       "make -C .claude/test"
@@ -67,7 +73,7 @@ main() {
   [[ "${cmd}" =~ (^|[\;\&\|][[:space:]]*)(bats|shellcheck|hadolint|kcov)([[:space:]]|$) ]] || return 0
 
   local tool="${BASH_REMATCH[2]}"
-  msg="$(printf '驗證一律走 Docker 提醒：偵測到直接跑 %s,結果可能與 CI 不一致(本機 bats-mock / shellcheck 版本可能不同)。改用 ./build.sh test、make -f Makefile.ci test/lint、或 make -C .claude/test test。' "${tool}")"
+  msg="$(printf '驗證一律走 Docker 提醒：偵測到直接跑 %s,結果可能與 CI 不一致(本機 bats-mock / shellcheck 版本可能不同)。改用 just -f justfile.ci test/lint、./build.sh test、或 make -C .claude/test test(過渡期 make -f Makefile.ci 仍接受)。' "${tool}")"
 
   jq -n --arg m "${msg}" '{
     systemMessage: $m,

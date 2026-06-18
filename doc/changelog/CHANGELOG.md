@@ -6,6 +6,30 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **`enforce_make_first_upgrade.sh` -> `enforce_wrapper_first_upgrade.sh`,
+  wrapper-adaptive after base#573 (closes #202).** base#573 retired
+  `Makefile.ci` for `justfile.ci` (single runner = just). The upgrade
+  gate's detection was Makefile.ci-only, so post-#573 it matched no
+  repo root and went latently dead. It now detects the repo's actual
+  CI-runner wrapper in precedence order -- `justfile` (downstream
+  consumer -> `just upgrade`, the main path), `justfile.ci` (base self
+  -> `just -f justfile.ci upgrade`), `Makefile.ci` (legacy ->
+  `make -f Makefile.ci upgrade`, kept for the transition window until
+  downstream `.base` flips) -- and the deny message quotes the matching
+  canonical. Renamed runner-neutral so the make->just migration needs
+  no second rename. `remind_docker_for_lint.sh` now also treats
+  `just -f justfile.ci` / `just test|build|lint` as already-wrapped
+  (make tolerated during transition). Cascade: settings.json wiring,
+  `auto_allow_touch_ack` / `checkpoint.sh` headers, the `wrapper-first`
+  instinct, `remind_tdd_categories` repo-detect + lint hint,
+  `/pr` + `/issue-fix` + `parallel-agents` + `wait-gh-state` snippets,
+  CLAUDE.md / CONTEXT.md, and the two upgrade memory entries all lead
+  with just. 6 new spec cases (4 adaptive-detection + 2 lint-wrapper).
+  Historical one-shot batch scripts are left as-is (out of scope, per
+  #169 precedent). Follow-up: drop the legacy Makefile.ci branch after
+  the downstream fanout completes.
+
 ### Added
 - **`check_test_md_drift.sh` now counts pytest tests (closes #198).**
   The TEST.md-drift guard previously saw only `^@test` stanzas in

@@ -37,12 +37,11 @@ HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${HOOK_DIR}/../scripts/lib/checkpoint.sh"
 
-readonly HOOK_SLUG="enforce-make-first-upgrade"
-readonly CANONICAL='make -f Makefile.ci upgrade VERSION=vX.Y.Z'
-readonly REASON='Direct invocation skips the init.sh symlink resync + main.yaml @tag sed that the make wrapper performs (refs issue #36).'
+readonly HOOK_SLUG="enforce-wrapper-first-upgrade"
+readonly REASON='Direct invocation skips the init.sh symlink resync + main.yaml @tag sed that the CI-runner upgrade wrapper performs (refs issue #36).'
 
 main() {
-  local input cmd cwd work_dir repo_root makefile version_arg ack_path
+  local input cmd cwd work_dir repo_root version_arg ack_path
   input="$(cat)"
   cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
   cwd="$(printf '%s' "${input}" | jq -r '.cwd // empty' 2>/dev/null)"
@@ -75,9 +74,31 @@ main() {
   repo_root="$(git -C "${work_dir}" rev-parse --show-toplevel 2>/dev/null)"
   [[ -z "${repo_root}" ]] && repo_root="${work_dir}"
 
-  makefile="${repo_root}/Makefile.ci"
-  [[ -f "${makefile}" ]] || return 0
-  grep -qE '^upgrade:' "${makefile}" 2>/dev/null || return 0
+  # Wrapper-adaptive detection (refs #202; base#573 retired Makefile.ci
+  # for justfile.ci). Precedence, first match wins:
+  #   1. justfile + `upgrade` recipe   -> `just upgrade` (downstream
+  #      consumer; the main path -- the trigger surfaces only happen in
+  #      `.base` consumers, whose root carries the container-ops justfile)
+  #   2. justfile.ci + `upgrade` recipe -> `just -f justfile.ci upgrade`
+  #      (base-self CI runner)
+  #   3. Makefile.ci + `upgrade:` target -> `make -f Makefile.ci upgrade`
+  #      (legacy / transition window: downstream `.base` still ships
+  #      Makefile.ci until the next base release + fanout)
+  # No wrapper present -> silent (raw call OK, nothing to enforce).
+  # just recipes are `upgrade *args:` / `upgrade:`; make is `upgrade:`.
+  local canonical_base="" ver_style=""
+  if [[ -f "${repo_root}/justfile" ]] \
+     && grep -qE '^upgrade([[:space:]]|:)' "${repo_root}/justfile" 2>/dev/null; then
+    canonical_base="just upgrade"; ver_style="positional"
+  elif [[ -f "${repo_root}/justfile.ci" ]] \
+       && grep -qE '^upgrade([[:space:]]|:)' "${repo_root}/justfile.ci" 2>/dev/null; then
+    canonical_base="just -f justfile.ci upgrade"; ver_style="positional"
+  elif [[ -f "${repo_root}/Makefile.ci" ]] \
+       && grep -qE '^upgrade:' "${repo_root}/Makefile.ci" 2>/dev/null; then
+    canonical_base="make -f Makefile.ci upgrade"; ver_style="varflag"
+  else
+    return 0
+  fi
 
   # Short-circuit if the user has already acked this exact command.
   if ack_path="$(is_acked "${HOOK_SLUG}" "${cmd}")"; then
@@ -91,12 +112,18 @@ main() {
     return 0
   fi
 
-  # Extract optional version arg for the canonical hint (upgrade.sh form only).
+  # Extract optional version arg for the canonical hint (upgrade.sh form
+  # only). just recipes take a positional arg (`just upgrade v0.30.0`);
+  # the make wrapper takes `VERSION=v0.30.0`.
   version_arg=""
   if [[ "${cmd}" =~ (\.base|template)/upgrade\.sh[[:space:]]+(v[0-9][0-9.]*(-[A-Za-z0-9.]+)?) ]]; then
-    version_arg=" VERSION=${BASH_REMATCH[2]}"
+    if [[ "${ver_style}" == "varflag" ]]; then
+      version_arg=" VERSION=${BASH_REMATCH[2]}"
+    else
+      version_arg=" ${BASH_REMATCH[2]}"
+    fi
   fi
-  local canonical_with_version="make -f Makefile.ci upgrade${version_arg}"
+  local canonical_with_version="${canonical_base}${version_arg}"
 
   local md_path
   md_path="$(write_checkpoint \
@@ -104,10 +131,10 @@ main() {
     "${cmd}" \
     "${REASON}" \
     "${canonical_with_version}" \
-    "Canonical wrapper: ${CANONICAL}")"
+    "Canonical wrapper: ${canonical_base}")"
 
   local deny_msg
-  deny_msg="make-first-upgrade gate (issue #36): direct base/template upgrade path is denied.
+  deny_msg="wrapper-first-upgrade gate (issue #36): direct base/template upgrade path is denied.
 Use the canonical wrapper:
   ${canonical_with_version}
 Why: ${REASON}
