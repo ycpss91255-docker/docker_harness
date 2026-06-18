@@ -6,7 +6,39 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **`ci-and-stamp.sh` makes the local-CI-before-PR gate satisfiable for
+  every repo (closes #208).** `enforce_local_full_ci_before_pr.sh`
+  (#176) fires on any repo's worktree but the local-ci-pass marker was
+  written only by docker_harness's own `.claude/test/Makefile`, so
+  base / downstream PRs were always denied (base#580 / base#582 had to
+  be hand-stamped). The new `.claude/scripts/ci-and-stamp.sh
+  [<repo-path>]` auto-detects the repo's CI runner
+  (`.claude/test/Makefile` → `make -C .claude/test check`;
+  `justfile.ci` → `just -f justfile.ci test` + `lint`; root `justfile`
+  → `./build.sh test`), runs the FULL CI mirror, and writes
+  `.claude/state/local-ci-pass/<HEAD-sha>.ok` only on green -- so the
+  marker attests "GH CI will pass", not just "tests pass". The marker
+  convention stays entirely docker_harness-side; base's `justfile.ci`
+  is untouched. The gate now also fail-opens for repos with no
+  detectable CI mechanism, and its deny message points at
+  `ci-and-stamp.sh`.
+
+### Fixed
+- **`make -C .claude/test lint` / `test` now check the live worktree,
+  not the baked image (closes #214).** Both targets ran `docker run
+  $(IMAGE)` without a volume mount, so they lint/test the build-time
+  `COPY` snapshot -- a script edited after the last image build passed
+  local lint but failed CI on a fresh build (bit #169 SC2016 and #202
+  SC2034). They now `-v $(REPO_ROOT):/work` the live tree, matching the
+  single-spec run pattern, so local `make check` mirrors CI.
+
 ### Changed
+- **Centralised the local-CI-pass marker write in `ci-and-stamp.sh`
+  (refs #208).** The `.claude/test/Makefile` `test:` target no longer
+  stamps the marker (the #176 special-case); all repos including
+  docker_harness now stamp via the single `ci-and-stamp.sh` path -- one
+  mechanism, no docker_harness exception.
 - **`enforce_make_first_upgrade.sh` -> `enforce_wrapper_first_upgrade.sh`,
   wrapper-adaptive after base#573 (closes #202).** base#573 retired
   `Makefile.ci` for `justfile.ci` (single runner = just). The upgrade
