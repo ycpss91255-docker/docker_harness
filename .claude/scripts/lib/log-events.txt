@@ -60,3 +60,9 @@ pr_failed
 issue_created
 issue_skipped
 issue_failed
+
+# --- ci-and-stamp (refs #208) ---
+ci_start
+ci_failed
+marker_written
+no_ci_mechanism
