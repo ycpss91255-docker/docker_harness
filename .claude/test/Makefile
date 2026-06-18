@@ -25,15 +25,18 @@ build:  ## Build the test docker image
 	docker build -f $(CURDIR)/Dockerfile -t $(IMAGE) $(REPO_ROOT)
 
 test: build  ## Run bats specs (smoke + integration) inside docker
-	docker run --rm $(IMAGE)
-	@# On green, write the local-CI marker for HEAD so
-	@# enforce_local_full_ci_before_pr.sh (refs #176) lets the PR open.
-	@# Runs only if the docker run above exited 0 (make stops on error).
-	@mkdir -p $(REPO_ROOT)/.claude/state/local-ci-pass && \
-	  touch $(REPO_ROOT)/.claude/state/local-ci-pass/$$(git -C $(REPO_ROOT) rev-parse HEAD).ok
+	@# -v mounts the live worktree so bats runs the working-tree specs,
+	@# not the build-time COPY baked into the image (refs #214).
+	docker run --rm -v "$(REPO_ROOT):/work" $(IMAGE)
+	@# The local-CI-pass marker is NOT written here anymore; it is
+	@# centralised in .claude/scripts/ci-and-stamp.sh so every repo
+	@# (not just docker_harness) stamps via one path (refs #208).
 
 lint: build  ## Run shellcheck against all hook + helper scripts inside docker
-	docker run --rm --entrypoint sh $(IMAGE) -c \
+	@# -v mounts the live worktree so shellcheck lints the working-tree
+	@# scripts, not the build-time COPY baked into the image (refs #214 --
+	@# a post-build edit previously passed local lint but failed CI).
+	docker run --rm -v "$(REPO_ROOT):/work" --entrypoint sh $(IMAGE) -c \
 	  'shellcheck /work/.claude/hooks/*.sh /work/.claude/scripts/*.sh /work/.claude/scripts/lib/*.sh'
 
 hadolint:  ## Lint .claude/test/Dockerfile with Hadolint
