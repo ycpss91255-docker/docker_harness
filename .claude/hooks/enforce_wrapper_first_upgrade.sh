@@ -41,7 +41,7 @@ readonly HOOK_SLUG="enforce-wrapper-first-upgrade"
 readonly REASON='Direct invocation skips the init.sh symlink resync + main.yaml @tag sed that the CI-runner upgrade wrapper performs (refs issue #36).'
 
 main() {
-  local input cmd cwd work_dir repo_root makefile version_arg ack_path
+  local input cmd cwd work_dir repo_root version_arg ack_path
   input="$(cat)"
   cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
   cwd="$(printf '%s' "${input}" | jq -r '.cwd // empty' 2>/dev/null)"
