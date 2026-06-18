@@ -18,6 +18,9 @@ mk_repo() {
   # doc-only-since-green check).
   echo ".claude/state/" > "${dir}/.gitignore"
   echo "code" > "${dir}/script.sh"
+  # A CI mechanism so the gate applies (post-#208 it fail-opens for
+  # repos with no detectable CI). justfile.ci marks a base-style repo.
+  printf 'test:\n\t:\n' > "${dir}/justfile.ci"
   git -C "${dir}" add -A
   git -C "${dir}" commit -q -m init
   echo "${dir}"
@@ -128,4 +131,20 @@ fire() {
   commit_file "${repo}" "doc/test/TEST.md" "y" "docs: test md"
   fire "gh pr create --title T --body-file /tmp/x.md" "${repo}"
   assert_silent
+}
+
+@test "fail-open: repo with no detectable CI mechanism is silent (refs #208)" {
+  # No .claude/test/Makefile, no justfile.ci, no root justfile -> the
+  # gate has nothing to verify against, so it must not block.
+  local repo
+  repo="$(mktemp -d)"
+  git -C "${repo}" init -q -b main
+  git -C "${repo}" config user.email t@t
+  git -C "${repo}" config user.name t
+  echo x > "${repo}/f"
+  git -C "${repo}" add -A
+  git -C "${repo}" commit -q -m init
+  fire "gh pr create --title T --body-file /tmp/x.md" "${repo}"
+  assert_silent
+  rm -rf "${repo}"
 }
