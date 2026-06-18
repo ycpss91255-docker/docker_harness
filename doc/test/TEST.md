@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **964 tests** (961 smoke + 3 integration) plus shellcheck (40 hook
+Total: **970 tests** (967 smoke + 3 integration) plus shellcheck (40 hook
 scripts + 32 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -213,7 +213,7 @@ parity; the count tracks def-functions not collected cases, so
 | [7] zh-TW heading '## 目錄結構' is recognized | translated heading also enters the tree-walker → FIRE on stale path |
 | [7] silent when README has no Directory Structure section | no tree section at all → SILENT (walker no-op) |
 
-### test/smoke/remind_docker_for_lint_spec.bats (12)
+### test/smoke/remind_docker_for_lint_spec.bats (14)
 | Test | Scenario |
 |------|----------|
 | fires on standalone shellcheck | bare `shellcheck ...` → FIRE |
@@ -1104,19 +1104,23 @@ stay silent.
 | strips single env-prefix and matches docker build | env-prefix tolerance |
 | strips multiple env-prefixes and matches docker build | multi env-prefix |
 
-### test/smoke/enforce_make_first_upgrade_spec.bats (19)
+### test/smoke/enforce_wrapper_first_upgrade_spec.bats (23)
 
-Covers `.claude/hooks/enforce_make_first_upgrade.sh` — BLOCKING
+Covers `.claude/hooks/enforce_wrapper_first_upgrade.sh` — BLOCKING
 PreToolUse hook that DENIES three direct surfaces bypassing the
-make wrapper when `Makefile.ci` has an `upgrade:` target: (1)
-`./.base/upgrade.sh` variants, (2) `./template/upgrade.sh` legacy
-folder name, (3) `git subtree pull --prefix=.base|template`. All
-three skip the init.sh symlink resync + main.yaml `@tag` sed (refs
-issue #36 incident + ADR-00000005). The deny can be lifted via the
-`/tmp` checkpoint protocol (ADR-00000002 / #117): the hook writes
-a checkpoint markdown + quotes the matching `touch <ack-file>`
-command; the second attempt of the same cmd hits `is_acked` and is
-allowed through.
+CI-runner upgrade wrapper: (1) `./.base/upgrade.sh` variants, (2)
+`./template/upgrade.sh` legacy folder name, (3) `git subtree pull
+--prefix=.base|template`. Detection is wrapper-adaptive (refs #202 /
+base#573): the repo's wrapper is found in precedence order justfile
+(`just upgrade`) > justfile.ci (`just -f justfile.ci upgrade`) >
+Makefile.ci (`make -f Makefile.ci upgrade`, legacy), and the deny
+message quotes the matching canonical; no wrapper present -> silent.
+All three raw surfaces skip the init.sh symlink resync + main.yaml
+`@tag` sed (refs issue #36 incident + ADR-00000005). The deny can be
+lifted via the `/tmp` checkpoint protocol (ADR-00000002 / #117): the
+hook writes a checkpoint markdown + quotes the matching `touch
+<ack-file>` command; the second attempt of the same cmd hits
+`is_acked` and is allowed through.
 
 | Test | Scenario |
 |------|----------|
