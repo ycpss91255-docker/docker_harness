@@ -15,8 +15,8 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **970 tests** (967 smoke + 3 integration) plus shellcheck (40 hook
-scripts + 32 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
+Total: **977 tests** (974 smoke + 3 integration) plus shellcheck (40 hook
+scripts + 33 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
 CLAUDE.md) plus a CLAUDE.md ceiling audit (`make ceiling-check`
@@ -1179,15 +1179,17 @@ mutating commands pass through silently. Lift mechanism is the same
 | allows same for-loop after ack file exists | ack-bypass |
 | ack for different command does NOT bypass deny | hash isolation |
 
-### test/smoke/enforce_local_full_ci_before_pr_spec.bats (10)
+### test/smoke/enforce_local_full_ci_before_pr_spec.bats (11)
 
 Covers `.claude/hooks/enforce_local_full_ci_before_pr.sh` — BLOCKING
 PreToolUse hook that DENIES `gh pr create` / `gh pr ready` unless
 local CI passed on HEAD (a `.claude/state/local-ci-pass/<sha>.ok`
-marker exists, written by `make -C .claude/test test` on green) or
-only documentation changed since the last green. `LOCAL_CI_ACK=<sha>`
-overrides for the exact HEAD. Fails safe (silent) outside a git repo.
-Refs #176.
+marker exists, written by `ci-and-stamp.sh` on green) or only
+documentation changed since the last green. `LOCAL_CI_ACK=<sha>`
+overrides for the exact HEAD. Fails safe (silent) outside a git repo,
+and fail-opens (silent) for a repo with no detectable CI mechanism
+(no `.claude/test/Makefile` / `justfile.ci` / root `justfile`) since
+nothing can stamp it (refs #176 / #208).
 
 | Test | Scenario |
 |------|----------|
@@ -1201,6 +1203,27 @@ Refs #176.
 | gh pr ready also gated (no marker -> deny) | ready trigger → DENY |
 | silent (fail safe) when cwd is not a git repo | non-repo → SILENT |
 | allows when only doc/ + TEST.md changed since the green marker | multi-doc-only → ALLOW |
+| fail-open: repo with no detectable CI mechanism is silent | no make/justfile.ci/justfile → SILENT (issue #208) |
+
+### test/smoke/ci_and_stamp_spec.bats (6)
+
+Covers `.claude/scripts/ci-and-stamp.sh` (refs #208) — runs a repo's
+full CI mirror and, on green, writes the local-ci-pass marker the gate
+checks. Centralises marker-writing docker_harness-side so base /
+downstream PRs (not just docker_harness) can satisfy the gate; the
+runner is auto-detected (`.claude/test/Makefile` → `make -C
+.claude/test check`; `justfile.ci` → `just -f justfile.ci test+lint`;
+root `justfile` → `./build.sh test`; none → no stamp + notice). The CI
+runner is stubbed via a PATH shim exiting 0/1 (no real docker).
+
+| Test | Scenario |
+|------|----------|
+| docker_harness-style (.claude/test/Makefile) green -> stamps marker | detect + run + stamp |
+| CI command non-zero -> NO marker, propagates failure | red CI does not stamp |
+| base-style (justfile.ci) green -> detects just path + stamps | base detection |
+| downstream (root justfile) green -> runs ./build.sh test + stamps | downstream detection |
+| no CI mechanism -> no stamp, exit 0, notice | fail-open passthrough |
+| marker filename is the exact HEAD sha | sha-keyed marker |
 
 ### test/smoke/enforce_worktree_for_branch_spec.bats (14)
 

@@ -70,6 +70,17 @@ main() {
   root="$(git -C "${cwd}" rev-parse --show-toplevel 2>/dev/null)" || return 0
   head="$(git -C "${root}" rev-parse HEAD 2>/dev/null)" || return 0
 
+  # Fail-open when the repo has no detectable CI mechanism (refs #208):
+  # nothing can write the marker, so there is nothing to gate. The
+  # markers are written by ci-and-stamp.sh, which only knows how to run
+  # CI for repos carrying one of these (mutually exclusive across the
+  # org's repos). A repo with none has no local CI to assert -> allow.
+  if [[ ! -f "${root}/.claude/test/Makefile" \
+        && ! -f "${root}/justfile.ci" \
+        && ! -f "${root}/justfile" ]]; then
+    return 0
+  fi
+
   # 1. LOCAL_CI_ACK override (must match HEAD exactly).
   if [[ "${cmd}" =~ LOCAL_CI_ACK=([0-9a-fA-F]+) ]]; then
     [[ "${BASH_REMATCH[1]}" == "${head}" ]] && return 0
@@ -99,7 +110,7 @@ main() {
   fi
 
   # 4. Deny.
-  deny "Local CI has not passed on HEAD ${short}. Run the repo's CI gate first (docker_harness: \`make -C .claude/test test\`; base: \`make -f Makefile.ci test\`; downstream: \`just build test\`) -- it writes ${MARKER_SUBDIR}/<sha>.ok on green. Then re-open the PR. If you have a reason to skip (and accept the GH CI round-trip risk), override for this exact HEAD: LOCAL_CI_ACK=${head} gh pr create ... (refs #176)."
+  deny "Local CI has not passed on HEAD ${short}. Run \`.claude/scripts/ci-and-stamp.sh\` from the repo (it auto-detects the repo's CI -- make / just / build.sh -- runs the full mirror, and writes ${MARKER_SUBDIR}/<sha>.ok on green). Then re-open the PR. If you have a reason to skip (and accept the GH CI round-trip risk), override for this exact HEAD: LOCAL_CI_ACK=${head} gh pr create ... (refs #176 / #208)."
   return 0
 }
 
