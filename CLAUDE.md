@@ -48,9 +48,9 @@ make upgrade         # upgrade .base/ subtree (e.g. make upgrade v0.30.0)
 Base self-test (template / docker_harness CI gate):
 
 ```bash
-just -f justfile.ci test          # bats + shellcheck + kcov
-just -f justfile.ci lint          # shellcheck only
-just -f justfile.ci upgrade       # subtree pull to latest tag
+just ci test          # bats + shellcheck + kcov
+just ci lint          # shellcheck only
+just ci upgrade       # subtree pull to latest tag
 ```
 
 For flags and overrides, read `<cmd> -h` or `make help` first.
@@ -86,7 +86,7 @@ from prose.
 - Version bump + RC + release tag: `[[semver-bump]]` (canonical
   primitive: `.claude/scripts/release-tag.sh`)
 - `.base` subtree upgrade: `just upgrade [vX.Y.Z]` (downstream) /
-  `just -f justfile.ci upgrade` (base self); wrapper-first, raw
+  `just ci upgrade` (base self); wrapper-first, raw
   `./.base/upgrade.sh` and `git subtree pull` are BLOCKed by
   `enforce_wrapper_first_upgrade.sh` (legacy `make -f Makefile.ci
   upgrade` still accepted during the make->just transition)
