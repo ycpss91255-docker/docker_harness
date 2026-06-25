@@ -13,7 +13,9 @@ app/*, multi_run, etc.). Tracks:
   PR-wait-CI).
 - `.claude/commands/` — slash commands (`/audit /batch-pr /doc-sync
   /new-repo /pr /release /safe-delete`).
-- `.claude/skills/` — `/wait-pr-ci` skill.
+- `.claude/skills/` — repo-owned skills (symlinks into
+  `.agents/skills/`). Third-party skills are machine-local; see
+  [Agent skills](#agent-skills).
 
 Sub-repos in this workspace are managed independently and excluded via
 `.gitignore`.
@@ -30,6 +32,33 @@ claude
 
 Hook configuration lives in `.claude/settings.json`. Personal
 permissions go in `.claude/settings.local.json` (gitignored).
+
+## Agent skills
+
+Skills live canonically under `.agents/skills/<name>/`, surfaced to
+Claude Code as symlinks at `.claude/skills/<name>`.
+
+- **Repo-owned skills** (this repo's own — `gh-artifact-format`,
+  `semver-bump`, `wait-pr-ci`, `rebase-pr`, `wait-gh-state`,
+  `strategic-compact`, `proactive-optimization`,
+  `skillification-candidates`, `parallel-agents`, `batch-mutation-pr`)
+  are tracked in git at both ends, so they are present on a fresh clone.
+- **Third-party skills** (vendored from
+  [`mattpocock/skills`](https://github.com/mattpocock/skills) — `tdd`,
+  `grill-me`, `diagnose`, `handoff`, `prototype`, `to-issues`,
+  `zoom-out`, `caveman`, `grill-with-docs`, `write-a-skill`,
+  `improve-codebase-architecture`) are **machine-local and not tracked
+  in git**. A fresh clone does not have them; install or refresh them
+  with:
+
+  ```bash
+  npx skills@latest add mattpocock/skills
+  ```
+
+  Until installed, the corresponding workflows (e.g. `/tdd`,
+  `/grill-me`) are unavailable. See
+  [ADR-00000011](doc/adr/00000011-split-skill-tracking.md) for the
+  rationale.
 
 ## Testing
 
@@ -60,7 +89,7 @@ docker/                       # workspace root
 │   ├── settings.json         # hook + tool registration
 │   ├── hooks/                # *.sh hook scripts + test/ specs
 │   ├── commands/             # slash commands
-│   ├── skills/               # custom skills
+│   ├── skills/               # symlinks into .agents/skills/ (repo-owned tracked)
 │   └── test/                 # Dockerfile + Makefile for hook test image
 ├── doc/
 │   ├── test/TEST.md          # test single source of truth
