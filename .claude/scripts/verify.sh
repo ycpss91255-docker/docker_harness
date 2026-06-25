@@ -127,7 +127,7 @@ run_test_md() {
       _log_warn verify drift_detected kind=test-md file="${rel}" claimed="${claimed}" actual="${actual}"
       drifts=$((drifts + 1))
     fi
-  done < <(grep -E '^### test/.+\.bats \([0-9]+\)$' "${test_md}" || true)
+  done < <(grep -hE '^### test/.+\.bats \([0-9]+\)$' "${REPO_ROOT}"/doc/test/*.md 2>/dev/null || true)
 
   if (( drifts > 0 )); then
     _log_err verify lint_fail kind=test-md count="${drifts}"

@@ -34,7 +34,7 @@ load '../lib/test_helper'
 ### test/unit/missing_spec.bats (10)
 EOF
   run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/doc/test/TEST.md\"}}"
-  assert_message_contains "listed in TEST.md but file missing"
+  assert_message_contains "listed in doc/test catalog but file missing"
   rm -rf "${repo}"
 }
 
@@ -62,7 +62,7 @@ mktemp_base_drift_repo() {
   printf '### .base/test/smoke/script_help.bats (5)\n' > "${repo}/doc/test/TEST.md"
   run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/.base/test/smoke/script_help.bats\"}}"
   assert_message_contains "TEST.md drift"
-  assert_message_contains ".base/test/smoke/script_help.bats: TEST.md says 5, actual 3"
+  assert_message_contains ".base/test/smoke/script_help.bats: doc/test catalog says 5, actual 3"
   rm -rf "${repo}"
 }
 
@@ -81,7 +81,7 @@ mktemp_base_drift_repo() {
   mkdir -p "${repo}/test" "${repo}/.base/test/smoke" "${repo}/doc/test"
   printf '### .base/test/smoke/script_help.bats (10)\n' > "${repo}/doc/test/TEST.md"
   run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/doc/test/TEST.md\"}}"
-  assert_message_contains ".base/test/smoke/script_help.bats: listed in TEST.md but file missing"
+  assert_message_contains ".base/test/smoke/script_help.bats: listed in doc/test catalog but file missing"
   rm -rf "${repo}"
 }
 
@@ -98,7 +98,33 @@ mktemp_base_drift_repo() {
     printf '### .base/test/smoke/script_help.bats (7)\n'
   } > "${repo}/doc/test/TEST.md"
   run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/doc/test/TEST.md\"}}"
-  assert_message_contains ".base/test/smoke/script_help.bats: TEST.md says 7, actual 3"
+  assert_message_contains ".base/test/smoke/script_help.bats: doc/test catalog says 7, actual 3"
+  rm -rf "${repo}"
+}
+
+# ---- per-type catalog split (base #695) ----
+# After the split, the per-spec `### <path> (N)` headers live in the
+# per-type catalogs (doc/test/unit.md / integration.md / ...), not in
+# TEST.md (the index). The guard scans every doc/test/*.md.
+
+@test "fires when drift is in a sibling catalog (doc/test/unit.md, not TEST.md)" {
+  local repo
+  repo="$(mktemp_base_drift_repo 3)"
+  printf '# TEST.md index -- see per-type catalogs\n' > "${repo}/doc/test/TEST.md"
+  printf '### .base/test/smoke/script_help.bats (5)\n' > "${repo}/doc/test/unit.md"
+  run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/.base/test/smoke/script_help.bats\"}}"
+  assert_message_contains "TEST.md drift"
+  assert_message_contains ".base/test/smoke/script_help.bats: doc/test catalog says 5, actual 3"
+  rm -rf "${repo}"
+}
+
+@test "silent when sibling-catalog count matches (doc/test/unit.md)" {
+  local repo
+  repo="$(mktemp_base_drift_repo 4)"
+  printf '# TEST.md index\n' > "${repo}/doc/test/TEST.md"
+  printf '### .base/test/smoke/script_help.bats (4)\n' > "${repo}/doc/test/unit.md"
+  run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/.base/test/smoke/script_help.bats\"}}"
+  assert_silent
   rm -rf "${repo}"
 }
 
@@ -129,7 +155,7 @@ write_pytest_defs() {
   printf '### test/unit/widget_test.py (5)\n' > "${repo}/doc/test/TEST.md"
   run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/test/unit/widget_test.py\"}}"
   assert_message_contains "TEST.md drift"
-  assert_message_contains "test/unit/widget_test.py: TEST.md says 5, actual 3"
+  assert_message_contains "test/unit/widget_test.py: doc/test catalog says 5, actual 3"
   rm -rf "${repo}"
 }
 
@@ -165,7 +191,7 @@ write_pytest_defs() {
   mkdir -p "${repo}/test/unit" "${repo}/doc/test"
   printf '### test/unit/gone_test.py (3)\n' > "${repo}/doc/test/TEST.md"
   run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/doc/test/TEST.md\"}}"
-  assert_message_contains "test/unit/gone_test.py: listed in TEST.md but file missing"
+  assert_message_contains "test/unit/gone_test.py: listed in doc/test catalog but file missing"
   rm -rf "${repo}"
 }
 
@@ -176,7 +202,7 @@ write_pytest_defs() {
   write_pytest_defs "${repo}/test/unit/test_widget.py" 2
   printf '### test/unit/test_widget.py (9)\n' > "${repo}/doc/test/TEST.md"
   run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/test/unit/test_widget.py\"}}"
-  assert_message_contains "test/unit/test_widget.py: TEST.md says 9, actual 2"
+  assert_message_contains "test/unit/test_widget.py: doc/test catalog says 9, actual 2"
   rm -rf "${repo}"
 }
 

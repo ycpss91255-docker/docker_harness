@@ -7,10 +7,10 @@ For the path: $ARGUMENTS — if empty, default to `${CLAUDE_PROJECT_DIR}` (sessi
 For each in-scope repo, run these checks and collect findings:
 
 **1. TEST.md per-section count drift**
-For every `### test/<rel>.bats (N)` heading in `doc/test/TEST.md`, count `^@test` in the corresponding `test/<rel>.bats` file. Report any mismatch with both numbers (TEST.md says X, actual Y). Also flag headings whose path doesn't exist on disk, and `.bats` files not listed in TEST.md at all.
+For every `### test/<rel>.bats (N)` heading across the `doc/test/*.md` catalogs (post-#695 split: `unit.md` / `integration.md` / `behavioural.md` / `smoke.md`; the glob still covers a single unsplit `TEST.md`), count `^@test` in the corresponding `test/<rel>.bats` file. Report any mismatch with both numbers (catalog says X, actual Y). Also flag headings whose path doesn't exist on disk, and `.bats` files not listed in any catalog at all.
 
 **2. TEST.md total**
-The header line `**N tests** total (X unit + Y integration)` — verify N matches the sum of per-section counts AND the actual @test totals. If unit/integration split is given, verify those subtotals too.
+The `doc/test/TEST.md` index header line `**N tests** total (X unit + Y integration)` — verify N matches the sum of per-section counts across the catalogs AND the actual @test totals. If unit/integration split is given, verify those subtotals too.
 
 **3. CHANGELOG `[Unreleased]` freshness**
 If the working tree (or staged area, when in a git repo) has any modifications under the repo, check that `doc/changelog/CHANGELOG.md`'s `[Unreleased]` section has at least one bullet that wasn't there at HEAD. Use `git diff HEAD -- doc/changelog/CHANGELOG.md` — if no change touches `[Unreleased]`, warn (it might still be correct for pure refactors; flag, don't fail).

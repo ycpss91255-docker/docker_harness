@@ -33,7 +33,7 @@
 set -uo pipefail
 
 main() {
-  local input file_path dir repo_root test_md mismatches
+  local input file_path dir repo_root mismatches
   input="$(cat)"
   file_path="$(printf '%s' "${input}" | jq -r '
     .tool_input.file_path
@@ -61,7 +61,9 @@ main() {
 
   [[ -z "${repo_root}" ]] && return 0
 
-  test_md="${repo_root}/doc/test/TEST.md"
+  # Per-spec `### <path> (N)` headers live in the per-type catalogs under
+  # doc/test/ since the base #695 split (TEST.md is the index now); scan
+  # every doc/test/*.md (the glob still includes TEST.md for unsplit repos).
 
   # Pure bash — avoid gawk-only `match($0, /re/, arr)` 3-arg form which
   # silently mis-runs under mawk / POSIX awk.
@@ -73,7 +75,7 @@ main() {
     local expected="${BASH_REMATCH[4]}"
     local path="${repo_root}/${rel}"
     if [[ ! -f "${path}" ]]; then
-      mismatches+="  ${rel}: listed in TEST.md but file missing"$'\n'
+      mismatches+="  ${rel}: listed in doc/test catalog but file missing"$'\n'
       continue
     fi
     local actual
@@ -82,9 +84,9 @@ main() {
       py)   actual="$(grep -cE '^[[:space:]]*def test_' "${path}" 2>/dev/null || printf '0')" ;;
     esac
     if (( actual != expected )); then
-      mismatches+="  ${rel}: TEST.md says ${expected}, actual ${actual}"$'\n'
+      mismatches+="  ${rel}: doc/test catalog says ${expected}, actual ${actual}"$'\n'
     fi
-  done < "${test_md}"
+  done < <(cat "${repo_root}"/doc/test/*.md 2>/dev/null)
   mismatches="${mismatches%$'\n'}"
 
   if [[ -n "${mismatches}" ]]; then
