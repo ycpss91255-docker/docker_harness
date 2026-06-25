@@ -1,7 +1,7 @@
 # ADR-00000010: Vendor-In Matt Pocock Skills Installer State
 
 - **Date:** 2026-06-11
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-00000011](00000011-split-skill-tracking.md)
 
 ## Context
 

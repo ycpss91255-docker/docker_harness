@@ -34,6 +34,29 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   single-spec run pattern, so local `make check` mirrors CI.
 
 ### Changed
+- **Split skill tracking: repo-owned tracked, vendored machine-local
+  (closes #210, supersedes ADR-00000010 via ADR-00000011).** The ten
+  repo-owned skills (`batch-mutation-pr`, `gh-artifact-format`,
+  `parallel-agents`, `proactive-optimization`, `rebase-pr`,
+  `semver-bump`, `skillification-candidates`, `strategic-compact`,
+  `wait-gh-state`, `wait-pr-ci`) were real directories under
+  `.claude/skills/` (Claude-only), while third-party `mattpocock/skills`
+  already used the agent-agnostic `.agents/skills/<name>/` + symlink
+  layout -- so the canonical store was split on the wrong axis. Each
+  repo-owned skill is now `git mv`'d to `.agents/skills/<name>/`
+  (history preserved) and surfaced via a tracked symlink
+  `.claude/skills/<name>` -> `../../.agents/skills/<name>`, making them
+  agent-agnostic and shareable by a future non-Claude agent. The
+  third-party skills, their symlinks, and `skills-lock.json` are now
+  **untracked** (`git rm --cached`, content left on disk) and
+  reinstalled with `npx skills@latest add mattpocock/skills` -- this
+  repo tracks what it owns, not a second copy of upstream. `.gitignore`
+  gains a layer-by-layer block (`.agents/*` + `.agents/skills/*` +
+  `.claude/skills/*` with the ten repo-owned negated back in at both
+  ends). A new `skills_canonical_layout_spec.bats` (3 cases) locks the
+  symlink invariant; `README.md` documents the install step. Reference
+  paths citing `.claude/skills/<name>/SKILL.md` keep resolving through
+  the symlink unchanged.
 - **Centralised the local-CI-pass marker write in `ci-and-stamp.sh`
   (refs #208).** The `.claude/test/Makefile` `test:` target no longer
   stamps the marker (the #176 special-case); all repos including

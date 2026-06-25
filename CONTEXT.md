@@ -177,7 +177,7 @@ docker/
     │   ├── remind_log_helper.sh        # PostToolUse hook：Edit/Write .claude/scripts/*.sh 後 delegate 到 check-log-helper-usage.sh,若該檔案有 bare printf|echo (usage()/allowlist marker 外) 則 systemMessage nudge 提醒走 _log_*,refs #148 M5
     │   ├── warn_structured_data_text_tools.sh # PreToolUse hook：bash 指令用 awk/sed 處理 .json/.jsonl 且無 jq 時 systemMessage nudge 改用 jq / Grep 工具(line-oriented 解析 JSONL 會誤計);non-blocking,配 structured-data-use-jq instinct
     │   └── test/                       # bats specs (smoke + integration) — 跑法見 Makefile
-    ├── skills/
+    ├── skills/                         # repo-owned; each a symlink -> ../../.agents/skills/<name>/ (third-party mattpocock skills machine-local, omitted; ADR-11)
     │   ├── rebase-pr/SKILL.md          # PR 因 BEHIND/CONFLICTING 需 rebase 時的 one-shot 流程,配 rebase-pr.sh + wait-pr-ci FAIL hint,refs #87
     │   ├── wait-pr-ci/SKILL.md         # PR CI 等待用 Monitor 而非 sleep 輪詢
     │   ├── gh-artifact-format/SKILL.md # gh issue/pr artifact 格式規範(issue title/body 5 sections/close 3 tiers/comment 3 categories/cross-ref keywords)配 enforce_gh_body_file.sh hook
@@ -186,7 +186,8 @@ docker/
     │   ├── wait-gh-state/SKILL.md      # 非 CI 的 GitHub state 監看 (issue close / release stable),sibling to wait-pr-ci;refs #115
     │   ├── proactive-optimization/SKILL.md # 任務 boundary 時主動提 optimisation 候選 (workflow ergonomics / cross-repo inconsistency / doc drift / manual repetition),配 remind_proactive_optimization.sh Stop hook;refs #124
     │   ├── skillification-candidates/SKILL.md # 任務 wrap-up 時提 skillification 候選 (/tmp/*.sh re-use / parser-fallback / slash-command gap / bug-in-skill),配 remind_skillification_candidates.sh Stop hook;refs #125
-    │   └── parallel-agents/SKILL.md    # bulk workload (N>=4 獨立 items) 時用最多 3 個 parallel Agent 並行 (single response 內多 Agent 呼叫),配 remind_parallel_when_bulk.sh UserPromptSubmit hook;refs #126
+    │   ├── parallel-agents/SKILL.md    # bulk workload (N>=4 獨立 items) 時用最多 3 個 parallel Agent 並行 (single response 內多 Agent 呼叫),配 remind_parallel_when_bulk.sh UserPromptSubmit hook;refs #126
+    │   └── batch-mutation-pr/SKILL.md  # generic batch-mutation-PR 引擎 (跨 repo fan-out line edits),配 batch-mutation-pr.sh + batch-line-edit.sh preset;refs #169/#207
     ├── test/                           # docker_harness 自己的 hook 測試 infra（與下游 repo 的 Dockerfile 無關）
     │   ├── Dockerfile                  # bats 1.11 + shellcheck on Alpine（COPY .claude/hooks/ + .claude/scripts/）
     │   └── Makefile                    # make -C .claude/test build / test / lint / hadolint / check / tree-check / ceiling-check

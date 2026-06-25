@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **977 tests** (974 smoke + 3 integration) plus shellcheck (40 hook
+Total: **980 tests** (977 smoke + 3 integration) plus shellcheck (40 hook
 scripts + 33 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -1640,6 +1640,21 @@ until a tag matching `--tag-pattern` (POSIX ERE) appears as stable (no
 | --on-rc message printed for rc tag | on-rc emission |
 | rc dedup across iterations emits once | tag dedup |
 | non-matching tags are ignored | tag-pattern filter |
+
+### test/smoke/skills_canonical_layout_spec.bats (3)
+
+Structural invariant (not a hook) asserting repo-owned skills are
+canonicalised under `.agents/skills/<name>/` with a tracked symlink at
+`.claude/skills/<name>` -> `../../.agents/skills/<name>`. Third-party
+mattpocock skills are machine-local and deliberately not asserted.
+Guards against an accidental revert to a real `.claude/skills/`
+directory or a broken symlink. New in #210; see ADR-00000011.
+
+| Test | Scenario |
+|------|----------|
+| every repo-owned .claude/skills/<name> is a symlink to ../../.agents/skills/<name> | symlink shape + target |
+| every repo-owned skill resolves its SKILL.md through the symlink | functional reachability |
+| every repo-owned skill canonical dir is a real directory under .agents/skills | canonical store is a real dir, not nested symlink |
 
 ## Integration specs
 
