@@ -122,6 +122,8 @@ from prose.
 - Author a new skill (skill scaffolding + progressive disclosure):
   `[[write-a-skill]]`
 - Caveman mode (low-token communication): `[[caveman]]`
-- Vendored skill source of truth: [`skills-lock.json`](skills-lock.json)
-  + `.agents/skills/` (upstream: `mattpocock/skills`)
+- Skill layout: repo-owned skills tracked under `.agents/skills/<name>/`
+  + `.claude/skills/` symlink; third-party (`mattpocock/skills`)
+  machine-local, reinstall `npx skills@latest add mattpocock/skills`
+  (ADR-00000011)
 - Memory portability across machines: `.claude/scripts/setup-memory-link.sh`
