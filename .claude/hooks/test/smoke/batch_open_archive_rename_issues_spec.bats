@@ -109,11 +109,11 @@ EOF
   assert_output --partial "ycpss91255-docker/urg_node_humble"
   assert_output --partial "urg_node_humble -> urg_node_ros2"
   assert_output --partial "ycpss91255-docker/urg_node_noetic"
-  assert_output --partial "urg_node_noetic -> urg_node_ros"
+  assert_output --partial "urg_node_noetic -> urg_node_ros1"
   assert_output --partial "ycpss91255-docker/realsense_humble"
   assert_output --partial "realsense_humble -> realsense_ros2"
   assert_output --partial "ycpss91255-docker/realsense_noetic"
-  assert_output --partial "realsense_noetic -> realsense_ros"
+  assert_output --partial "realsense_noetic -> realsense_ros1"
 
   # 11 created in summary
   assert_output --partial '"created":"11"'
@@ -162,7 +162,7 @@ EOF
   assert_output --partial "## Proposal"
   assert_output --partial "## Acceptance"
   assert_output --partial "## Out of scope"
-  assert_output --partial "urg_node_ros"
+  assert_output --partial "urg_node_ros1"
   assert_output --partial "ROS 1"
   assert_output --partial ".base"
   assert_output --partial "refs #86"
