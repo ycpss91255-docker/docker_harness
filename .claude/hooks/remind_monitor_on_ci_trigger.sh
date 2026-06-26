@@ -7,7 +7,7 @@
 # Monitor the resulting run via wait-tag-ci.sh / /wait-pr-ci instead of
 # sleep-polling. Non-blocking (always exit 0).
 #
-# Why: sibling of remind_pr_wait_ci.sh (which only fires on `gh pr
+# Why: sibling of remind_ci_auto_merge.sh (which only fires on `gh pr
 # create`). Without this hook, agents re-run a failed workflow or
 # dispatch one manually and then forget to arm a Monitor — CI results
 # go unchecked or get sleep-polled, burning context.

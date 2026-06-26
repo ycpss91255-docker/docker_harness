@@ -108,6 +108,7 @@ docker/
     │   ├── check-claude-md-tree.sh          # CI lint：parse this file 的 .claude/ tree vs filesystem，drift 就 exit 1 (post-#127: make tree-check passes CONTEXT.md as arg)
     │   ├── check-claude-md-ceiling.sh        # CI lint：assert CLAUDE.md 行數 + ^## 數在 ceiling 內 (defaults 240 / 20, env-overridable);refs #127
     │   ├── rebase-pr.sh                      # one-shot rebase + force-push for a PR whose base moved (BEHIND/CONFLICTING);auto-resolve worktree by branch via $WORKSPACE_DIR scan,refs #87
+    │   ├── auto-merge-on-green.sh           # auto-merge-on-green skill 的腳本:arm gh pr merge --auto + poll mergeStateStatus(MERGED/BEHIND→update-branch/DIRTY/FAIL/grace),refs #211
     │   ├── wait-pr-ci.sh                    # wait-pr-ci skill 的 PR-scoped polling loop（避開 Monitor parser warning）
     │   ├── wait-pr-ci-batch.sh              # 多 repo 多 PR 同一個 Monitor 的 batch 版本（取代 N 個平行 Monitor stream）
     │   ├── wait-tag-ci.sh                   # 同 skill 的 tag/branch-scoped 版本（gh run list --branch <tag>）
@@ -143,7 +144,7 @@ docker/
     │   ├── remind_readme_on_core_script.sh # git commit 前提醒 base 核心 .sh 改動是否同步 README
     │   ├── check_test_md_drift.sh      # *.bats / test_*.py|*_test.py / TEST.md 後比對測試數(.bats 數 @test、.py 數 def test_,refs #156/#198)
     │   ├── remind_tdd_categories.sh    # 動到 .sh/Dockerfile/compose 等時提醒 4 類測試
-    │   ├── remind_pr_wait_ci.sh        # gh pr create 前提醒用 /wait-pr-ci skill
+    │   ├── remind_ci_auto_merge.sh     # gh pr create 前提醒用 auto-merge-on-green skill(arm auto-merge + Monitor 落地);refs #211 (原 remind_pr_wait_ci)
     │   ├── remind_monitor_on_ci_trigger.sh # gh workflow run / gh run rerun 前提醒用 wait-tag-ci.sh / /wait-pr-ci (refs #154)
     │   ├── remind_monitor_on_git_push.sh # git push re-push/force-push 既有 PR branch（非 -u、非 main、非 tag）時提醒對同 PR re-invoke /wait-pr-ci(完成 CI-watch umbrella,refs #157)
     │   ├── remind_no_ai_attribution.sh # git commit / gh pr create 前掃 inline 歸屬字串
@@ -178,6 +179,7 @@ docker/
     │   ├── warn_structured_data_text_tools.sh # PreToolUse hook：bash 指令用 awk/sed 處理 .json/.jsonl 且無 jq 時 systemMessage nudge 改用 jq / Grep 工具(line-oriented 解析 JSONL 會誤計);non-blocking,配 structured-data-use-jq instinct
     │   └── test/                       # bats specs (smoke + integration) — 跑法見 Makefile
     ├── skills/                         # repo-owned; each a symlink -> ../../.agents/skills/<name>/ (third-party mattpocock skills machine-local, omitted; ADR-11)
+    │   ├── auto-merge-on-green/SKILL.md # 開 PR 後落地單一 PR:arm GitHub auto-merge + Monitor 包 auto-merge-on-green.sh,配 remind_ci_auto_merge hook;refs #211
     │   ├── rebase-pr/SKILL.md          # PR 因 BEHIND/CONFLICTING 需 rebase 時的 one-shot 流程,配 rebase-pr.sh + wait-pr-ci FAIL hint,refs #87
     │   ├── wait-pr-ci/SKILL.md         # PR CI 等待用 Monitor 而非 sleep 輪詢
     │   ├── gh-artifact-format/SKILL.md # gh issue/pr artifact 格式規範(issue title/body 5 sections/close 3 tiers/comment 3 categories/cross-ref keywords)配 enforce_gh_body_file.sh hook

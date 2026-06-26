@@ -30,8 +30,8 @@ teardown() {
 @test "gh pr create with attribution body fires both pre-tool hooks" {
   local input='{"tool_input":{"command":"gh pr create --title foo --body \"summary\\n\\nGenerated with [Claude Code]\""}}'
 
-  run "$(hook remind_pr_wait_ci.sh)" <<< "${input}"
-  assert_message_contains "wait-pr-ci"
+  run "$(hook remind_ci_auto_merge.sh)" <<< "${input}"
+  assert_message_contains "auto-merge-on-green"
 
   run "$(hook remind_no_ai_attribution.sh)" <<< "${input}"
   assert_message_contains "AI 歸屬標記"
