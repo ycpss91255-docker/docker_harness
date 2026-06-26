@@ -165,6 +165,22 @@ detect_subcmd() {
   fi
 }
 
+# close_segment <cmd> -- the `gh issue close ...` slice only, from the first
+# `gh issue close` up to the next command separator (&&, ||, |, ;). Rule 3's
+# -c/--comment detection must scope to this slice, else a -c belonging to a
+# different program in a chained / quoted command (python3 -c, bash -c,
+# git log -S '... -c ...') false-triggers the deny (refs #219).
+close_segment() {
+  local cmd="$1" seg=""
+  if [[ "${cmd}" =~ (gh[[:space:]]+issue[[:space:]]+close.*) ]]; then
+    seg="${BASH_REMATCH[1]}"
+  fi
+  seg="${seg%%&&*}"
+  seg="${seg%%|*}"
+  seg="${seg%%;*}"
+  printf '%s' "${seg}"
+}
+
 deny() {
   local reason="$1"
   jq -n --arg m "${reason}" '{
@@ -229,7 +245,7 @@ main() {
       return 0
       ;;
     "issue close")
-      if printf '%s' "${cmd}" | grep -qE -e '(--comment|-c)([[:space:]]+|=)'; then
+      if printf '%s' "$(close_segment "${cmd}")" | grep -qE -e '(--comment|-c)([[:space:]]+|=)'; then
         deny "gh issue close --comment is denied. Use two-step close: gh issue comment N --body-file X (or short --body \"<le 80 chars>\"), then gh issue close N [--reason completed|not\\ planned]. Rule 3 of #64."
         return 0
       fi
