@@ -91,8 +91,10 @@ from prose.
   `enforce_wrapper_first_upgrade.sh` (legacy `make -f Makefile.ci
   upgrade` still accepted during the make->just transition)
 - New repo creation under the org: `/new-repo`
-- CI monitoring after PR open: `[[wait-pr-ci]]` (PR-scoped) or
-  `[[wait-gh-state]]` (issue close / release tag)
+- Land a PR after open (arm GitHub auto-merge + Monitor):
+  `[[auto-merge-on-green]]`; pure CI monitoring (no merge):
+  `[[wait-pr-ci]]` (PR / tag) or `[[wait-gh-state]]` (issue close /
+  release tag)
 - Rebase a stale PR (BEHIND / CONFLICTING): `[[rebase-pr]]`
 - gh issue / PR artifact format (titles / body / close / comment /
   cross-ref): `[[gh-artifact-format]]` (enforced by
