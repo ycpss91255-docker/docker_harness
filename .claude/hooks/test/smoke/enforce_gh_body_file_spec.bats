@@ -155,6 +155,21 @@ stub_gh_fail() {
   assert_permission_decision "deny"
 }
 
+@test "rule 3: python3 -c mentioning gh issue close in a literal is NOT blocked (refs #219)" {
+  run "$(hook enforce_gh_body_file.sh)" <<< '{"tool_input":{"command":"python3 -c \"print(1) # gh issue close\""}}'
+  assert_silent
+}
+
+@test "rule 3: git log -S for the gh issue close string is NOT blocked (refs #219)" {
+  run "$(hook enforce_gh_body_file.sh)" <<< '{"tool_input":{"command":"git log -S '\''gh issue close'\''"}}'
+  assert_silent
+}
+
+@test "rule 3: gh issue close N (no comment) chained before another -c command is allowed (refs #219)" {
+  run "$(hook enforce_gh_body_file.sh)" <<< '{"tool_input":{"command":"gh issue close 42 && python3 -c \"print(1)\""}}'
+  assert_silent
+}
+
 @test "rule 3: gh issue close N --reason completed (no comment) allowed" {
   run "$(hook enforce_gh_body_file.sh)" <<< '{"tool_input":{"command":"gh issue close 42 --reason completed"}}'
   assert_silent

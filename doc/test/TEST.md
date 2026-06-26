@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **995 tests** (992 smoke + 3 integration) plus shellcheck (40 hook
+Total: **998 tests** (995 smoke + 3 integration) plus shellcheck (40 hook
 scripts + 34 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -391,7 +391,7 @@ exempt from `--body-file` scanning.
 | silent when Dockerfile.test-tools has no final-stage apk add | no final apk → SILENT |
 | handles empty smoke step gracefully | YAML run block empty → no crash |
 
-### test/smoke/enforce_gh_body_file_spec.bats (51)
+### test/smoke/enforce_gh_body_file_spec.bats (54)
 
 Covers `.claude/hooks/enforce_gh_body_file.sh` -- the PreToolUse hook
 that BLOCKS gh routing violations from issue #64. Renamed + upgraded
@@ -421,6 +421,9 @@ threshold for short inline bodies.
 | rule 4: gh pr create --body-file path with dash-like name allowed | path with `-` but not literal `-` → SILENT |
 | rule 3: gh issue close N --comment "..." denied | `--comment` on close → DENY (two-step required) |
 | rule 3: gh issue close N -c "..." (short form) denied | short form of `--comment` → DENY |
+| rule 3: python3 -c mentioning gh issue close in a literal is NOT blocked | `-c` of another program, scoped out → SILENT (#219) |
+| rule 3: git log -S for the gh issue close string is NOT blocked | string-only match, no flag → SILENT (#219) |
+| rule 3: gh issue close N (no comment) chained before another -c command is allowed | `-c` after `&&` cut from close-segment → SILENT (#219) |
 | rule 3: gh issue close N --reason completed (no comment) allowed | reason-only close → SILENT |
 | rule 3: gh issue close N --reason "not planned" allowed | reason-only close with quoted reason → SILENT |
 | rule 3: gh issue close N (no args beyond N) allowed | bare close → SILENT |
