@@ -43,6 +43,19 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ci-and-stamp.sh`.
 
 ### Fixed
+- **`ci-and-stamp.sh` detects base / downstream against base's current
+  command surface (refs #220, Severity 1).** Detection still keyed off
+  `justfile.ci` (base) and `./build.sh test` (downstream), but base
+  retired `justfile.ci` for a root `justfile` + `just test` and
+  downstream dropped `./build.sh` for `just build test` -- so base PRs
+  fell through to the `./build.sh test` branch and downstream PRs ran a
+  now-missing `./build.sh`, both exiting 127, leaving the local-CI gate
+  unsatisfiable (manual `LOCAL_CI_ACK` workaround). Now: root `justfile`
+  + `.base/` subtree → downstream `just build test`; root `justfile`
+  without `.base/` → base `just test` + `just test lint` (the `.base/`
+  subtree is the discriminator since both carry a root justfile);
+  `.claude/test/Makefile` → docker_harness is unchanged. verify.md /
+  issue-fix.md detection docs + the coupled spec fixtures updated.
 - **`enforce_gh_body_file.sh` Rule 3 no longer over-matches a `-c` from
   another program (closes #219).** The `-c`/`--comment` deny scanned the
   whole command line, so any command that merely contained the substring

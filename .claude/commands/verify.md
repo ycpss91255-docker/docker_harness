@@ -34,8 +34,9 @@ Each phase prints `### <phase>` header then its raw output. At the end, a `## Ve
 unless local CI passed on the current HEAD. Run
 `.claude/scripts/ci-and-stamp.sh` from the repo to green: it
 auto-detects the repo's CI runner (docker_harness → `make -C
-.claude/test check`; base → `just -f justfile.ci test` + `lint`;
-downstream → `./build.sh test`), runs the full mirror, and writes the
+.claude/test check`; downstream, i.e. root `justfile` + `.base/` →
+`just build test`; base, i.e. root `justfile` without `.base/` →
+`just test` + `just test lint`), runs the full mirror, and writes the
 marker `.claude/state/local-ci-pass/<HEAD-sha>.ok` only on green --
 which satisfies the gate for ANY repo, not just docker_harness. The
 canonical flow is: **ci-and-stamp green → commit → open PR**.

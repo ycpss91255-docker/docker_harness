@@ -4,8 +4,11 @@
 # full CI mirror and, on green, writes the local-ci-pass marker that
 # enforce_local_full_ci_before_pr.sh checks. Detection is by marker
 # file (.claude/test/Makefile -> docker_harness `make check`;
-# justfile.ci -> base `just -f justfile.ci test|lint`; root justfile ->
-# downstream `./build.sh test`; none -> no stamp, fail-open notice).
+# root justfile + .base/ subtree -> downstream `just build test`;
+# root justfile, no .base/ -> base `just test` + `just test lint`;
+# none -> no stamp, fail-open notice). Detection order matters: the
+# downstream `.base/` check precedes the base check (both have a root
+# justfile; the .base/ subtree is what a consumer repo vendors). Refs #220.
 #
 # The actual CI runner (make / just / ./build.sh) is stubbed via a
 # PATH shim that exits ${STUB_RC:-0}, so no real docker / make / just
@@ -54,19 +57,18 @@ marker() { echo "${REPO}/.claude/state/local-ci-pass/$(git -C "${REPO}" rev-pars
   [[ ! -f "$(marker)" ]] || { echo "marker should NOT exist on CI failure"; return 1; }
 }
 
-@test "base-style (justfile.ci) green -> detects just path + stamps" {
-  echo 'test:' > "${REPO}/justfile.ci"
+@test "base-style (root justfile, no .base) green -> runs just test + stamps" {
+  echo 'test:' > "${REPO}/justfile"
   stub_cmd just
   PATH="${STUB_DIR}:${PATH}" STUB_RC=0 run "$(script ci-and-stamp.sh)" "${REPO}"
   assert_success
   [[ -f "$(marker)" ]] || { echo "marker not written for base-style"; return 1; }
 }
 
-@test "downstream (root justfile) green -> runs ./build.sh test + stamps" {
+@test "downstream (root justfile + .base subtree) green -> runs just build test + stamps" {
   echo 'build *args:' > "${REPO}/justfile"
-  printf '#!/usr/bin/env bash\nexit ${STUB_RC:-0}\n' > "${REPO}/build.sh"
-  chmod +x "${REPO}/build.sh"
-  git -C "${REPO}" add -A; git -C "${REPO}" commit -q -m wip
+  mkdir -p "${REPO}/.base"
+  stub_cmd just
   PATH="${STUB_DIR}:${PATH}" STUB_RC=0 run "$(script ci-and-stamp.sh)" "${REPO}"
   assert_success
   [[ -f "$(marker)" ]] || { echo "marker not written for downstream"; return 1; }

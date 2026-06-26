@@ -18,10 +18,11 @@
 # Usage:
 #   ci-and-stamp.sh [<repo-path>]      # default: cwd
 #
-# Detection (mutually exclusive across repos):
-#   <root>/.claude/test/Makefile  -> docker_harness -> make -C .claude/test check
-#   <root>/justfile.ci            -> base           -> just -f justfile.ci test && lint
-#   <root>/justfile (-> .base)    -> downstream     -> ./build.sh test
+# Detection (first match wins; order matters -- both base and downstream
+# now carry a root justfile, so the .base/ subtree distinguishes them):
+#   <root>/.claude/test/Makefile      -> docker_harness -> make -C .claude/test check
+#   <root>/justfile  +  <root>/.base/ -> downstream      -> just build test
+#   <root>/justfile  (no .base/)      -> base            -> just test && just test lint
 #   none of the above             -> no CI mechanism -> do NOT stamp,
 #                                    exit 0 with a notice (the gate
 #                                    fail-opens for such repos)
@@ -62,16 +63,16 @@ main() {
     _log_info ci-and-stamp ci_start kind=docker_harness cmd="make -C .claude/test check"
     make -C "${root}/.claude/test" check
     rc=$?
-  elif [[ -f "${root}/justfile.ci" ]]; then
-    _log_info ci-and-stamp ci_start kind=base cmd="just -f justfile.ci test+lint"
-    ( cd "${root}" && just -f justfile.ci test && just -f justfile.ci lint )
+  elif [[ -f "${root}/justfile" && -d "${root}/.base" ]]; then
+    _log_info ci-and-stamp ci_start kind=downstream cmd="just build test"
+    ( cd "${root}" && just build test )
     rc=$?
   elif [[ -f "${root}/justfile" ]]; then
-    _log_info ci-and-stamp ci_start kind=downstream cmd="./build.sh test"
-    ( cd "${root}" && ./build.sh test )
+    _log_info ci-and-stamp ci_start kind=base cmd="just test && just test lint"
+    ( cd "${root}" && just test && just test lint )
     rc=$?
   else
-    _log_warn ci-and-stamp no_ci_mechanism repo="${root}" reason=no-makefile-justfile.ci-justfile
+    _log_warn ci-and-stamp no_ci_mechanism repo="${root}" reason=no-makefile-justfile
     return 0
   fi
 
