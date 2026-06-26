@@ -15,8 +15,8 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **980 tests** (977 smoke + 3 integration) plus shellcheck (40 hook
-scripts + 33 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
+Total: **995 tests** (992 smoke + 3 integration) plus shellcheck (40 hook
+scripts + 34 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
 CLAUDE.md) plus a CLAUDE.md ceiling audit (`make ceiling-check`
@@ -238,19 +238,50 @@ parity; the count tracks def-functions not collected cases, so
 | silent on git commit without attribution | clean message → SILENT |
 | silent on non-git/gh command containing attribution string | `echo Co-Authored-By: Claude` → SILENT |
 
-### test/smoke/remind_pr_wait_ci_spec.bats (5)
+### test/smoke/remind_ci_auto_merge_spec.bats (6)
+
+Covers `.claude/hooks/remind_ci_auto_merge.sh` (renamed from
+`remind_pr_wait_ci`; refs #211). PreToolUse on Bash matcher; fires ONLY
+on `gh pr create`, instructing the agent to land the PR via the
+`auto-merge-on-green` skill. `git push` is owned by
+`remind_monitor_on_git_push`, so this hook stays silent on it.
+
 | Test | Scenario |
 |------|----------|
-| fires on gh pr create | direct invocation → FIRE |
+| fires on gh pr create -> auto-merge-on-green | direct invocation → FIRE |
 | fires on chained command containing gh pr create | `... && gh pr create` → FIRE |
 | silent on gh pr list | non-create gh command → SILENT |
+| silent on git push (owned by remind_monitor_on_git_push) | `git push` → SILENT |
 | silent on unrelated command | `echo hello` → SILENT |
 | silent on empty command | empty input → SILENT |
+
+### test/smoke/auto_merge_on_green_spec.bats (12)
+
+Covers `.claude/scripts/auto-merge-on-green.sh` (refs #211; ported from
+initialization#154/#155). PATH-stubs `gh` so `gh pr view` returns a
+canned `mergeStateStatus` fixture and merge / update-branch are logged
+no-ops; `--no-arm --interval 0 --max-iterations N` make the poll loop
+deterministic. The gh-call log asserts arm / update-branch side effects.
+
+| Test | Scenario |
+|------|----------|
+| arg validation: missing --repo -> exit 2 | required-arg |
+| arg validation: non-numeric --pr -> exit 2 | arg type |
+| arg validation: bad --merge-method -> exit 2 | enum validation |
+| MERGED -> exit 0 with MERGED line | terminal success |
+| required check FAILURE while BLOCKED -> FAIL exit 1 | check failed, left armed |
+| merge conflict DIRTY -> FAIL exit 1 with rebase hint | conflict terminal |
+| closed unmerged -> FAIL exit 1 | closed terminal |
+| BEHIND -> runs gh pr update-branch, stays pending | strict-staleness nudge |
+| pending check still running -> keeps polling (max-iter 124) | pending keeps waiting |
+| BLOCKED with no pending/failed check past grace -> FAIL blocked | grace bail |
+| no PR (empty gh view) -> FAIL exit 1 | missing PR |
+| arm step runs gh pr merge --auto --squash --delete-branch | arm side effect |
 
 ### test/smoke/remind_monitor_on_ci_trigger_spec.bats (13)
 
 Covers `.claude/hooks/remind_monitor_on_ci_trigger.sh` — PreToolUse on
-Bash matcher. Sibling of `remind_pr_wait_ci`; fires when the agent
+Bash matcher. Sibling of `remind_ci_auto_merge`; fires when the agent
 triggers a new CI run via `gh workflow run` (workflow_dispatch) or
 `gh run rerun` (re-running a previous run), reminding to Monitor the
 resulting run via `wait-tag-ci.sh` / `/wait-pr-ci` instead of
@@ -1662,7 +1693,7 @@ directory or a broken symlink. New in #210; see ADR-00000011.
 | Test | Scenario |
 |------|----------|
 | git commit with Co-Authored-By: Claude AND code-only stage fires both pre-tool hooks | `remind_no_ai_attribution` + `check_changelog_drift` both FIRE on the same input |
-| gh pr create with attribution body fires both pre-tool hooks | `remind_pr_wait_ci` + `remind_no_ai_attribution` both FIRE |
+| gh pr create with attribution body fires both pre-tool hooks | `remind_ci_auto_merge` + `remind_no_ai_attribution` both FIRE |
 | editing a Dockerfile fires only the TDD reminder, not content-scan hooks | `remind_tdd_categories` FIRE; emoji/AI-attribution/coverage-excl SILENT |
 
 ## Lint

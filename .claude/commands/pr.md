@@ -27,24 +27,21 @@ Follow this workflow:
    - Docs only: `docs: <description>`
    - Do NOT add AI attribution lines (e.g. `Co-Authored-By: Claude ...`, `Generated with Claude Code`); CLAUDE.md「不加 AI 歸屬標記」明文禁止。
 
-5. **Push branch, create PR, enable auto-merge**:
+5. **Push branch, create PR**:
    ```
    git push -u origin <branch-name>
    # PR body 必須走 --body-file (enforce_gh_body_file.sh hook BLOCK inline --body)
    # 先 Write 寫到 /tmp/pr-<slug>-body.md,再:
    gh pr create --title "<type>: <title>" --body-file /tmp/pr-<slug>-body.md
-   gh pr merge <number> --auto --squash --delete-branch
    ```
-   `--auto` 讓 GitHub 端在 CI 全綠 + branch up-to-date 時自動 squash-merge + 刪 branch。所有 16 個 active repo 都已開啟 `allow_auto_merge`(2026-05-13 batch enable)。`.github` 例外:doc-only PR + paths filter 會讓 status check 永遠 pending,auto-merge 卡死 — 該 repo 改走手動 `gh pr merge`。
+   arming GitHub auto-merge + 監看落地交給 step 6 的 `auto-merge-on-green` skill(它跑 `gh pr merge --auto --squash --delete-branch`)。所有 active repo 都已開啟 `allow_auto_merge`。`.github` 例外:doc-only PR + paths filter 會讓 status check 永遠 pending,auto-merge 卡死 — 該 repo 改走手動 `gh pr merge`。
 
    PR body shape 規範參見 `.claude/skills/gh-artifact-format/SKILL.md`(issue body 同 5 sections,但 PR 多一個 `## Test plan` checklist)。Skill 也涵蓋 close-comment 3 tiers / non-closing comment 3 categories / cross-ref keywords (`Closes` / `Fixes` / `refs` / `supersedes` / `closes part of`)。
 
-6. **Wait for merge (僅當有下游步驟時)**:
-   - 如果這個 PR 是 base repo(要接 tag + 13 下游 fanout),或要在 session 內接續其他依賴 merged state 的動作,用 `wait-pr-ci` skill (`.claude/skills/wait-pr-ci/SKILL.md`) 等 `ALL_DONE` 通知 — Monitor + 30s poll loop,不會 sleep 卡 agent。
-   - 一般 bug fix / feat / doc PR 沒有下游步驟,fire-and-forget 即可,GitHub auto-merge 會處理完。
-   - 若 auto-merge 卡在 BEHIND(main 移動 / dependabot batch),GitHub 不會自動 rebase。處理方式:
-     - dependabot PR:留 `@dependabot rebase` comment
-     - 一般 PR:本地 `git pull --rebase origin main` + force-push,auto-merge 重新評估
+6. **Land the PR via `auto-merge-on-green`**(canonical 落地單一 PR 流程):
+   - 用 `auto-merge-on-green` skill (`.claude/skills/auto-merge-on-green/SKILL.md`):一個 Monitor 包 `.claude/scripts/auto-merge-on-green.sh --repo <O>/<R> --pr <N>` — 它 arm GitHub auto-merge、輪詢 `mergeStateStatus`、`BEHIND` 自動 `gh pr update-branch`(取代以前手動 `git pull --rebase` + force-push)、CI 失敗回報且保留 armed(fix-push 自動落地)。`remind_ci_auto_merge` hook 會在 `gh pr create` 後提醒。
+   - 純監看(不 merge,例如 base repo 要接 tag + 下游 fanout,或等其他依賴 merged state 的動作)才用 `wait-pr-ci` skill 等 `ALL_DONE`。
+   - dependabot PR 卡 BEHIND:留 `@dependabot rebase` comment。`.github` doc-only PR:auto-merge 卡死,手動 `gh pr merge`。
 
 7. **If this PR was on the `base` repo**: after merge + tag, the
    13 downstream repos need the new `.base/` subtree version pulled.

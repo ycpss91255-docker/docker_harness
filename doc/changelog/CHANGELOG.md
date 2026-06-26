@@ -7,6 +7,24 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **`auto-merge-on-green` skill + script land a single PR end-to-end
+  (closes #211; ADR-00000012; ported from initialization#154/#155).**
+  `.claude/scripts/auto-merge-on-green.sh --repo <O>/<R> --pr <N>` arms
+  GitHub-native auto-merge (`gh pr merge --auto --squash
+  --delete-branch`), then polls `gh pr view --json
+  state,mergeStateStatus,statusCheckRollup` keyed on `mergeStateStatus`
+  (repo-agnostic; no hardcoded check name): `MERGED` -> exit 0; `BEHIND`
+  -> `gh pr update-branch` (automates the manual rebase + force-push the
+  old `/pr` step 6 required under `strict` protection); `DIRTY` ->
+  exit 1; required-check `FAILURE` while `BLOCKED` -> exit 1 with
+  auto-merge left armed (a fix-push lands it); non-progressing `BLOCKED`
+  past `--grace` (90s) -> exit 1. Exit codes 0/1/2/124 match the
+  `wait-pr-ci` siblings; the agent wraps it in one Monitor. The
+  `auto-merge-on-green` skill (canonical `.agents/skills/`, symlinked
+  from `.claude/skills/`) composes the pure-monitor `wait-pr-ci`; it is
+  now the canonical "land a single PR" flow while `wait-pr-ci` stays for
+  tag / batch / wait-then-dependent-work. 12 script spec cases (mocked
+  `gh`).
 - **`ci-and-stamp.sh` makes the local-CI-before-PR gate satisfiable for
   every repo (closes #208).** `enforce_local_full_ci_before_pr.sh`
   (#176) fires on any repo's worktree but the local-ci-pass marker was
@@ -34,6 +52,18 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   single-spec run pattern, so local `make check` mirrors CI.
 
 ### Changed
+- **CI-watch reminder umbrella re-pointed at `auto-merge-on-green`
+  (refs #211).** `remind_pr_wait_ci.sh` is renamed to
+  `remind_ci_auto_merge.sh` (still `gh pr create`-only) and now
+  instructs the `auto-merge-on-green` skill instead of bare
+  `wait-pr-ci`. `remind_monitor_on_git_push.sh` keeps its trigger +
+  `-u`/`main`/tag exclusions and updates only its message to
+  `auto-merge-on-green` (arm is idempotent on re-push).
+  `remind_monitor_on_ci_trigger.sh` is unchanged (tag / dispatch
+  context). Hooks were kept SEPARATE rather than merged (as
+  initialization did) to avoid double-firing and preserve the tested
+  git-push exclusions. `settings.json` + the integration chain spec +
+  `CONTEXT.md` follow the rename. `/pr` steps 5-6 point at the skill.
 - **Split skill tracking: repo-owned tracked, vendored machine-local
   (closes #210, supersedes ADR-00000010 via ADR-00000011).** The ten
   repo-owned skills (`batch-mutation-pr`, `gh-artifact-format`,
