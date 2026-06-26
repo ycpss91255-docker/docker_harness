@@ -75,6 +75,18 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   single-spec run pattern, so local `make check` mirrors CI.
 
 ### Changed
+- **`remind_tdd_categories` / `remind_docker_for_lint` aligned to base's
+  current `just` surface (refs #220).** `remind_tdd_categories`
+  repo-detection now recognises a root `justfile` as a repo marker (base
+  + downstream moved to a root justfile, so a repo whose only marker was
+  the retired `justfile.ci` was mis-detected and fell back to the generic
+  4-category reminder); its lint clause and `remind_docker_for_lint`'s
+  message now lead with `just test` / `just test lint` (base) and
+  `just build test` (downstream) instead of the retired `just -f
+  justfile.ci` / `./build.sh`. Legacy `make -f Makefile.ci` / `./build.sh`
+  stay tolerated in the wrapper allow-list until the #497 downstream
+  fanout completes. +1 spec case. (`check_prefer_dot_sh` re-point + the
+  `.claude/test` Makefile->justfile migration are separate follow-ups.)
 - **CI-watch reminder umbrella re-pointed at `auto-merge-on-green`
   (refs #211).** `remind_pr_wait_ci.sh` is renamed to
   `remind_ci_auto_merge.sh` (still `gh pr create`-only) and now
