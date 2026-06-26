@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **998 tests** (995 smoke + 3 integration) plus shellcheck (40 hook
+Total: **999 tests** (996 smoke + 3 integration) plus shellcheck (40 hook
 scripts + 34 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -327,7 +327,7 @@ re-invoke `/wait-pr-ci` on the same PR. Silent on initial `-u` pushes
 | silent on non-git command (ls) | non-git → SILENT |
 | silent on bulk tag push variant | --tags bulk → SILENT |
 
-### test/smoke/remind_tdd_categories_spec.bats (12)
+### test/smoke/remind_tdd_categories_spec.bats (13)
 | Test | Scenario |
 |------|----------|
 | fires on .sh file edit | shell logic → FIRE |
@@ -342,6 +342,7 @@ re-invoke `/wait-pr-ci` on the same PR. Silent on initial `-u` pushes
 | [#75] .sh in repo with full test infra keeps all 4 categories | repo-detect: template layout → all 4 clauses |
 | [#75] Dockerfile in repo with only test/smoke/ keeps Smoke + Lint | repo-detect on Dockerfile path |
 | [#75] repo without any test/ subdir falls back to all 4 categories | fallback preserves pre-#75 behaviour |
+| [#220] .sh in repo detected via root justfile only (no Dockerfile) scopes categories | repo-detect: base/downstream root-justfile marker |
 
 ### test/smoke/remind_no_heredoc_redirect_spec.bats (10)
 | Test | Scenario |
