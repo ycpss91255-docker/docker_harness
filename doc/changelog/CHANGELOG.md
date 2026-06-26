@@ -43,6 +43,16 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ci-and-stamp.sh`.
 
 ### Fixed
+- **`enforce_gh_body_file.sh` Rule 3 no longer over-matches a `-c` from
+  another program (closes #219).** The `-c`/`--comment` deny scanned the
+  whole command line, so any command that merely contained the substring
+  `gh issue close` plus a `-c` token anywhere (`python3 -c "...gh issue
+  close..."`, `git log -S 'gh issue close'`) was falsely BLOCKED. The
+  detection is now scoped to a `close_segment` -- the `gh issue close ...`
+  slice up to the next `&&` / `||` / `|` / `;` -- so a `-c` belonging to a
+  chained or quoted other program is excluded, while a genuine
+  `gh issue close N --comment`/`-c` (the flag is a real argument of that
+  gh call) is still denied. +3 regression cases.
 - **`make -C .claude/test lint` / `test` now check the live worktree,
   not the baked image (closes #214).** Both targets ran `docker run
   $(IMAGE)` without a volume mount, so they lint/test the build-time
