@@ -73,7 +73,7 @@ main() {
   [[ "${cmd}" =~ (^|[\;\&\|][[:space:]]*)(bats|shellcheck|hadolint|kcov)([[:space:]]|$) ]] || return 0
 
   local tool="${BASH_REMATCH[2]}"
-  msg="$(printf '驗證一律走 Docker 提醒：偵測到直接跑 %s,結果可能與 CI 不一致(本機 bats-mock / shellcheck 版本可能不同)。改用 just -f justfile.ci test/lint、./build.sh test、或 make -C .claude/test test(過渡期 make -f Makefile.ci 仍接受)。' "${tool}")"
+  msg="$(printf '驗證一律走 Docker 提醒：偵測到直接跑 %s,結果可能與 CI 不一致(本機 bats-mock / shellcheck 版本可能不同)。改用 just test / just test lint(base)、just build test(downstream)、或 make -C .claude/test test(docker_harness;legacy ./build.sh test / make -f Makefile.ci 仍接受)。' "${tool}")"
 
   jq -n --arg m "${msg}" '{
     systemMessage: $m,
