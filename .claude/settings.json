@@ -121,7 +121,7 @@
           },
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/remind_pr_wait_ci.sh",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/remind_ci_auto_merge.sh",
             "timeout": 10
           },
           {

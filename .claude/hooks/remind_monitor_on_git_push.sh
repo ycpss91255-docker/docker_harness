@@ -3,12 +3,12 @@
 #
 # Fires before any Bash command. When the command re-pushes / force-pushes
 # an existing PR branch (CI re-runs on the new head, but there is no
-# `gh pr create` event to re-trigger remind_pr_wait_ci), emit a JSON
-# systemMessage reminding to re-invoke the /wait-pr-ci skill on the same
-# PR. Non-blocking (always exit 0).
+# `gh pr create` event to re-trigger remind_ci_auto_merge), emit a JSON
+# systemMessage reminding to drive the same PR to land via the
+# auto-merge-on-green skill on the new head. Non-blocking (always exit 0).
 #
-# This completes the CI-watch coverage umbrella (#157):
-#   - gh pr create                 -> remind_pr_wait_ci.sh
+# This completes the CI-watch coverage umbrella (#157, #211):
+#   - gh pr create                 -> remind_ci_auto_merge.sh
 #   - gh run rerun / workflow run  -> remind_monitor_on_ci_trigger.sh
 #   - git push (re-push)           -> THIS hook
 #
@@ -45,7 +45,7 @@ main() {
   # Bulk tag push (`git push --tags`): not a PR branch.
   [[ "${cmd}" =~ (^|[[:space:]])--tags([[:space:]]|$) ]] && return 0
 
-  msg="git push 提醒：這是對既有 branch 的 re-push / force-push，CI 會在新 head 重跑。對同一個 PR 重新 invoke /wait-pr-ci skill（.claude/skills/wait-pr-ci/SKILL.md）追 CI，別用 sleep 輪詢。(初次 -u push 由 gh pr create 提醒接手；推 main / tag 不在此列)"
+  msg="git push 提醒：對既有 branch 的 re-push / force-push，CI 會在新 head 重跑。若該分支已有 PR,用 auto-merge-on-green skill（.claude/skills/auto-merge-on-green/SKILL.md,arm 為 idempotent)確認落地;armed 的 PR 綠後 GitHub 會自動合,BEHIND 自動 update-branch。純監看(不 merge)才用 wait-pr-ci。別 sleep 輪詢。(初次 -u push 由 gh pr create 提醒接手；推 main / tag 不在此列)"
 
   jq -n --arg m "${msg}" '{
     systemMessage: $m,

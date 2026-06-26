@@ -13,7 +13,7 @@ fire() {
 
 @test "fires on git push --force-with-lease" {
   fire "git push --force-with-lease"
-  assert_message_contains "wait-pr-ci"
+  assert_message_contains "auto-merge-on-green"
 }
 
 @test "silent on git push -u origin feat/x (initial push)" {
@@ -33,17 +33,17 @@ fire() {
 
 @test "fires on plain git push (re-push to existing upstream)" {
   fire "git push"
-  assert_message_contains "wait-pr-ci"
+  assert_message_contains "auto-merge-on-green"
 }
 
 @test "fires on git push origin feat/x without -u (re-push)" {
   fire "git push origin feat/x"
-  assert_message_contains "wait-pr-ci"
+  assert_message_contains "auto-merge-on-green"
 }
 
 @test "fires on git -C <dir> push --force-with-lease" {
   fire "git -C worktree/docker_harness-9 push --force-with-lease"
-  assert_message_contains "wait-pr-ci"
+  assert_message_contains "auto-merge-on-green"
 }
 
 @test "silent on version-tag push (git push origin vX.Y.Z)" {
