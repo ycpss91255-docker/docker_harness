@@ -78,6 +78,17 @@ teardown() {
   refute_output --partial "Integration 必須"
 }
 
+@test "[#220] .sh in repo detected via root justfile only (no Dockerfile) scopes categories" {
+  mkdir -p "${TMPDIR}/jrepo/test/smoke"
+  echo "test:" > "${TMPDIR}/jrepo/justfile"
+  mkdir -p "${TMPDIR}/jrepo/script"
+  echo "echo a" > "${TMPDIR}/jrepo/script/foo.sh"
+  run "$(hook remind_tdd_categories.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/jrepo/script/foo.sh\"}}"
+  assert_message_contains "Smoke"
+  refute_output --partial "Unit 必須"
+  refute_output --partial "Integration 必須"
+}
+
 @test "[#75] .sh in repo with full test infra keeps all 4 categories" {
   mkdir -p "${TMPDIR}/repo/test/smoke" \
            "${TMPDIR}/repo/test/unit" \
