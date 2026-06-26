@@ -47,6 +47,7 @@ skills-lock.json
 .agents/*
 !.agents/skills/
 .agents/skills/*
+!.agents/skills/auto-merge-on-green/
 !.agents/skills/batch-mutation-pr/
 !.agents/skills/gh-artifact-format/
 !.agents/skills/parallel-agents/
@@ -59,6 +60,7 @@ skills-lock.json
 !.agents/skills/wait-pr-ci/
 
 .claude/skills/*
+!.claude/skills/auto-merge-on-green
 !.claude/skills/batch-mutation-pr
 !.claude/skills/gh-artifact-format
 !.claude/skills/parallel-agents
