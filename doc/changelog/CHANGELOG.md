@@ -75,6 +75,16 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   single-spec run pattern, so local `make check` mirrors CI.
 
 ### Changed
+- **`batch-open-archive-rename-issues.sh` rename map uses the explicit
+  `*_ros1` ROS 1 target (closes #227).** The `RENAME_REPOS` entries
+  encoded the retired bare `*_ros` target (`urg_node_ros`,
+  `realsense_ros`); the org naming convention (.github#23, 2026-06-25)
+  retired bare `*_ros` (= implicit ROS 1) for explicit `*_ros1` /
+  `*_ros2`. A re-run would have advertised wrong names, so the ROS 1
+  entries now target `urg_node_ros1` / `realsense_ros1` (the
+  `realsense_noetic` entry is historical -- its rename is done -- kept
+  with the corrected name). One-time historical tool; re-running it is
+  out of scope. Coupled spec assertions updated.
 - **`remind_tdd_categories` / `remind_docker_for_lint` aligned to base's
   current `just` surface (refs #220).** `remind_tdd_categories`
   repo-detection now recognises a root `justfile` as a repo marker (base
