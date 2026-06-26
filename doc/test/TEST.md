@@ -1246,16 +1246,18 @@ full CI mirror and, on green, writes the local-ci-pass marker the gate
 checks. Centralises marker-writing docker_harness-side so base /
 downstream PRs (not just docker_harness) can satisfy the gate; the
 runner is auto-detected (`.claude/test/Makefile` → `make -C
-.claude/test check`; `justfile.ci` → `just -f justfile.ci test+lint`;
-root `justfile` → `./build.sh test`; none → no stamp + notice). The CI
+.claude/test check`; root `justfile` + `.base/` → `just build test`;
+root `justfile` without `.base/` → `just test` + `just test lint`;
+none → no stamp + notice; the `.base/` subtree distinguishes a
+downstream consumer from base since both carry a root justfile). The CI
 runner is stubbed via a PATH shim exiting 0/1 (no real docker).
 
 | Test | Scenario |
 |------|----------|
 | docker_harness-style (.claude/test/Makefile) green -> stamps marker | detect + run + stamp |
 | CI command non-zero -> NO marker, propagates failure | red CI does not stamp |
-| base-style (justfile.ci) green -> detects just path + stamps | base detection |
-| downstream (root justfile) green -> runs ./build.sh test + stamps | downstream detection |
+| base-style (root justfile, no .base) green -> runs just test + stamps | base detection (#220) |
+| downstream (root justfile + .base subtree) green -> runs just build test + stamps | downstream detection (#220) |
 | no CI mechanism -> no stamp, exit 0, notice | fail-open passthrough |
 | marker filename is the exact HEAD sha | sha-keyed marker |
 
