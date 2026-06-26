@@ -61,11 +61,16 @@ readonly ARCHIVE_REPOS=(
 )
 
 # Rename entries: <old_repo>|<new_repo>|<ros_version_label>
+# ROS 1 targets use the explicit *_ros1 suffix (org naming convention,
+# .github#23 / 2026-06-25): bare *_ros (= implicit ROS 1) is retired.
+# realsense_noetic is already renamed to realsense_ros1 (realsense_ros1#52),
+# so its entry is historical; kept with the corrected target so a re-run
+# advertises the right name. This is a one-time tool (re-run out of scope).
 readonly RENAME_REPOS=(
   'urg_node_humble|urg_node_ros2|ROS 2'
-  'urg_node_noetic|urg_node_ros|ROS 1'
+  'urg_node_noetic|urg_node_ros1|ROS 1'
   'realsense_humble|realsense_ros2|ROS 2'
-  'realsense_noetic|realsense_ros|ROS 1'
+  'realsense_noetic|realsense_ros1|ROS 1'
 )
 
 usage() {
