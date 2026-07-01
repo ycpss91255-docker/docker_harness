@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **1008 tests** (1005 smoke + 3 integration) plus shellcheck (40 hook
+Total: **1025 tests** (1022 smoke + 3 integration) plus shellcheck (41 hook
 scripts + 34 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -1236,7 +1236,7 @@ mutating commands pass through silently. Lift mechanism is the same
 | allows same for-loop after ack file exists | ack-bypass |
 | ack for different command does NOT bypass deny | hash isolation |
 
-### test/smoke/enforce_serial_merge_gate_spec.bats (14)
+### test/smoke/enforce_serial_merge_gate_spec.bats (17)
 
 Covers `.claude/hooks/enforce_serial_merge_gate.sh` — BLOCKING
 PreToolUse hook that DENIES the 2nd+ same-repo `gh pr merge ... --auto`
