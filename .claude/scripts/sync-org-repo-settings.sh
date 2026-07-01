@@ -54,7 +54,7 @@ SCOPE_REPO=""
 ALL_REPOS=(
   jetson_sdk_manager isaac docker_harness base omniverse_web_viewer ros1_bridge
   template ros2_distro ros_distro sam_manager seggpt urg_node_noetic
-  urg_node_humble sick_noetic sick_humble realsense_noetic realsense_humble
+  urg_node_humble sick_noetic sick_humble realsense_ros1 realsense_ros2
   gemini_cli codex_cli claude_code ai_agent .github multi_run
 )
 

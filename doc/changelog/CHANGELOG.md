@@ -75,6 +75,15 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   single-spec run pattern, so local `make check` mirrors CI.
 
 ### Changed
+- **Live repo-name references updated for the realsense rename (closes
+  #224).** The org renamed `realsense_noetic` -> `realsense_ros1` and
+  `realsense_humble` -> `realsense_ros2`; live/re-runnable scripts +
+  command docs (`sync-org-repo-settings.sh`, `batch-base-upgrade.{sh,md}`,
+  `check-template-versions.sh`, `batch-gitignore-{add-line,fix}.sh`,
+  `pr.md`) now use the current names (parked entries renamed in place, not
+  re-activated). Frozen one-shot historical scripts are left as-is;
+  `ros_distro`->`ros1_distro` and the urg_node renames are deferred until
+  those renames land.
 - **`batch-open-archive-rename-issues.sh` rename map uses the explicit
   `*_ros1` ROS 1 target (closes #227).** The `RENAME_REPOS` entries
   encoded the retired bare `*_ros` target (`urg_node_ros`,

@@ -101,7 +101,7 @@ Wrap the first line in a Monitor (so it doesn't block the agent on a long poll) 
 Hardcoded in the script (`DEFAULT_REPOS`). Currently 13 repos:
 
 - `agent/{ai_agent,claude_code,codex_cli,gemini_cli}` (4)
-- `app/{realsense_ros2,realsense_noetic,ros1_bridge,sick_humble,sick_noetic,urg_node_humble,urg_node_noetic}` (7)
+- `app/{realsense_ros2,realsense_ros1,ros1_bridge,sick_humble,sick_noetic,urg_node_humble,urg_node_noetic}` (7)
 - `env/{ros_distro,ros2_distro}` (2)
 
 The 6 legacy single-distro env repos (`ros_noetic`, `ros_kinetic`,
