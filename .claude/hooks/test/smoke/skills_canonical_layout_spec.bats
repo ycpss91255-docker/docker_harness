@@ -21,10 +21,10 @@ REPO_OWNED_SKILLS=(
   gh-artifact-format
   parallel-agents
   proactive-optimization
-  rebase-pr
   semver-bump
   skillification-candidates
   strategic-compact
+  update-stale-pr
   wait-gh-state
   wait-pr-ci
 )

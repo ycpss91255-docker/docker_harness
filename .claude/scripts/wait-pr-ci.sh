@@ -241,9 +241,9 @@ main() {
       out="${out}PR${pr}: checks=${state} mergeable=${m}"$'\n'
 
       # mergeable=CONFLICTING means main moved + the PR has merge conflicts.
-      # No amount of polling will resolve this -- the head must be rebased.
-      # Surface as FAIL with a rebase-pr.sh hint so the caller acts on it
-      # (refs issue #87) rather than looping forever waiting for MERGEABLE.
+      # No amount of polling will resolve this -- the head must merge in
+      # origin/main. Surface as FAIL with an update-stale-pr.sh hint so the
+      # caller acts on it (refs #87 / #221) rather than looping forever.
       case "${state}" in
         FAIL) fail_pr="${pr}"; fail_reason="check"; all_ready=0 ;;
         all-pass)
@@ -266,7 +266,7 @@ main() {
     if [[ -n "${fail_pr}" ]]; then
       case "${fail_reason:-}" in
         conflict)
-          printf 'FAIL %s (mergeable=CONFLICTING). Rebase:\n  .claude/scripts/rebase-pr.sh %s --repo %s\nSee .claude/skills/rebase-pr/SKILL.md.\n' \
+          printf 'FAIL %s (mergeable=CONFLICTING). Update (merge origin/main, no rebase):\n  .claude/scripts/update-stale-pr.sh %s --repo %s\nSee .claude/skills/update-stale-pr/SKILL.md.\n' \
             "${fail_pr}" "${fail_pr}" "${repo}"
           ;;
         closed)
