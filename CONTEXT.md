@@ -107,7 +107,7 @@ docker/
     │   ├── fix-dockerfile-copy-script.sh     # 通用：對 --branch 指定的 chore 分支批次 patch downstream Dockerfile 把 `COPY *.sh /lint/` 改成 `COPY script/*.sh /lint/`（base#330 / v0.31.0 wrapper consolidation 後 root 沒有 *.sh,active 2 個下游 fanout 必須跑,idempotent）
     │   ├── check-claude-md-tree.sh          # CI lint：parse this file 的 .claude/ tree vs filesystem，drift 就 exit 1 (post-#127: make tree-check passes CONTEXT.md as arg)
     │   ├── check-claude-md-ceiling.sh        # CI lint：assert CLAUDE.md 行數 + ^## 數在 ceiling 內 (defaults 240 / 20, env-overridable);refs #127
-    │   ├── rebase-pr.sh                      # one-shot rebase + force-push for a PR whose base moved (BEHIND/CONFLICTING);auto-resolve worktree by branch via $WORKSPACE_DIR scan,refs #87
+    │   ├── update-stale-pr.sh               # one-shot merge origin/main + normal push (NO rebase/force) for a PR whose base moved (BEHIND/CONFLICTING);auto-resolve worktree by branch via $WORKSPACE_DIR scan,refs #87/#221
     │   ├── auto-merge-on-green.sh           # auto-merge-on-green skill 的腳本:arm gh pr merge --auto + poll mergeStateStatus(MERGED/BEHIND→update-branch/DIRTY/FAIL/grace),refs #211
     │   ├── serial-merge.sh                  # 同 repo 多 PR 依序落地:逐一 delegate auto-merge-on-green.sh(只 arm 隊首→≤1 armed→CI O(N²)→O(N)),skip-and-continue + summary,refs #235
     │   ├── wait-pr-ci.sh                    # wait-pr-ci skill 的 PR-scoped polling loop（避開 Monitor parser warning）
@@ -161,6 +161,7 @@ docker/
     │   ├── enforce_wrapper_first_upgrade.sh # 三個 surface (./.base/upgrade.sh / ./template/upgrade.sh / git subtree pull --prefix=.base|template) 前 BLOCK,改走 hook 偵測的 CI-runner wrapper(justfile→just upgrade / justfile.ci→just -f justfile.ci upgrade / Makefile.ci→make -f Makefile.ci upgrade,checkpoint ack 可解,refs #36 / ADR-00000002 / base#573 / #202)
     │   ├── enforce_batch_via_script.sh   # 跨 repo for-loop + mutation (git push|reset|tag|branch -D / gh issue|pr close|merge|comment --body) 前 BLOCK,改走 .claude/scripts/<name>.sh(checkpoint ack 可解,refs #121 / ADR-00000002)
     │   ├── enforce_worktree_for_branch.sh # 主 checkout 內 git checkout -b|-B 前 BLOCK,要求改走 git worktree add <path> -b <branch> main(內部 worktree 自動放行,checkpoint ack 可解,refs #122 / PR #89 / ADR-00000006)
+    │   ├── enforce_merge_update_not_rebase.sh # git rebase(除 --abort/--continue/--skip)+ 有 open PR 的 branch force-push 前 BLOCK,改走 git merge origin/main + 一般 push;no-PR force-push / gh 錯誤 fail-open,checkpoint ack 可解,refs #221
     │   ├── enforce_local_full_ci_before_pr.sh # gh pr create/ready 前 BLOCK：HEAD 無 local-CI marker(.claude/state/local-ci-pass/<sha>.ok,由 make -C .claude/test test 綠時寫)且非「綠後只動 doc」則 deny;LOCAL_CI_ACK=<sha> 可 override(refs #176)
     │   ├── check_prefer_dot_sh.sh       # docker build/run/exec/stop/compose 前：cwd 有對應 .sh wrapper 則 deny,沒有則 ask
     │   ├── remind_topics_yaml_on_new_repo.sh # gh repo create ycpss91255-docker/* 前提醒去 .github topics.yaml 加 repos.* 條目
@@ -181,7 +182,7 @@ docker/
     │   └── test/                       # bats specs (smoke + integration) — 跑法見 Makefile
     ├── skills/                         # repo-owned; each a symlink -> ../../.agents/skills/<name>/ (third-party mattpocock skills machine-local, omitted; ADR-11)
     │   ├── auto-merge-on-green/SKILL.md # 開 PR 後落地單一 PR:arm GitHub auto-merge + Monitor 包 auto-merge-on-green.sh,配 remind_ci_auto_merge hook;refs #211
-    │   ├── rebase-pr/SKILL.md          # PR 因 BEHIND/CONFLICTING 需 rebase 時的 one-shot 流程,配 rebase-pr.sh + wait-pr-ci FAIL hint,refs #87
+    │   ├── update-stale-pr/SKILL.md    # PR BEHIND/CONFLICTING 時 merge origin/main + 一般 push(不 rebase/force)的 one-shot 流程,配 update-stale-pr.sh + wait-pr-ci FAIL hint,refs #87/#221
     │   ├── wait-pr-ci/SKILL.md         # PR CI 等待用 Monitor 而非 sleep 輪詢
     │   ├── gh-artifact-format/SKILL.md # gh issue/pr artifact 格式規範(issue title/body 5 sections/close 3 tiers/comment 3 categories/cross-ref keywords)配 enforce_gh_body_file.sh hook
     │   ├── semver-bump/SKILL.md        # 版本 tag 流程:X/Y/Z 分類 + RC 程序 + RELEASE_X_BUMP_ACK 使用,配 release-tag.sh + enforce_semver_tag_via_script.sh,refs #106

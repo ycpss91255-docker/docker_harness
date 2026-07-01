@@ -94,6 +94,23 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   single-spec run pattern, so local `make check` mirrors CI.
 
 ### Changed
+- **Stale PRs update via merge-not-rebase, enforced by a new hook
+  (closes #221).** Under strict branch protection, a stale PR was
+  updated with `git rebase` + `force-push` -- which rewrites SHAs, races
+  CI, and needs a force-push ACK every time; under squash-merge rebase's
+  linear history is discarded anyway. New `enforce_merge_update_not_rebase.sh`
+  PreToolUse hook DENIES `git rebase` (recovery flags `--abort`/
+  `--continue`/`--skip` exempt; `git pull --rebase` included) and DENIES
+  `git push --force`/`--force-with-lease` ONLY on a branch that has an
+  open PR (via `gh pr list --head`; no-PR force-push and gh errors
+  fail-open), steering both to `git merge origin/main` + a normal push.
+  Deny is checkpoint + touch-ACK overridable. `rebase-pr.sh` + the
+  `rebase-pr` skill are re-authored as `update-stale-pr.sh` +
+  `update-stale-pr` (merge origin/main + normal push, no rebase/force);
+  the `wait-pr-ci` CONFLICTING hint and `auto-merge-on-green` DIRTY
+  message now point at the merge-update flow. New hook spec (15) +
+  update-stale-pr spec (14); `enforce_merge_update_not_rebase.sh`
+  registered in settings.json.
 - **Live repo-name references updated for the realsense rename (closes
   #224).** The org renamed `realsense_noetic` -> `realsense_ros1` and
   `realsense_humble` -> `realsense_ros2`; live/re-runnable scripts +

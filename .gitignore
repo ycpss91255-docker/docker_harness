@@ -52,7 +52,7 @@ skills-lock.json
 !.agents/skills/gh-artifact-format/
 !.agents/skills/parallel-agents/
 !.agents/skills/proactive-optimization/
-!.agents/skills/rebase-pr/
+!.agents/skills/update-stale-pr/
 !.agents/skills/semver-bump/
 !.agents/skills/skillification-candidates/
 !.agents/skills/strategic-compact/
@@ -65,7 +65,7 @@ skills-lock.json
 !.claude/skills/gh-artifact-format
 !.claude/skills/parallel-agents
 !.claude/skills/proactive-optimization
-!.claude/skills/rebase-pr
+!.claude/skills/update-stale-pr
 !.claude/skills/semver-bump
 !.claude/skills/skillification-candidates
 !.claude/skills/strategic-compact

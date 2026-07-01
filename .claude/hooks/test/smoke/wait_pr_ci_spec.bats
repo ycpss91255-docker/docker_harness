@@ -94,16 +94,16 @@ STUB_EOF
   assert_output --partial "FAIL 7"
 }
 
-@test "all-pass + CONFLICTING mergeable exits 1 with rebase-pr hint" {
-  # refs ycpss91255-docker/docker_harness#87 -- when checks pass but
-  # mergeable=CONFLICTING, the only resolution is a rebase. Surface
-  # as FAIL with the rebase-pr.sh canonical incantation rather than
-  # looping forever on CONFLICTING.
+@test "all-pass + CONFLICTING mergeable exits 1 with update-stale-pr hint" {
+  # refs ycpss91255-docker/docker_harness#87 / #221 -- when checks pass but
+  # mergeable=CONFLICTING, the resolution is to merge origin/main into the
+  # branch (no rebase). Surface as FAIL with the update-stale-pr.sh
+  # canonical incantation rather than looping forever on CONFLICTING.
   stub_gh '{"mergeable":"CONFLICTING","statusCheckRollup":[{"name":"test","status":"COMPLETED","conclusion":"SUCCESS"}]}'
   run "$(script wait-pr-ci.sh)" --repo a/b --prs 42 --interval 0 --max-iterations 3
   assert_failure 1
   assert_output --partial "FAIL 42 (mergeable=CONFLICTING)"
-  assert_output --partial "rebase-pr.sh 42 --repo a/b"
+  assert_output --partial "update-stale-pr.sh 42 --repo a/b"
 }
 
 @test "mixed SUCCESS+SKIPPED rollup hits ALL_DONE" {
