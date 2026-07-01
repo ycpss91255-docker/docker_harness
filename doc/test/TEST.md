@@ -1236,6 +1236,40 @@ mutating commands pass through silently. Lift mechanism is the same
 | allows same for-loop after ack file exists | ack-bypass |
 | ack for different command does NOT bypass deny | hash isolation |
 
+### test/smoke/enforce_serial_merge_gate_spec.bats (14)
+
+Covers `.claude/hooks/enforce_serial_merge_gate.sh` — BLOCKING
+PreToolUse hook that DENIES the 2nd+ same-repo `gh pr merge ... --auto`
+arm of a batch (issue #236). On an `--auto` arm it queries the target
+repo's open PRs already armed for auto-merge
+(`gh pr list --repo <repo> --state open --json number,autoMergeRequest`),
+excluding the PR being armed. 0 already armed → ALLOW (single arm,
+silent); ≥ 1 → DENY with a data-rich message (repo + armed list +
+ready-to-paste `.claude/scripts/serial-merge.sh <repo> <armed...>
+<this-pr>`). Non-`--auto` merges, read-only `gh pr view`, and unrelated
+commands pass through silently; the query fails open. Lift via the
+`/tmp` checkpoint protocol (ADR-00000002) or the `SERIAL_MERGE=1`
+bypass (env var or inline command prefix). `gh` is PATH-stubbed so
+`gh pr list --json` returns a synthetic armed-PR array driven by the
+`ARMED` env var.
+
+| Test | Scenario |
+|------|----------|
+| silent on first arm when repo has no already-armed PR | 0 armed → allow |
+| denies second same-repo arm with a data-rich message | positive trigger + message content |
+| deny message contains ready-to-paste serial-merge.sh command | canonical command |
+| deny writes a checkpoint markdown | checkpoint side-effect |
+| short repo name expands to default owner in the message | default-owner expansion |
+| excludes the PR being armed from the armed count (idempotent re-arm) | self-exclusion |
+| allows same command after ack file exists | ack-bypass |
+| ack for a different command does NOT bypass deny | hash isolation |
+| SERIAL_MERGE=1 env bypasses the gate | env bypass |
+| SERIAL_MERGE=1 inline command prefix bypasses the gate | inline prefix bypass |
+| silent on non-auto gh pr merge (not an arm) | scope: --auto only |
+| silent on unrelated command (git status) | non-merge command |
+| silent on gh pr view (read-only) | read-only gh |
+| silent on empty command | empty-input guard |
+
 ### test/smoke/enforce_local_full_ci_before_pr_spec.bats (11)
 
 Covers `.claude/hooks/enforce_local_full_ci_before_pr.sh` — BLOCKING

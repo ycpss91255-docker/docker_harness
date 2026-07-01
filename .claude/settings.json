@@ -211,6 +211,11 @@
           },
           {
             "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/enforce_serial_merge_gate.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/enforce_worktree_for_branch.sh",
             "timeout": 10
           },
