@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **999 tests** (996 smoke + 3 integration) plus shellcheck (40 hook
+Total: **1008 tests** (1005 smoke + 3 integration) plus shellcheck (40 hook
 scripts + 34 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -277,6 +277,28 @@ deterministic. The gh-call log asserts arm / update-branch side effects.
 | BLOCKED with no pending/failed check past grace -> FAIL blocked | grace bail |
 | no PR (empty gh view) -> FAIL exit 1 | missing PR |
 | arm step runs gh pr merge --auto --squash --delete-branch | arm side effect |
+
+### test/smoke/serial_merge_spec.bats (9)
+
+Covers `.claude/scripts/serial-merge.sh` (issue #235) — lands N same-repo
+PRs serially by delegating each to `auto-merge-on-green.sh` one at a time
+(so at most one PR is ever armed, turning the O(N^2) CI re-run blow-up
+under strict branch protection into O(N)). The delegate is seamed via the
+`SERIAL_MERGE_DELEGATE` env override to a fake that logs its `--repo`/`--pr`
+and exits per `FAIL_PRS`; `gh` is also PATH-stubbed to a logged no-op. The
+call-log asserts ordering, default-owner prefix, and skip-and-continue.
+
+| Test | Scenario |
+|------|----------|
+| --help prints usage and exits 0 | help path |
+| arg validation: missing repo arg -> exit 2 | required-arg validation |
+| arg validation: repo but no PR args -> exit 2 | required-arg validation |
+| arg validation: non-numeric PR -> exit 2 before any delegation | up-front validation, empty call-log |
+| --dry-run prints planned order and makes no delegate/gh call | dry-run no-op (empty call-log) |
+| default-owner expansion: short repo foo -> ycpss91255-docker/foo | default owner prefix |
+| ordering: PRs are delegated in the given argument order | serial order preserved |
+| skip-and-continue: first PR fails, second still lands, exit 1 names failed PR | continue-on-error + summary |
+| all-success: every delegate exits 0 -> exit 0 with merged summary | happy path |
 
 ### test/smoke/remind_monitor_on_ci_trigger_spec.bats (13)
 
