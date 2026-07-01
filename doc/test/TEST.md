@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **999 tests** (996 smoke + 3 integration) plus shellcheck (40 hook
+Total: **1014 tests** (1011 smoke + 3 integration) plus shellcheck (41 hook
 scripts + 34 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -472,7 +472,7 @@ parser warnings). `gh` is stubbed via PATH so the loop sees canned
 | unknown arg exits 2 | unknown flag |
 | all-pass + MERGEABLE single PR exits 0 with ALL_DONE | happy path |
 | any FAILURE check exits 1 with FAIL <pr> | fail-fast on FAILURE |
-| all-pass + CONFLICTING mergeable exits 1 with rebase-pr hint | mergeable=CONFLICTING surfaces as FAIL with rebase-pr.sh hint (issue #87) |
+| all-pass + CONFLICTING mergeable exits 1 with update-stale-pr hint | mergeable=CONFLICTING surfaces as FAIL with update-stale-pr.sh hint (issue #87 / #221) |
 | mixed SUCCESS+SKIPPED rollup hits ALL_DONE | SKIPPED counts as success-equivalent (issue #86) |
 | multiple PRs all-pass + MERGEABLE exits 0 | CSV PR batching |
 | custom --check-filter narrows to a non-default check name | filter override (container-repo / org-profile usage) |
@@ -760,14 +760,14 @@ helpers. Refs issue #97.
 | throttle: second fire with same signal-bucket silent | TMPDIR marker |
 | silent on missing transcript_path | defensive |
 
-### test/smoke/rebase_pr_spec.bats (14)
+### test/smoke/update_stale_pr_spec.bats (14)
 
-Covers `.claude/scripts/rebase-pr.sh` -- the one-shot rebase +
-force-push primitive for a PR whose base branch has moved
-(`mergeStateStatus: BEHIND` / `CONFLICTING`). `gh` is stubbed via
-PATH; `git` operations run against real temp worktrees so the
-auto-resolver's branch-name match is exercised end-to-end. Refs
-issue #87.
+Covers `.claude/scripts/update-stale-pr.sh` (refs #87 / #221) -- the
+one-shot `git merge origin/<base>` + normal push primitive (NO rebase,
+NO force) for a PR whose base branch has moved (`mergeStateStatus:
+BEHIND` / `CONFLICTING`). Renamed from `rebase-pr.sh`. `gh` is stubbed
+via PATH; `git` runs against real temp worktrees so the auto-resolver's
+branch-name match is exercised end-to-end.
 
 | Test | Scenario |
 |------|----------|
@@ -782,9 +782,38 @@ issue #87.
 | --worktree pointing at non-existent path exits 3 | explicit-path validation |
 | auto-resolves worktree by branch via WORKSPACE_DIR scan | resolver happy path |
 | --worktree overrides auto-resolution | explicit override |
-| ambiguous worktree match (>1 branch hit) falls back to no-match exit 3 | resolver disambiguation |
-| --dry-run prints planned commands, no fetch / rebase / push | dry-run preview |
+| --dry-run prints planned merge commands, no fetch / merge / push | dry-run preview |
 | --dry-run honours non-main base branch | non-main base support |
+| clean run invokes git merge + normal push, never rebase / force | merge-update mechanism |
+
+### test/smoke/enforce_merge_update_not_rebase_spec.bats (15)
+
+Covers `.claude/hooks/enforce_merge_update_not_rebase.sh` (refs #221) --
+PreToolUse (Bash). DENIES `git rebase` (any position, incl. `git -C`,
+and `git pull --rebase`) steering to `git merge origin/main`; DENIES
+`git push --force`/`-f`/`--force-with-lease` ONLY on a branch that has
+an open PR (`gh pr list --head`), steering to merge-update. Recovery
+flags (`--abort`/`--continue`/`--skip`), no-PR force-push, gh errors,
+and non-git commands stay silent (fail-open). Deny is checkpoint +
+touch-ACK overridable. `gh` mocked on PATH; setup seeds a real branch.
+
+| Test | Scenario |
+|------|----------|
+| git rebase main -> deny | rebase denied |
+| git rebase -i HEAD~3 -> deny | interactive rebase denied |
+| git -C some/dir rebase origin/main -> deny | -C form denied |
+| git pull --rebase -> deny | pull --rebase denied |
+| git rebase --abort -> silent (recovery exempt) | recovery flag |
+| git rebase --continue -> silent (recovery exempt) | recovery flag |
+| git rebase --skip -> silent (recovery exempt) | recovery flag |
+| git push --force on branch WITH open PR -> deny | force-push gated on open PR |
+| git push --force-with-lease origin feat/x WITH open PR -> deny | lease variant + explicit branch |
+| git push --force on branch with NO open PR -> silent (fail-open) | no-PR force-push allowed |
+| git push --force when gh errors / unavailable -> silent (fail-open) | gh failure fail-open |
+| plain git push (no force) -> silent | non-force push |
+| non-git command (ls) -> silent | out of scope |
+| empty command -> silent | empty input |
+| git rebase after ack file exists -> allow | checkpoint ACK override |
 
 ### test/smoke/wait_tag_ci_spec.bats (14)
 

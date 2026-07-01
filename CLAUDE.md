@@ -95,7 +95,8 @@ from prose.
   `[[auto-merge-on-green]]`; pure CI monitoring (no merge):
   `[[wait-pr-ci]]` (PR / tag) or `[[wait-gh-state]]` (issue close /
   release tag)
-- Rebase a stale PR (BEHIND / CONFLICTING): `[[rebase-pr]]`
+- Update a stale PR (BEHIND / CONFLICTING) via merge origin/main
+  (no rebase/force): `[[update-stale-pr]]`
 - gh issue / PR artifact format (titles / body / close / comment /
   cross-ref): `[[gh-artifact-format]]` (enforced by
   `enforce_gh_body_file.sh`)
