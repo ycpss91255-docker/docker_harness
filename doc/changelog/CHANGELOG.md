@@ -7,6 +7,25 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **`serial-merge.sh` lands N same-repo PRs serially (closes #235).**
+  `.claude/scripts/serial-merge.sh <owner/repo> <pr1> <pr2> ...` lands a
+  list of PRs against a single repo one at a time, delegating each to
+  `auto-merge-on-green.sh --repo <O>/<R> --pr <N>` and advancing to the
+  next PR only after the current one returns. Under `strict` branch
+  protection (base must be up to date before merge), arming N PRs at once
+  is O(N^2) in CI runs -- each merge advances base, marking every other
+  armed PR BEHIND and forcing an update-branch re-run for all of them;
+  landing serially keeps at most ONE PR armed at a time (which also makes
+  it naturally exempt from the #236 at-most-one-armed-PR gate) and reduces
+  the CI-run cost to O(N). A short repo name defaults owner
+  `ycpss91255-docker` (mirrors `batch-pr-merge.sh`). Skip-and-continue: a
+  PR whose delegate exits non-zero (CI fail / DIRTY / closed) is logged
+  and left armed for a fix-push while the run continues; a final summary
+  line lists merged / failed PRs and the exit is non-zero if any failed.
+  `--dry-run` prints the planned landing order without touching gh, and
+  the delegate's per-transition stdout passes straight through so the
+  whole run is Monitor-wrappable. Exit codes 0/1/2 match the batch
+  siblings. 8 script spec cases (seamed delegate + mocked `gh`).
 - **`auto-merge-on-green` skill + script land a single PR end-to-end
   (closes #211; ADR-00000012; ported from initialization#154/#155).**
   `.claude/scripts/auto-merge-on-green.sh --repo <O>/<R> --pr <N>` arms
