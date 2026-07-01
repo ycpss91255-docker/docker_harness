@@ -57,7 +57,7 @@ Follow this workflow:
    ```
    Manual fan-out (kept for reference; prefer the batch script):
    ```
-   for repo in env/ros_distro env/ros2_distro agent/ai_agent agent/claude_code agent/codex_cli agent/gemini_cli app/realsense_ros2 app/realsense_noetic app/sick_humble app/sick_noetic app/urg_node_noetic app/ros1_bridge app/urg_node_humble; do
+   for repo in env/ros_distro env/ros2_distro agent/ai_agent agent/claude_code agent/codex_cli agent/gemini_cli app/realsense_ros2 app/realsense_ros1 app/sick_humble app/sick_noetic app/urg_node_noetic app/ros1_bridge app/urg_node_humble; do
      git -C "${CLAUDE_PROJECT_DIR}/$repo" pull
      (cd "${CLAUDE_PROJECT_DIR}/$repo" && ./.base/upgrade.sh && git push)
    done

@@ -42,15 +42,16 @@ readonly DEFAULT_REPOS=(
   #   - 3 app repos (ros1_bridge, sick_humble, sick_noetic): archive pending
   #     (functionally covered by env/ros_distro + env/ros2_distro)
   #   - 3 sensor repos still parked (urg_node_humble/noetic,
-  #     realsense_noetic): pending template->base subtree migration +
-  #     repo rename to urg_node_ros{,2} / realsense_ros.
-  #     realsense_humble migrated + renamed -> realsense_ros2 (active below).
+  #     realsense_ros1): pending template->base subtree migration; the
+  #     realsense rename is done (realsense_noetic -> realsense_ros1),
+  #     urg_node still pending rename to urg_node_ros{,2}.
+  #     realsense_ros2 migrated + renamed (active below).
   # Uncomment a repo's line once its prerequisite work merges.
   # agent/ai_agent
   # agent/claude_code
   # agent/codex_cli
   # agent/gemini_cli
-  # app/realsense_noetic
+  # app/realsense_ros1
   # app/ros1_bridge
   # app/sick_humble
   # app/sick_noetic
