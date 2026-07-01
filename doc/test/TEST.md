@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **1023 tests** (1020 smoke + 3 integration) plus shellcheck (41 hook
+Total: **1029 tests** (1026 smoke + 3 integration) plus shellcheck (41 hook
 scripts + 34 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -808,7 +808,7 @@ branch-name match is exercised end-to-end.
 | --dry-run honours non-main base branch | non-main base support |
 | clean run invokes git merge + normal push, never rebase / force | merge-update mechanism |
 
-### test/smoke/enforce_merge_update_not_rebase_spec.bats (15)
+### test/smoke/enforce_merge_update_not_rebase_spec.bats (21)
 
 Covers `.claude/hooks/enforce_merge_update_not_rebase.sh` (refs #221) --
 PreToolUse (Bash). DENIES `git rebase` (any position, incl. `git -C`,
@@ -836,6 +836,12 @@ touch-ACK overridable. `gh` mocked on PATH; setup seeds a real branch.
 | non-git command (ls) -> silent | out of scope |
 | empty command -> silent | empty input |
 | git rebase after ack file exists -> allow | checkpoint ACK override |
+| B1: force flag from a chained non-git command does not trip force-push | segment-scoped, `git push .. && docker build -f` stays silent |
+| B2: git push -f origin HEAD resolves HEAD to the current branch and denies | HEAD/@ maps to current branch (keyed gh stub) |
+| N1: global -c option before rebase is still denied | subcommand parse skips globals |
+| N1: global -c option before push --force is still gated | subcommand parse skips globals |
+| N2: rebase inside a commit message is not treated as a rebase | subcommand=commit, not rebase |
+| N3: +refspec force-push on an open-PR branch is denied | `+refspec` force detected |
 
 ### test/smoke/wait_tag_ci_spec.bats (14)
 

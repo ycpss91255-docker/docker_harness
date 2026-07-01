@@ -175,7 +175,7 @@ main() {
   fi
 
   if ! git -C "${worktree}" merge "origin/${base}" 2>&1; then
-    if git -C "${worktree}" status --porcelain 2>/dev/null | grep -qE '^(UU|AA|DD|U |A |D | U| A| D)'; then
+    if [[ -n "$(git -C "${worktree}" diff --name-only --diff-filter=U 2>/dev/null)" ]]; then
       err ""
       err "merge hit conflicts. Conflicted files:"
       git -C "${worktree}" diff --name-only --diff-filter=U >&2

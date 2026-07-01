@@ -62,6 +62,23 @@ EOF
   chmod +x "${STUB_DIR}/gh"
 }
 
+# stub_gh_head <branch> <json> -- gh shim returning <json> ONLY when the
+# args contain `--head <branch>`, else an empty list. Lets a test prove the
+# hook resolved the RIGHT branch (e.g. HEAD -> current branch), which the
+# any-args stub_gh cannot distinguish.
+stub_gh_head() {
+  printf '%s' "$2" > "${STUB_DIR}/gh_resp"
+  cat > "${STUB_DIR}/gh" <<EOF
+#!/usr/bin/env bash
+if printf '%s ' "\$@" | grep -q -- '--head $1 '; then
+  cat "${STUB_DIR}/gh_resp"
+else
+  echo '[]'
+fi
+EOF
+  chmod +x "${STUB_DIR}/gh"
+}
+
 ack_path_for() {
   # Mirror lib/checkpoint.sh: sha256(cmd) first 16 hex chars; ack lives at
   # $TMPDIR/claude-checkpoint-<slug>-<session>-<hash>.ack
@@ -70,11 +87,14 @@ ack_path_for() {
   echo "${TMPDIR}/claude-checkpoint-enforce-merge-update-not-rebase-${CLAUDE_SESSION_ID}-${hash}.ack"
 }
 
-# run_hook <cmd> [cwd] -- feed the hook the PreToolUse stdin JSON.
+# run_hook <cmd> [cwd] -- feed the hook the PreToolUse stdin JSON. Built
+# with jq so a command containing double-quotes (e.g. a commit message) is
+# escaped correctly rather than breaking the JSON.
 run_hook() {
-  local cmd="$1" cwd="${2:-${REPO}}"
-  run "$(hook enforce_merge_update_not_rebase.sh)" \
-    <<< "{\"tool_input\":{\"command\":\"${cmd}\"},\"cwd\":\"${cwd}\"}"
+  local cmd="$1" cwd="${2:-${REPO}}" json
+  json="$(jq -n --arg c "${cmd}" --arg d "${cwd}" \
+    '{tool_input:{command:$c}, cwd:$d}')"
+  run "$(hook enforce_merge_update_not_rebase.sh)" <<< "${json}"
 }
 
 # ---- surface 1: git rebase -> deny ----
@@ -177,4 +197,43 @@ run_hook() {
     echo "expected reason to say 'previously acked', got: ${reason}" >&2
     return 1
   }
+}
+
+# ---- boundary cases: false-positives + bypass holes (review of #221) ----
+
+@test "B1: force flag from a chained non-git command does not trip force-push" {
+  # `-f` belongs to `docker build`, not the `git push` segment.
+  stub_gh '[{"number":5}]'
+  run_hook 'git push origin main && docker build -f Dockerfile .'
+  assert_silent
+}
+
+@test "B2: git push -f origin HEAD resolves HEAD to the current branch and denies" {
+  # gh returns a PR ONLY for feat/topic; if the hook used the literal 'HEAD'
+  # as --head it would find nothing and wrongly allow.
+  stub_gh_head 'feat/topic' '[{"number":5}]'
+  run_hook 'git push -f origin HEAD'
+  assert_permission_decision "deny"
+}
+
+@test "N1: global -c option before rebase is still denied" {
+  run_hook 'git -c rebase.autostash=true rebase main'
+  assert_permission_decision "deny"
+}
+
+@test "N1: global -c option before push --force is still gated" {
+  stub_gh '[{"number":5}]'
+  run_hook 'git -c foo=bar push --force'
+  assert_permission_decision "deny"
+}
+
+@test "N2: rebase inside a commit message is not treated as a rebase" {
+  run_hook 'git commit -m "feat: disallow git rebase org-wide"'
+  assert_silent
+}
+
+@test "N3: +refspec force-push on an open-PR branch is denied" {
+  stub_gh '[{"number":5}]'
+  run_hook 'git push origin +feat/topic'
+  assert_permission_decision "deny"
 }
