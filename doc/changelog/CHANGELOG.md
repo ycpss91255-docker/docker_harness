@@ -7,6 +7,23 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **`enforce_serial_merge_gate.sh` routes same-repo batch auto-merge
+  through `serial-merge.sh` (closes #236).** A PreToolUse Bash hook that,
+  on a `gh pr merge ... --auto` arm, queries the target repo's open PRs
+  already armed for auto-merge (`gh pr list --repo <repo> --state open
+  --json number,autoMergeRequest`, excluding the PR being armed). 0
+  already armed → ALLOW (single-PR arm, zero added latency); ≥ 1 → DENY
+  with a data-rich message naming the repo, the count + list of
+  already-armed PRs, and a ready-to-paste `.claude/scripts/serial-merge.sh
+  <repo> <armed...> <this-pr>` command — stopping the "dump-all" pattern
+  that costs O(N^2) redundant CI re-runs under strict branch protection.
+  Scoped to `--auto` arming: non-auto `gh pr merge` and read-only `gh pr
+  view` pass through, and the query fails open so a `gh` outage never
+  blocks a legitimate single arm. Lift via the `/tmp` checkpoint protocol
+  (ADR-00000002) or the `SERIAL_MERGE=1` bypass (env var or inline command
+  prefix) that `serial-merge.sh` itself uses so its per-PR arm never
+  self-blocks. Registered in `settings.json` PreToolUse after
+  `enforce_batch_via_script.sh`. 14 smoke spec cases (PATH-stubbed `gh`).
 - **`serial-merge.sh` lands N same-repo PRs serially (closes #235).**
   `.claude/scripts/serial-merge.sh <owner/repo> <pr1> <pr2> ...` lands a
   list of PRs against a single repo one at a time, delegating each to
