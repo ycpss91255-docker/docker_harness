@@ -141,9 +141,10 @@ main() {
       printf 'FAIL closed-unmerged\n'
       exit 1
     fi
-    # Terminal: merge conflict -- needs a rebase, polling will not fix it.
+    # Terminal: merge conflict -- needs a merge of origin/main, polling
+    # will not fix it. Update via merge (no rebase); see update-stale-pr.
     if [[ "${mss}" == "DIRTY" ]]; then
-      printf 'FAIL conflict (mergeStateStatus=DIRTY). Rebase the branch onto the base, then re-run.\n'
+      printf 'FAIL conflict (mergeStateStatus=DIRTY). Merge origin/main into the branch (no rebase) and resolve: .claude/scripts/update-stale-pr.sh <pr> --repo <repo>, then re-run.\n'
       exit 1
     fi
     # Terminal: a required check failed (CI done, not all passing, merge
