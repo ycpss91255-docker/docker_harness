@@ -55,8 +55,11 @@ ack_path_for() {
 }
 
 run_hook() {
-  run "$(hook enforce_serial_merge_gate.sh)" \
-    <<< "{\"tool_input\":{\"command\":\"$1\"},\"cwd\":\"${PWD}\"}"
+  # Build the stdin JSON with jq so a command containing double-quotes
+  # (e.g. a commit message) is escaped rather than breaking the JSON.
+  local json
+  json="$(jq -n --arg c "$1" --arg d "${PWD}" '{tool_input:{command:$c}, cwd:$d}')"
+  run "$(hook enforce_serial_merge_gate.sh)" <<< "${json}"
 }
 
 # ---- positive: 1st arm passes ----
@@ -180,4 +183,34 @@ run_hook() {
 @test "silent on empty command" {
   run_hook ""
   assert_silent
+}
+
+# ---- review hardening (#236 follow-up) ----
+
+@test "N1: non-merge command that merely mentions gh pr merge --auto is silent" {
+  # A commit message referencing the pattern must not false-trigger: the
+  # segment's command is `git commit`, not `gh pr merge` (cf #219).
+  export ARMED="773 774"
+  run_hook 'git commit -m "feat: gate blocks the 2nd gh pr merge --auto"'
+  assert_silent
+}
+
+@test "N3: fail-open when gh pr list errors (silent)" {
+  cat > "${STUB_DIR}/gh" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+  chmod +x "${STUB_DIR}/gh"
+  run_hook "gh pr merge 775 --repo ycpss91255-docker/base --auto --squash"
+  assert_silent
+}
+
+@test "N4: mixed armed set excludes only the PR being armed" {
+  export ARMED="774 775"
+  run_hook "gh pr merge 775 --repo ycpss91255-docker/base --auto --squash"
+  assert_permission_decision "deny"
+  local reason
+  reason="$(echo "${output}" | jq -r '.hookSpecificOutput.permissionDecisionReason // empty')"
+  [[ "${reason}" == *"already has 1 auto-merge-armed"* ]] || { echo "want count 1, got: ${reason}"; return 1; }
+  [[ "${reason}" == *"serial-merge.sh ycpss91255-docker/base 774 775"* ]] || { echo "want 774 excluded-self order, got: ${reason}"; return 1; }
 }
