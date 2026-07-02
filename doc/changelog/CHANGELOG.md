@@ -79,6 +79,19 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ci-and-stamp.sh`.
 
 ### Fixed
+- **`enforce_serial_merge_gate.sh` detection hardened (fixes the #236
+  gate merged in #241).** Two defects: (1) `gh pr merge --auto` was
+  matched anywhere in the command, so a commit message mentioning the
+  pattern (e.g. committing the gate itself) false-triggered a deny; now
+  the command is split on `&& || | ;` and a segment must START with `gh
+  pr merge` (past any env prefix) to qualify, mirroring #219's
+  `close_segment`. (2) When the arm carried no `--repo`, the pasted
+  `serial-merge.sh` remediation had an empty repo slot (which
+  serial-merge would mis-parse); the repo is now resolved via `gh repo
+  view` and the gate fails open if it cannot be determined. +3 spec
+  cases (commit-message false-positive, gh-error fail-open,
+  mixed-armed-set exclude-self); TEST.md total/hook counts corrected
+  (the #241 merge left them stale).
 - **`ci-and-stamp.sh` detects base / downstream against base's current
   command surface (refs #220, Severity 1).** Detection still keyed off
   `justfile.ci` (base) and `./build.sh test` (downstream), but base

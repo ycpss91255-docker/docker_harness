@@ -54,30 +54,52 @@ main() {
   cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
   [[ -z "${cmd}" ]] && return 0
 
-  # Clause 1a: must be a `gh pr merge` arm.
-  [[ "${cmd}" =~ gh[[:space:]]+pr[[:space:]]+merge([[:space:]]|$) ]] || return 0
-  # Clause 1b: must carry the --auto flag (scope: arming only).
-  [[ "${cmd}" =~ (^|[[:space:]])--auto([[:space:]]|$) ]] || return 0
-
   # SERIAL_MERGE=1 explicit bypass (env var OR inline command prefix).
   if [[ "${SERIAL_MERGE:-}" == "1" ]] \
      || [[ "${cmd}" =~ (^|[[:space:]])SERIAL_MERGE=1([[:space:]]) ]]; then
     return 0
   fi
 
-  # Extract the target repo from --repo <val> / -R <val> / --repo=<val>.
+  # Find the command SEGMENT that arms auto-merge. Split on && || | ; so a
+  # `gh pr merge --auto` inside a quoted arg of another command (e.g. a
+  # commit message) does not false-trigger (cf #219 close_segment). A
+  # segment qualifies when, after any VAR=val env prefix, it begins with
+  # `gh pr merge` and carries --auto.
+  local segments seg s merge_seg=""
+  segments="$(printf '%s' "${cmd}" | sed 's/&&/\n/g; s/||/\n/g; s/|/\n/g; s/;/\n/g')"
+  while IFS= read -r seg; do
+    s="${seg#"${seg%%[![:space:]]*}"}"
+    while [[ "${s}" =~ ^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+ ]]; do
+      s="${s#"${BASH_REMATCH[0]}"}"
+    done
+    if [[ "${s}" =~ ^gh[[:space:]]+pr[[:space:]]+merge([[:space:]]|$) ]] \
+       && [[ "${s}" =~ (^|[[:space:]])--auto([[:space:]]|$) ]]; then
+      merge_seg="${s}"
+      break
+    fi
+  done <<< "${segments}"
+  [[ -z "${merge_seg}" ]] && return 0
+
+  # Extract the target repo from --repo <val> / -R <val> / --repo=<val> in
+  # the merge segment; else resolve the cwd repo so the remediation command
+  # is well-formed instead of carrying an empty repo slot.
   local repo=""
-  if [[ "${cmd}" =~ (--repo|-R)[[:space:]=]+([^[:space:]]+) ]]; then
+  if [[ "${merge_seg}" =~ (--repo|-R)[[:space:]=]+([^[:space:]]+) ]]; then
     repo="${BASH_REMATCH[2]}"
+  fi
+  if [[ -z "${repo}" ]]; then
+    repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)" || repo=""
   fi
   # Short repo name -> default-owner expansion (mirrors serial-merge.sh).
   if [[ -n "${repo}" && "${repo}" != */* ]]; then
     repo="${DEFAULT_OWNER}/${repo}"
   fi
+  # Cannot resolve a repo -> fail open (a malformed remediation would mislead).
+  [[ -z "${repo}" ]] && return 0
 
   # Extract the PR being armed: first bare-integer token after `merge`.
   local this_pr=""
-  local tail="${cmd#*merge}"
+  local tail="${merge_seg#*merge}"
   local tok
   for tok in ${tail}; do
     if [[ "${tok}" =~ ^[0-9]+$ ]]; then
@@ -90,13 +112,8 @@ main() {
   # error / empty result is treated as "0 armed" so a gh outage never blocks
   # a legitimate single arm.
   local list_json="" armed=""
-  if [[ -n "${repo}" ]]; then
-    list_json="$(gh pr list --repo "${repo}" --state open \
-      --json number,autoMergeRequest 2>/dev/null)" || list_json=""
-  else
-    list_json="$(gh pr list --state open \
-      --json number,autoMergeRequest 2>/dev/null)" || list_json=""
-  fi
+  list_json="$(gh pr list --repo "${repo}" --state open \
+    --json number,autoMergeRequest 2>/dev/null)" || list_json=""
   [[ -z "${list_json}" ]] && return 0
 
   # Armed PR numbers (autoMergeRequest != null), excluding the one being
