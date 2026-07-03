@@ -15,7 +15,7 @@ make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
 make -C .claude/test check       # lint + hadolint + test (full CI gate)
 ```
 
-Total: **1046 tests** (1043 smoke + 3 integration) plus shellcheck (42 hook
+Total: **1047 tests** (1044 smoke + 3 integration) plus shellcheck (42 hook
 scripts + 34 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
 plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
@@ -1165,28 +1165,29 @@ template v0.18.0 / v0.18.1 to ship with `.version` still on v0.17.0
 | resolves repo via cd subdir && git tag | cwd-resolution path |
 | resolves repo via git -C and blocks mismatch | `-C` resolution path |
 
-### test/smoke/check_prefer_dot_sh_spec.bats (19)
+### test/smoke/check_prefer_dot_sh_spec.bats (20)
 
 Covers `.claude/hooks/check_prefer_dot_sh.sh` — PreToolUse hook that
 detects `docker build/run/exec/stop` and `docker compose <up|down|build|
-run|exec>` calls. Denies + points at the matching `.sh` wrapper when
-one exists in cwd; forces `ask` prompt when no wrapper is available.
-Read-only subs / make-internal calls / already-asked subs (rm/push/...)
-stay silent.
+run|exec>` calls. Denies + steers to the matching `just <verb>` recipe
+when cwd has a root `justfile` defining that recipe; forces `ask` prompt
+when there is no justfile or no such recipe. Read-only subs /
+make-internal calls / already-asked subs (rm/push/...) stay silent.
 
 | Test | Scenario |
 |------|----------|
-| deny docker build when build.sh exists | wrapper-present, build path |
-| deny docker run when run.sh exists | wrapper-present, run path |
-| deny docker exec when exec.sh exists | wrapper-present, exec path |
-| deny docker stop when stop.sh exists | wrapper-present, stop path |
-| deny docker compose up → run.sh | compose up → run.sh map |
-| deny docker compose down → stop.sh | compose down → stop.sh map |
-| deny docker compose build → build.sh | compose build map |
-| deny docker compose exec → exec.sh | compose exec map |
-| deny docker compose run → run.sh | compose run map |
-| ask when docker build but no build.sh wrapper | no-wrapper fallback |
-| ask when docker compose up but no run.sh wrapper | no-wrapper fallback (compose) |
+| deny docker build when justfile has build recipe | recipe-present, build path |
+| deny docker run when justfile has run recipe | recipe-present, run path |
+| deny docker exec when justfile has exec recipe | recipe-present, exec path |
+| deny docker stop when justfile has stop recipe | recipe-present, stop path |
+| deny docker compose up → just run | compose up → just run map |
+| deny docker compose down → just stop | compose down → just stop map |
+| deny docker compose build → just build | compose build map |
+| deny docker compose exec → just exec | compose exec map |
+| deny docker compose run → just run | compose run map |
+| ask when docker build but no justfile | no-justfile fallback |
+| ask when justfile present but no build recipe | justfile-without-recipe fallback |
+| ask when docker compose up but no justfile | no-justfile fallback (compose) |
 | silent on read-only docker subcommand (ps) | non-target sub |
 | silent on read-only docker subcommand (images) | non-target sub |
 | silent on docker pull (download is harmless) | pull is harmless |

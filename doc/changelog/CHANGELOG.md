@@ -124,6 +124,18 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   single-spec run pattern, so local `make check` mirrors CI.
 
 ### Changed
+- **`check_prefer_dot_sh` nudges toward `just <verb>` recipes, not the
+  retired `./build.sh` wrappers (refs #220).** Base migrated
+  container-ops from the `./build.sh` / `./run.sh` / `./exec.sh` /
+  `./stop.sh` root wrappers to top-level `just` recipes
+  (`just build|run|exec|stop`), so the hook no longer checks for a
+  wrapper FILE in cwd. It now checks for a root `justfile` that defines
+  the target recipe (grep for a `^<verb>( |:|*)` line, matching both
+  `build:` and `build *args:` forms): justfile + recipe present -> DENY
+  steering to `just <verb>` (the recipe runs setup.sh — refresh .env /
+  compose.yaml + language env + GPU/GUI detection — that raw docker
+  skips); no justfile or no such recipe -> softer ASK. Spec grows to 20
+  @test (adds a justfile-present-but-no-recipe -> ASK case).
 - **Stale PRs update via merge-not-rebase, enforced by a new hook
   (closes #221).** Under strict branch protection, a stale PR was
   updated with `git rebase` + `force-push` -- which rewrites SHAs, races

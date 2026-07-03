@@ -33,27 +33,28 @@ filesystem.
 
 ## 常用指令
 
-Container ops (downstream repos + base; wrappers under
-`.base/script/docker/`):
+Container ops (downstream repos; recipes imported top-level, args
+without `--`):
 
 ```bash
-make build           # build devel image  (e.g. make build test  |  make build -- --no-cache)
-make run             # interactive run    (e.g. make run -- -d)
-make exec            # exec into container (e.g. make exec -- -t bats-src bash)
-make stop            # stop + remove containers
-make setup           # regenerate .env + compose.yaml from setup.conf
-make upgrade         # upgrade .base/ subtree (e.g. make upgrade v0.30.0)
+just build            # build devel image  (e.g. just build test | just build --no-cache)
+just run              # interactive run    (e.g. just run -d)
+just exec             # exec into container (e.g. just exec -t bats-src bash)
+just stop             # stop + remove containers
+just setup            # regenerate .env + compose.yaml (just setup-tui = menu)
+just upgrade [vX.Y.Z] # upgrade .base/ subtree
 ```
 
-Base self-test (template / docker_harness CI gate):
+Base self-test:
 
 ```bash
-just ci test          # bats + shellcheck + kcov
-just ci lint          # shellcheck only
-just ci upgrade       # subtree pull to latest tag
+just test                  # base self: bats + shellcheck + hadolint (+ kcov)
+just test lint             # shellcheck + hadolint only
+make -C .claude/test check # docker_harness's own harness (until the justfile migration)
 ```
 
-For flags and overrides, read `<cmd> -h` or `make help` first.
+For flags/overrides read `<cmd> -h` or bare `just` first. Legacy
+downstream not yet fanned out may still use `make <verb>`.
 
 ## 標準容器結構
 
