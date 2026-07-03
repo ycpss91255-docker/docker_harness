@@ -3,26 +3,29 @@
 #
 # Fires before any Bash command. When the command is a state-changing
 # `docker <subcommand>` (build / run / exec / stop) or
-# `docker compose <up|down|build|run|exec>` AND cwd has the matching
-# `.sh` wrapper, BLOCKS with a message pointing at the wrapper. When
-# the wrapper is missing, forces prompt (permissionDecision="ask")
-# rather than letting the broader `Bash(docker:*)` allow rule pass.
+# `docker compose <up|down|build|run|exec>` AND cwd has a root `justfile`
+# that defines the matching recipe, BLOCKS with a message steering to
+# `just <verb>`. When there is no justfile or no such recipe, forces a
+# prompt (permissionDecision="ask") rather than letting the broader
+# `Bash(docker:*)` allow rule pass silently.
 #
-# Why: per CLAUDE.md「常用指令」與 user feedback,build/run/exec/stop 一律
-# 走 .sh wrapper（會帶 setup.sh 自動更新 .env / compose.yaml + 語言環境
-# + GPU/GUI 偵測）。直接跑 docker 跳過所有 wrapper 邏輯,容易產生與 wrapper
-# 不一致的容器狀態。
+# Why: base migrated container-ops from the retired `./build.sh` /
+# `./run.sh` / `./exec.sh` / `./stop.sh` root wrappers to top-level
+# `just` recipes (`just build|run|exec|stop|setup`). The recipe runs
+# setup.sh (refresh .env / compose.yaml + language env + GPU/GUI
+# detection) which raw docker skips, so running docker directly easily
+# produces container state inconsistent with what the recipe would build.
 #
-# Subcommand → wrapper map:
-#   docker build         → ./build.sh
-#   docker run           → ./run.sh
-#   docker exec          → ./exec.sh
-#   docker stop          → ./stop.sh
-#   docker compose up    → ./run.sh
-#   docker compose down  → ./stop.sh
-#   docker compose build → ./build.sh
-#   docker compose run   → ./run.sh
-#   docker compose exec  → ./exec.sh
+# Subcommand → just recipe map:
+#   docker build         → just build
+#   docker run           → just run
+#   docker exec          → just exec
+#   docker stop          → just stop
+#   docker compose up    → just run
+#   docker compose down  → just stop
+#   docker compose build → just build
+#   docker compose run   → just run
+#   docker compose exec  → just exec
 #
 # Out of scope (silent — fall through to other rules):
 #   - Read-only subcommands (ps / images / version / inspect / logs / pull / ...)
@@ -31,8 +34,17 @@
 
 set -uo pipefail
 
+# recipe_defined <justfile> <verb> — true if the justfile defines a
+# recipe named <verb>. Recipes can be `build:` or `build *args:` (or
+# `build arg:`), so match a line starting with the verb followed by a
+# space, a colon, or a `*` parameter marker.
+recipe_defined() {
+  local justfile="$1" verb="$2"
+  grep -Eq "^${verb}( |:|\*)" "${justfile}" 2>/dev/null
+}
+
 main() {
-  local input cmd cwd subcmd wrapper msg stripped
+  local input cmd cwd subcmd verb msg stripped
   input="$(cat)"
   cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
   cwd="$(printf '%s' "${input}" | jq -r '.cwd // empty' 2>/dev/null)"
@@ -46,31 +58,27 @@ main() {
   done
 
   subcmd=""
-  wrapper=""
+  verb=""
   if [[ "${stripped}" =~ ^docker[[:space:]]+(build|run|exec|stop)([[:space:]]|$) ]]; then
     subcmd="docker ${BASH_REMATCH[1]}"
-    case "${BASH_REMATCH[1]}" in
-      build) wrapper="build.sh" ;;
-      run)   wrapper="run.sh" ;;
-      exec)  wrapper="exec.sh" ;;
-      stop)  wrapper="stop.sh" ;;
-    esac
+    verb="${BASH_REMATCH[1]}"
   elif [[ "${stripped}" =~ ^docker[[:space:]]+compose[[:space:]]+(up|down|build|run|exec)([[:space:]]|$) ]]; then
     subcmd="docker compose ${BASH_REMATCH[1]}"
     case "${BASH_REMATCH[1]}" in
-      up|run) wrapper="run.sh" ;;
-      down)   wrapper="stop.sh" ;;
-      build)  wrapper="build.sh" ;;
-      exec)   wrapper="exec.sh" ;;
+      up|run) verb="run" ;;
+      down)   verb="stop" ;;
+      build)  verb="build" ;;
+      exec)   verb="exec" ;;
     esac
   else
     return 0
   fi
 
-  local wrapper_path="${cwd}/${wrapper}"
-  if [[ -e "${wrapper_path}" ]]; then
-    msg="$(printf '%s 改用 ./%s 提醒：當前 cwd 有 ./%s,優先呼叫 wrapper(會帶 setup.sh 自動更新 .env / compose.yaml + 語言環境 + GPU/GUI 偵測)。直接跑 docker 會繞過這層,容易產生與 wrapper 不一致的容器狀態。' \
-      "${subcmd}" "${wrapper}" "${wrapper}")"
+  local justfile="${cwd}/justfile"
+  if [[ -f "${justfile}" ]] && recipe_defined "${justfile}" "${verb}"; then
+    # shellcheck disable=SC2016  # backticks are literal markdown, not command substitution
+    msg="$(printf '%s — use `just %s` instead. cwd has a `justfile` with a `%s` recipe; the recipe runs setup.sh (refresh .env / compose.yaml + language env + GPU/GUI detection) which raw docker skips, so running docker directly easily produces container state inconsistent with the recipe.' \
+      "${subcmd}" "${verb}" "${verb}")"
     jq -n --arg m "${msg}" '{
       systemMessage: $m,
       hookSpecificOutput: {
@@ -82,8 +90,9 @@ main() {
     return 0
   fi
 
-  msg="$(printf '%s 無對應 ./%s wrapper(cwd=%s):直接跑 docker 確定要這樣?正常流程一律透過 ./build.sh / ./run.sh / ./exec.sh / ./stop.sh wrapper。' \
-    "${subcmd}" "${wrapper}" "${cwd}")"
+  # shellcheck disable=SC2016  # backticks are literal markdown, not command substitution
+  msg="$(printf '%s — no `just %s` recipe here (cwd=%s): sure you want raw docker? Container-ops normally go through `just build` / `just run` / `just exec` / `just stop` recipes.' \
+    "${subcmd}" "${verb}" "${cwd}")"
   jq -n --arg m "${msg}" '{
     systemMessage: $m,
     hookSpecificOutput: {
