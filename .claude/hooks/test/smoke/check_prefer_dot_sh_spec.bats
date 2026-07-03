@@ -4,87 +4,97 @@ load '../lib/test_helper'
 
 setup() {
   REPO="$(mktemp -d)"
-  for sh in build run exec stop; do
-    echo '#!/bin/sh' > "${REPO}/${sh}.sh"
-    chmod +x "${REPO}/${sh}.sh"
-  done
+  # Root justfile defining the container-ops recipes (build / run /
+  # exec / stop), both bare (`stop:`) and parameterised (`build *args:`)
+  # recipe forms so the recipe-existence grep is exercised.
+  printf 'build *args:\n\t:\nrun *args:\n\t:\nexec *args:\n\t:\nstop:\n\t:\n' > "${REPO}/justfile"
+  # A repo whose justfile lacks a `build` recipe (only `run`).
+  REPO_NO_BUILD="$(mktemp -d)"
+  printf 'run *args:\n\t:\n' > "${REPO_NO_BUILD}/justfile"
+  # A repo with no justfile at all.
   REPO_BARE="$(mktemp -d)"
 }
 
 teardown() {
-  rm -rf "${REPO}" "${REPO_BARE}"
+  rm -rf "${REPO}" "${REPO_NO_BUILD}" "${REPO_BARE}"
 }
 
-@test "deny docker build when build.sh exists" {
+@test "deny docker build when justfile has build recipe" {
   run "$(hook check_prefer_dot_sh.sh)" \
     <<< "{\"tool_input\":{\"command\":\"docker build -t foo .\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
-  assert_message_contains "./build.sh"
+  assert_message_contains "just build"
 }
 
-@test "deny docker run when run.sh exists" {
+@test "deny docker run when justfile has run recipe" {
   run "$(hook check_prefer_dot_sh.sh)" \
     <<< "{\"tool_input\":{\"command\":\"docker run --rm foo\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
-  assert_message_contains "./run.sh"
+  assert_message_contains "just run"
 }
 
-@test "deny docker exec when exec.sh exists" {
+@test "deny docker exec when justfile has exec recipe" {
   run "$(hook check_prefer_dot_sh.sh)" \
     <<< "{\"tool_input\":{\"command\":\"docker exec -it foo bash\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
-  assert_message_contains "./exec.sh"
+  assert_message_contains "just exec"
 }
 
-@test "deny docker stop when stop.sh exists" {
+@test "deny docker stop when justfile has stop recipe" {
   run "$(hook check_prefer_dot_sh.sh)" \
     <<< "{\"tool_input\":{\"command\":\"docker stop foo\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
-  assert_message_contains "./stop.sh"
+  assert_message_contains "just stop"
 }
 
-@test "deny docker compose up → run.sh" {
+@test "deny docker compose up → just run" {
   run "$(hook check_prefer_dot_sh.sh)" \
     <<< "{\"tool_input\":{\"command\":\"docker compose up -d\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
-  assert_message_contains "./run.sh"
+  assert_message_contains "just run"
 }
 
-@test "deny docker compose down → stop.sh" {
+@test "deny docker compose down → just stop" {
   run "$(hook check_prefer_dot_sh.sh)" \
     <<< "{\"tool_input\":{\"command\":\"docker compose down\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
-  assert_message_contains "./stop.sh"
+  assert_message_contains "just stop"
 }
 
-@test "deny docker compose build → build.sh" {
+@test "deny docker compose build → just build" {
   run "$(hook check_prefer_dot_sh.sh)" \
     <<< "{\"tool_input\":{\"command\":\"docker compose build\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
-  assert_message_contains "./build.sh"
+  assert_message_contains "just build"
 }
 
-@test "deny docker compose exec → exec.sh" {
+@test "deny docker compose exec → just exec" {
   run "$(hook check_prefer_dot_sh.sh)" \
     <<< "{\"tool_input\":{\"command\":\"docker compose exec foo bash\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
-  assert_message_contains "./exec.sh"
+  assert_message_contains "just exec"
 }
 
-@test "deny docker compose run → run.sh" {
+@test "deny docker compose run → just run" {
   run "$(hook check_prefer_dot_sh.sh)" \
     <<< "{\"tool_input\":{\"command\":\"docker compose run foo\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
-  assert_message_contains "./run.sh"
+  assert_message_contains "just run"
 }
 
-@test "ask when docker build but no build.sh wrapper" {
+@test "ask when docker build but no justfile" {
   run "$(hook check_prefer_dot_sh.sh)" \
     <<< "{\"tool_input\":{\"command\":\"docker build -t foo .\"},\"cwd\":\"${REPO_BARE}\"}"
   assert_permission_decision "ask"
 }
 
-@test "ask when docker compose up but no run.sh wrapper" {
+@test "ask when justfile present but no build recipe" {
+  run "$(hook check_prefer_dot_sh.sh)" \
+    <<< "{\"tool_input\":{\"command\":\"docker build -t foo .\"},\"cwd\":\"${REPO_NO_BUILD}\"}"
+  assert_permission_decision "ask"
+}
+
+@test "ask when docker compose up but no justfile" {
   run "$(hook check_prefer_dot_sh.sh)" \
     <<< "{\"tool_input\":{\"command\":\"docker compose up\"},\"cwd\":\"${REPO_BARE}\"}"
   assert_permission_decision "ask"
@@ -130,7 +140,7 @@ teardown() {
   run "$(hook check_prefer_dot_sh.sh)" \
     <<< "{\"tool_input\":{\"command\":\"BUILDKIT_PROGRESS=plain docker build -t foo .\"},\"cwd\":\"${REPO}\"}"
   assert_permission_decision "deny"
-  assert_message_contains "./build.sh"
+  assert_message_contains "just build"
 }
 
 @test "strips multiple env-prefixes and matches docker build" {
