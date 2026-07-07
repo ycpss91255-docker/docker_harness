@@ -50,7 +50,7 @@ Base self-test:
 ```bash
 just test                  # base self: bats + shellcheck + hadolint (+ kcov)
 just test lint             # shellcheck + hadolint only
-make -C .claude/test check # docker_harness's own harness (until the justfile migration)
+just -f .claude/test/justfile check # docker_harness harness (CI runs .claude/test/ci.sh)
 ```
 
 For flags/overrides read `<cmd> -h` or bare `just` first. Legacy
