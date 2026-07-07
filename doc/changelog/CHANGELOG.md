@@ -124,6 +124,22 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   single-spec run pattern, so local `make check` mirrors CI.
 
 ### Changed
+- **`.claude/test` harness migrated from `make` to a `just` + driver
+  model (refs #220; drops `make` as a docker_harness dependency).** The
+  `.claude/test/Makefile` is replaced by `.claude/test/ci.sh` (a driver
+  with `build`/`test`/`lint`/`hadolint`/`tree-check`/`ceiling-check`/
+  `log-helper-check`/`check`/`clean` subcommands, resolving the repo root
+  from its own location) + `.claude/test/justfile` (thin `just` wrappers
+  over the driver). Mirroring base's pattern, CI
+  (`.github/workflows/test.yaml`) invokes `.claude/test/ci.sh <target>`
+  directly -- no `just` in the runner -- while `just -f
+  .claude/test/justfile <target>` is the local entry over the same
+  driver, so CI and local runs can never drift. `ci-and-stamp.sh` +
+  `enforce_local_full_ci_before_pr.sh` detect docker_harness via
+  `.claude/test/ci.sh` (was `.claude/test/Makefile`); ~15 doc / comment /
+  hook references + `verify.sh` (now runs `just -f .claude/test/justfile`)
+  + the coupled specs updated. `.claude/test/ci.sh check` reproduces the
+  old `make check` gate (1047 specs green).
 - **Agent-facing config converted to English (closes #230).** The 24
   `.claude/hooks/*.sh` reminder/deny message strings + code comments, the
   coupled bats specs' Chinese assertions, `.claude/instincts.yaml`, and

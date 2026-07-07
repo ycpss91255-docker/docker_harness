@@ -47,8 +47,8 @@ load '../lib/test_helper'
   assert_silent
 }
 
-@test "silent inside make -C .claude/test wrapper (default list)" {
-  run "$(hook remind_docker_for_lint.sh)" <<< '{"tool_input":{"command":"make -C .claude/test test"}}'
+@test "silent inside just -f .claude/test/justfile wrapper (default list)" {
+  run "$(hook remind_docker_for_lint.sh)" <<< '{"tool_input":{"command":"just -f .claude/test/justfile test"}}'
   assert_silent
 }
 

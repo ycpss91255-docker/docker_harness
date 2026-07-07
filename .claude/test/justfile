@@ -1,0 +1,52 @@
+# docker_harness test-infra -- local entry point (just).
+#
+# These recipes are thin wrappers over the .claude/test/ci.sh driver, which
+# is ALSO what CI (.github/workflows/test.yaml) invokes directly -- so local
+# `just` runs and CI can never drift (refs #220 make->just migration; base
+# uses the same driver-not-just-in-CI pattern). The driver resolves the repo
+# root from its own location, so recipes work from any cwd.
+#
+# Usage from the repo root: `just -f .claude/test/justfile <recipe>`
+#   (or run `just <recipe>` from inside .claude/test/).
+
+_driver := justfile_directory() / "ci.sh"
+
+# List available recipes.
+default:
+    @{{_driver}} help
+
+# Build the test docker image.
+build:
+    {{_driver}} build
+
+# Run bats specs (smoke + integration) inside docker.
+test:
+    {{_driver}} test
+
+# Shellcheck all hook + helper scripts inside docker.
+lint:
+    {{_driver}} lint
+
+# Hadolint the test Dockerfile.
+hadolint:
+    {{_driver}} hadolint
+
+# Audit CONTEXT.md .claude/ tree vs filesystem (host).
+tree-check:
+    {{_driver}} tree-check
+
+# Audit CLAUDE.md line / section ceilings (host).
+ceiling-check:
+    {{_driver}} ceiling-check
+
+# Enforce lib/log.sh adoption in .claude/scripts (host).
+log-helper-check:
+    {{_driver}} log-helper-check
+
+# Full CI gate: lint + hadolint + test + tree-check + ceiling-check + log-helper-check.
+check:
+    {{_driver}} check
+
+# Remove the test image.
+clean:
+    {{_driver}} clean

@@ -4,7 +4,8 @@
 # inside Docker so behaviour matches CI exactly (CLAUDE.md "驗證一律走 Docker").
 #
 # Build context = repo root (so COPY paths reach .claude/...). Use the
-# `make -C .claude/test <target>` wrappers; direct invocation:
+# `just -f .claude/test/justfile <target>` wrapper (CI runs the same
+# `.claude/test/ci.sh <target>` driver); direct invocation:
 #   docker build -f .claude/test/Dockerfile -t claude-workspace-test:local .
 #   docker run --rm claude-workspace-test:local
 #   docker run --rm --entrypoint sh claude-workspace-test:local \

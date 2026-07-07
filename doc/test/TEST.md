@@ -8,21 +8,25 @@ All tests run inside Docker via the `.claude/test/Dockerfile` image
 (test infra lives under `.claude/test/`):
 
 ```bash
-make -C .claude/test build       # build the test image (docker_harness-test:local)
-make -C .claude/test test        # run all bats specs
-make -C .claude/test lint        # shellcheck on all hook + helper scripts
-make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
-make -C .claude/test check       # lint + hadolint + test (full CI gate)
+just -f .claude/test/justfile build       # build the test image (docker_harness-test:local)
+just -f .claude/test/justfile test        # run all bats specs
+just -f .claude/test/justfile lint        # shellcheck on all hook + helper scripts
+just -f .claude/test/justfile hadolint    # hadolint on .claude/test/Dockerfile
+just -f .claude/test/justfile check       # lint + hadolint + test (full CI gate)
 ```
+
+The `justfile` recipes above are the local wrapper; CI
+(`.github/workflows/test.yaml`) invokes the same
+`.claude/test/ci.sh <target>` driver directly (no `just` in CI).
 
 Total: **1047 tests** (1044 smoke + 3 integration) plus shellcheck (42 hook
 scripts + 34 helper scripts) plus Hadolint (`.claude/test/Dockerfile`)
-plus a CONTEXT.md `.claude/` tree audit (`make tree-check` —
+plus a CONTEXT.md `.claude/` tree audit (`ci.sh tree-check` —
 `.claude/scripts/check-claude-md-tree.sh`; pre-#127 audited
-CLAUDE.md) plus a CLAUDE.md ceiling audit (`make ceiling-check`
+CLAUDE.md) plus a CLAUDE.md ceiling audit (`ci.sh ceiling-check`
 — `.claude/scripts/check-claude-md-ceiling.sh`; defaults 240
 lines / 20 `^##` sections) plus a log-helper-usage audit
-(`make log-helper-check` —
+(`ci.sh log-helper-check` —
 `.claude/scripts/check-log-helper-usage.sh`; enforces lib/log.sh
 adoption in `.claude/scripts/*.sh`, refs #148 M5).
 
@@ -35,7 +39,7 @@ Per CONTEXT.md §11 (TDD 4-category matrix; pre-#127 lived in CLAUDE.md):
 | 1 | Smoke | `test/smoke/*_spec.bats` | Each hook fires on its trigger and stays silent otherwise |
 | 2 | Unit | n/a (hooks are linear single-function scripts) | Smoke covers what unit would |
 | 3 | Integration | `test/integration/chain_spec.bats` | Multi-hook scenarios where the same tool input drives several hooks |
-| 4 | Lint | `make -C .claude/test lint` (shellcheck) + `make -C .claude/test hadolint` | All `.sh` hooks + helper scripts pass shellcheck; `.claude/test/Dockerfile` passes Hadolint |
+| 4 | Lint | `just -f .claude/test/justfile lint` (shellcheck) + `just -f .claude/test/justfile hadolint` | All `.sh` hooks + helper scripts pass shellcheck; `.claude/test/Dockerfile` passes Hadolint |
 
 ## Smoke specs
 
@@ -223,7 +227,7 @@ parity; the count tracks def-functions not collected cases, so
 | silent inside ./build.sh test wrapper | `./build.sh test` → SILENT |
 | silent inside make -f Makefile.ci wrapper | `make -f Makefile.ci lint` → SILENT |
 | silent on unrelated command containing the word bats in path | `ls /usr/lib/bats-core` → SILENT |
-| silent inside make -C .claude/test wrapper (default list) | `make -C .claude/test test` → SILENT |
+| silent inside just -f .claude/test/justfile wrapper (default list) | `just -f .claude/test/justfile test` → SILENT |
 | lint_wrappers.txt overrides default list | sibling file lists custom wrapper → matches custom, SILENT |
 | lint_wrappers.txt override drops the default docker pattern | with override list = `make -C .claude`, `docker run ...; bats foo` → FIRE |
 | lint_wrappers.txt ignores blank and # comment lines | non-content lines skipped during parse |
@@ -1097,7 +1101,7 @@ Covers `.claude/scripts/check-claude-md-ceiling.sh` — CI lint that
 asserts a markdown file (default CLAUDE.md) stays under hard line-count
 and `^##` section-count ceilings (defaults 240 / 20, env-overridable
 via `MAX_LINES` / `MAX_SECTIONS`). Ships with the script alone in #127
-PR-A; PR-B wires it into `make -C .claude/test check` after the slim
+PR-A; PR-B wires it into `just -f .claude/test/justfile check` after the slim
 makes CLAUDE.md fit the ceilings.
 
 | Test | Scenario |
@@ -1315,7 +1319,7 @@ marker exists, written by `ci-and-stamp.sh` on green) or only
 documentation changed since the last green. `LOCAL_CI_ACK=<sha>`
 overrides for the exact HEAD. Fails safe (silent) outside a git repo,
 and fail-opens (silent) for a repo with no detectable CI mechanism
-(no `.claude/test/Makefile` / `justfile.ci` / root `justfile`) since
+(no `.claude/test/ci.sh` / `justfile.ci` / root `justfile`) since
 nothing can stamp it (refs #176 / #208).
 
 | Test | Scenario |
@@ -1330,7 +1334,7 @@ nothing can stamp it (refs #176 / #208).
 | gh pr ready also gated (no marker -> deny) | ready trigger → DENY |
 | silent (fail safe) when cwd is not a git repo | non-repo → SILENT |
 | allows when only doc/ + TEST.md changed since the green marker | multi-doc-only → ALLOW |
-| fail-open: repo with no detectable CI mechanism is silent | no make/justfile.ci/justfile → SILENT (issue #208) |
+| fail-open: repo with no detectable CI mechanism is silent | no ci.sh/justfile.ci/justfile → SILENT (issue #208) |
 
 ### test/smoke/ci_and_stamp_spec.bats (6)
 
@@ -1338,8 +1342,8 @@ Covers `.claude/scripts/ci-and-stamp.sh` (refs #208) — runs a repo's
 full CI mirror and, on green, writes the local-ci-pass marker the gate
 checks. Centralises marker-writing docker_harness-side so base /
 downstream PRs (not just docker_harness) can satisfy the gate; the
-runner is auto-detected (`.claude/test/Makefile` → `make -C
-.claude/test check`; root `justfile` + `.base/` → `just build test`;
+runner is auto-detected (`.claude/test/ci.sh` → `.claude/test/ci.sh
+check`; root `justfile` + `.base/` → `just build test`;
 root `justfile` without `.base/` → `just test` + `just test lint`;
 none → no stamp + notice; the `.base/` subtree distinguishes a
 downstream consumer from base since both carry a root justfile). The CI
@@ -1347,7 +1351,7 @@ runner is stubbed via a PATH shim exiting 0/1 (no real docker).
 
 | Test | Scenario |
 |------|----------|
-| docker_harness-style (.claude/test/Makefile) green -> stamps marker | detect + run + stamp |
+| docker_harness-style (.claude/test/ci.sh) green -> stamps marker | detect + run + stamp |
 | CI command non-zero -> NO marker, propagates failure | red CI does not stamp |
 | base-style (root justfile, no .base) green -> runs just test + stamps | base detection (#220) |
 | downstream (root justfile + .base subtree) green -> runs just build test + stamps | downstream detection (#220) |
@@ -1560,9 +1564,10 @@ network access.
 ### test/smoke/verify_spec.bats (15)
 
 Covers `.claude/scripts/verify.sh` — the unified change-complete
-verification loop fronted by `/verify`. Stubs the test image's
-`make lint`/`hadolint`/`test` targets via a temp `Makefile` so the
-spec runs without docker; phases that hit the filesystem
+verification loop fronted by `/verify`. Stubs the hard phases
+(`lint`/`hadolint`/`test`) via the `VERIFY_*_CMD` env overrides so the
+spec runs without docker/just (default entry: `just -f
+.claude/test/justfile <target>`); phases that hit the filesystem
 (`tree-audit`, `test-md`, `doc-scan`, `diff-stats`) exercise real
 paths against a temp git repo seeded by `setup()`.
 
@@ -1796,7 +1801,9 @@ directory or a broken symlink. New in #210; see ADR-00000011.
 
 ## Lint
 
-`make -C .claude/test lint` runs `shellcheck` against every top-level
-`.sh` in `.claude/hooks/` and `.claude/scripts/`. `make -C .claude/test
-hadolint` lints `.claude/test/Dockerfile`. Both are part of `make -C
-.claude/test check` and the CI workflow at `.github/workflows/test.yaml`.
+`just -f .claude/test/justfile lint` runs `shellcheck` against every
+top-level `.sh` in `.claude/hooks/` and `.claude/scripts/`. `just -f
+.claude/test/justfile hadolint` lints `.claude/test/Dockerfile`. Both
+are part of `just -f .claude/test/justfile check`; CI
+(`.github/workflows/test.yaml`) runs the same `.claude/test/ci.sh
+<target>` driver directly.

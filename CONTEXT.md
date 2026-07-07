@@ -98,14 +98,14 @@ docker/
     │   ├── batch-gitignore-add-line.sh      # 通用 .gitignore 追加任意行的 17 repo fanout（PR #23）
     │   ├── batch-mutation-pr.sh             # 通用跨 repo fanout 引擎：--mutation <script> 套到每個 repo,worktree->mutate->commit->push->PR;取代 one-shot batch-*.sh sprawl(refs #169,配 [[batch-mutation-pr]] skill)
     │   ├── batch-line-edit.sh               # batch-mutation-pr 的第一個 preset:--file/--line 跨 repo append-line-if-missing,delegate 給引擎(refs #169)
-    │   ├── ci-and-stamp.sh                  # 開 PR 前跑該 repo 的完整 CI mirror(auto-detect: .claude/test/Makefile→make check / justfile.ci→just -f justfile.ci test+lint / justfile→./build.sh test),綠燈才寫 .claude/state/local-ci-pass/<sha>.ok marker;集中 marker-write 讓 enforce_local_full_ci_before_pr 對所有 repo 可滿足(refs #208/#176)
+    │   ├── ci-and-stamp.sh                  # 開 PR 前跑該 repo 的完整 CI mirror(auto-detect: .claude/test/ci.sh→ci.sh check / justfile.ci→just -f justfile.ci test+lint / justfile→./build.sh test),綠燈才寫 .claude/state/local-ci-pass/<sha>.ok marker;集中 marker-write 讓 enforce_local_full_ci_before_pr 對所有 repo 可滿足(refs #208/#176)
     │   ├── batch-pr-merge.sh                # 批次 squash-merge 多個 <repo>:<pr>（接 short / full repo 名都可）
     │   ├── batch-pr-close.sh                # 批次 close 多個 <repo>:<pr>，--reason 必填（superseded-by 場景，例如 hotfix 後重 fanout 取代既有批次 PR）
     │   ├── check-template-versions.sh       # HTTPS curl 13 repo `.base/.version` 對齊檢查（release 後驗證）
     │   ├── fix-compose-copy-line.sh         # 一次性 compose.yaml COPY 路徑修正
     │   ├── fix-dockerfile-lint-lib.sh        # 通用：對 --branch 指定的 chore 分支批次 patch downstream Dockerfile 加 `COPY .base/script/docker/lib /lint/lib`（#284 sub-libs split 後 fanout 必須跑，idempotent）
     │   ├── fix-dockerfile-copy-script.sh     # 通用：對 --branch 指定的 chore 分支批次 patch downstream Dockerfile 把 `COPY *.sh /lint/` 改成 `COPY script/*.sh /lint/`（base#330 / v0.31.0 wrapper consolidation 後 root 沒有 *.sh,active 2 個下游 fanout 必須跑,idempotent）
-    │   ├── check-claude-md-tree.sh          # CI lint：parse this file 的 .claude/ tree vs filesystem，drift 就 exit 1 (post-#127: make tree-check passes CONTEXT.md as arg)
+    │   ├── check-claude-md-tree.sh          # CI lint：parse this file 的 .claude/ tree vs filesystem，drift 就 exit 1 (post-#127: just -f .claude/test/justfile tree-check passes CONTEXT.md as arg)
     │   ├── check-claude-md-ceiling.sh        # CI lint：assert CLAUDE.md 行數 + ^## 數在 ceiling 內 (defaults 240 / 20, env-overridable);refs #127
     │   ├── update-stale-pr.sh               # one-shot merge origin/main + normal push (NO rebase/force) for a PR whose base moved (BEHIND/CONFLICTING);auto-resolve worktree by branch via $WORKSPACE_DIR scan,refs #87/#221
     │   ├── auto-merge-on-green.sh           # auto-merge-on-green skill 的腳本:arm gh pr merge --auto + poll mergeStateStatus(MERGED/BEHIND→update-branch/DIRTY/FAIL/grace),refs #211
@@ -163,7 +163,7 @@ docker/
     │   ├── enforce_serial_merge_gate.sh  # `gh pr merge ... --auto` 第 2+ 個同 repo arm 前 BLOCK：查 `gh pr list --json number,autoMergeRequest` 已 armed >=1 就 deny + 印 ready-to-paste `.claude/scripts/serial-merge.sh <repo> <armed...> <this>`,避免 strict branch protection 下 O(N^2) CI re-run;0 armed 放行、SERIAL_MERGE=1 或 checkpoint ack 可 bypass(refs #236 / #235 / ADR-00000002)
     │   ├── enforce_worktree_for_branch.sh # 主 checkout 內 git checkout -b|-B 前 BLOCK,要求改走 git worktree add <path> -b <branch> main(內部 worktree 自動放行,checkpoint ack 可解,refs #122 / PR #89 / ADR-00000006)
     │   ├── enforce_merge_update_not_rebase.sh # git rebase(除 --abort/--continue/--skip)+ 有 open PR 的 branch force-push 前 BLOCK,改走 git merge origin/main + 一般 push;no-PR force-push / gh 錯誤 fail-open,checkpoint ack 可解,refs #221
-    │   ├── enforce_local_full_ci_before_pr.sh # gh pr create/ready 前 BLOCK：HEAD 無 local-CI marker(.claude/state/local-ci-pass/<sha>.ok,由 make -C .claude/test test 綠時寫)且非「綠後只動 doc」則 deny;LOCAL_CI_ACK=<sha> 可 override(refs #176)
+    │   ├── enforce_local_full_ci_before_pr.sh # gh pr create/ready 前 BLOCK：HEAD 無 local-CI marker(.claude/state/local-ci-pass/<sha>.ok,由 .claude/test/ci.sh test 綠時寫)且非「綠後只動 doc」則 deny;LOCAL_CI_ACK=<sha> 可 override(refs #176)
     │   ├── check_prefer_dot_sh.sh       # docker build/run/exec/stop/compose 前：cwd 有對應 .sh wrapper 則 deny,沒有則 ask
     │   ├── remind_topics_yaml_on_new_repo.sh # gh repo create ycpss91255-docker/* 前提醒去 .github topics.yaml 加 repos.* 條目
     │   ├── auto_clean_worktree_leak.sh  # PreToolUse Bash：git pull / git checkout origin/* / git merge origin/* 前掃 main checkout 非 whitelist M(`.claude/instincts.yaml` + `.claude/memory/**`)→ 寫 cleaned event 到 ~/.claude/log/worktree-leak-events.jsonl + git checkout HEAD -- <files> 還原後放行；refs #167
@@ -180,7 +180,7 @@ docker/
     │   ├── remind_parallel_when_bulk.sh # UserPromptSubmit hook：scan user prompt 偵測 bulk-work 訊號 (N >= 4 + plural noun / all|every + noun / 逗號分隔 4+ tokens / CJK 量詞) 且 prompt 未提 parallel/agent 時 remind 配 [[parallel-agents]] skill,configurable via PARALLEL_REMIND_{DISABLE,THRESHOLD};refs #126
     │   ├── remind_log_helper.sh        # PostToolUse hook：Edit/Write .claude/scripts/*.sh 後 delegate 到 check-log-helper-usage.sh,若該檔案有 bare printf|echo (usage()/allowlist marker 外) 則 systemMessage nudge 提醒走 _log_*,refs #148 M5
     │   ├── warn_structured_data_text_tools.sh # PreToolUse hook：bash 指令用 awk/sed 處理 .json/.jsonl 且無 jq 時 systemMessage nudge 改用 jq / Grep 工具(line-oriented 解析 JSONL 會誤計);non-blocking,配 structured-data-use-jq instinct
-    │   └── test/                       # bats specs (smoke + integration) — 跑法見 Makefile
+    │   └── test/                       # bats specs (smoke + integration) — 跑法見 .claude/test/justfile / ci.sh
     ├── skills/                         # repo-owned; each a symlink -> ../../.agents/skills/<name>/ (third-party mattpocock skills machine-local, omitted; ADR-11)
     │   ├── auto-merge-on-green/SKILL.md # 開 PR 後落地單一 PR:arm GitHub auto-merge + Monitor 包 auto-merge-on-green.sh,配 remind_ci_auto_merge hook;refs #211
     │   ├── update-stale-pr/SKILL.md    # PR BEHIND/CONFLICTING 時 merge origin/main + 一般 push(不 rebase/force)的 one-shot 流程,配 update-stale-pr.sh + wait-pr-ci FAIL hint,refs #87/#221
@@ -195,14 +195,16 @@ docker/
     │   └── batch-mutation-pr/SKILL.md  # generic batch-mutation-PR 引擎 (跨 repo fan-out line edits),配 batch-mutation-pr.sh + batch-line-edit.sh preset;refs #169/#207
     ├── test/                           # docker_harness 自己的 hook 測試 infra（與下游 repo 的 Dockerfile 無關）
     │   ├── Dockerfile                  # bats 1.11 + shellcheck on Alpine（COPY .claude/hooks/ + .claude/scripts/）
-    │   └── Makefile                    # make -C .claude/test build / test / lint / hadolint / check / tree-check / ceiling-check
+    │   ├── ci.sh                       # CI runner driver — both CI (.github/workflows/test.yaml) 與 local justfile 都呼叫；targets build / test / lint / hadolint / check / tree-check / ceiling-check / log-helper-check / clean
+    │   └── justfile                    # local just wrapper：just -f .claude/test/justfile <target> 轉呼 ci.sh <target>
     ├── settings.json                   # hooks 註冊 + permissions + sandbox（**唯一一份,無 settings.local.json**）
     └── instincts.yaml                  # 結構化 repo conventions (#95 pilot) — hooks/skills/commands 用 `instinct-query.sh` 查詢,取代 CLAUDE.md prose grep
 ```
 
-The `.claude/` block above is the audit target for `make -C .claude/test tree-check`
-(`.claude/scripts/check-claude-md-tree.sh`); drift between this listing and
-the filesystem fails the build. Post-#127 the make target invokes the script
+The `.claude/` block above is the audit target for `just -f .claude/test/justfile tree-check`
+(`.claude/scripts/check-claude-md-tree.sh`; CI runs the same
+`.claude/test/ci.sh tree-check` driver); drift between this listing and
+the filesystem fails the build. Post-#127 the tree-check target invokes the script
 with this file as the argument; pre-#127 it read `CLAUDE.md`.
 
 ### Standard container layout

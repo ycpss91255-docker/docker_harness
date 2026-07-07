@@ -7,9 +7,9 @@
 # actual filesystem under `.claude/`. Designed for CI lint — exits
 # non-zero on drift so the build fails.
 #
-# Default file: CLAUDE.md. Post-#127 the make target
-# (`make -C .claude/test tree-check`) passes CONTEXT.md instead,
-# because the tree listing moved there in the CLAUDE.md slim.
+# Default file: CLAUDE.md. Post-#127 the tree-check target
+# (`just -f .claude/test/justfile tree-check`) passes CONTEXT.md
+# instead, because the tree listing moved there in the CLAUDE.md slim.
 #
 # Compares direct children of:
 #   - .claude/commands/
@@ -34,9 +34,9 @@ Usage: $0 [path/to/markdown-file]
 
 Audit the \`.claude/\` tree listing in a markdown file against the
 actual filesystem. If no path is given, defaults to
-\`\${CLAUDE_PROJECT_DIR:-cwd}/CLAUDE.md\`. Post-#127 the make target
-\`make -C .claude/test tree-check\` passes CONTEXT.md (where the
-tree listing now lives after the CLAUDE.md slim).
+\`\${CLAUDE_PROJECT_DIR:-cwd}/CLAUDE.md\`. Post-#127 the tree-check
+target \`just -f .claude/test/justfile tree-check\` passes CONTEXT.md
+(where the tree listing now lives after the CLAUDE.md slim).
 
 Exit codes:
   0  Tree aligned with filesystem

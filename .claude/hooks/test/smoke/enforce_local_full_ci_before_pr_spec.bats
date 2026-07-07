@@ -134,7 +134,7 @@ fire() {
 }
 
 @test "fail-open: repo with no detectable CI mechanism is silent (refs #208)" {
-  # No .claude/test/Makefile, no justfile.ci, no root justfile -> the
+  # No .claude/test/ci.sh, no justfile.ci, no root justfile -> the
   # gate has nothing to verify against, so it must not block.
   local repo
   repo="$(mktemp -d)"
