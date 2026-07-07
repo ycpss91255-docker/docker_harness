@@ -39,10 +39,10 @@ main() {
 
   case "${fires}" in
     workflow)
-      msg="workflow_dispatch 提醒：開完別 sleep 輪詢 — 用 wait-tag-ci.sh (.claude/scripts/wait-tag-ci.sh) 把 dispatched run 跑到綠燈再走。內部 Monitor + until poll 30s，不會 burn context。"
+      msg="workflow_dispatch reminder: after triggering, don't sleep-poll -- use wait-tag-ci.sh (.claude/scripts/wait-tag-ci.sh) to drive the dispatched run to green before moving on. It uses Monitor + an until poll (30s) internally and won't burn context."
       ;;
     rerun)
-      msg="re-run 提醒：開完別 sleep 輪詢 — PR-scoped re-run 用 /wait-pr-ci skill (.claude/skills/wait-pr-ci/SKILL.md)，tag/branch-scoped re-run 用 wait-tag-ci.sh (.claude/scripts/wait-tag-ci.sh)。內部都走 Monitor + until poll，不會 burn context。"
+      msg="re-run reminder: after triggering, don't sleep-poll -- for a PR-scoped re-run use the /wait-pr-ci skill (.claude/skills/wait-pr-ci/SKILL.md), for a tag/branch-scoped re-run use wait-tag-ci.sh (.claude/scripts/wait-tag-ci.sh). Both use Monitor + an until poll internally and won't burn context."
       ;;
   esac
 

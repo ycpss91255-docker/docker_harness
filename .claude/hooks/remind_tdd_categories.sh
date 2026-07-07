@@ -9,7 +9,8 @@
 #
 # Mapping is intentionally a soft reminder, not enforcement: the hook does
 # NOT verify that tests were actually written. It just nags by re-injecting
-# the relevant row of the 變更類型 → 測試類別 table from CLAUDE.md, so the
+# the relevant row of the 變更類型 → 測試類別 (change type → test category)
+# table from CLAUDE.md, so the
 # rule stays in context the moment a relevant file is touched.
 #
 # Skip list:
@@ -67,46 +68,46 @@ build_reminder() {
   local smoke="" unit="" integration="" lint=""
   case "${key}" in
     entrypoint)
-      smoke="Smoke 必須（容器起來後核心 path 跑得過）"
-      lint="Lint 必須（ShellCheck）"
-      unit="視函式拆分補 Unit"
-      integration="視 multi-container 補 Integration"
+      smoke="Smoke required (core path runs once the container is up)"
+      lint="Lint required (ShellCheck)"
+      unit="Add Unit if functions are split out"
+      integration="Add Integration for multi-container"
       ;;
     hadolint)
-      lint="Lint 必須：跑一次全套（just build test / just test，或 make -C .claude/test test）確認既有檔案沒有新 violation"
-      smoke="Smoke 通常 N/A"
-      unit="Unit 通常 N/A"
-      integration="Integration 通常 N/A"
+      lint="Lint required: run the full suite once (just build test / just test, or make -C .claude/test test) to confirm existing files have no new violations"
+      smoke="Smoke usually N/A"
+      unit="Unit usually N/A"
+      integration="Integration usually N/A"
       ;;
     workflow)
-      integration="Integration 必須（PR 跑一次驗證新 workflow 真的觸發）"
-      smoke="視觸發點補 Smoke"
-      lint="Lint（actionlint 若有）"
+      integration="Integration required (run the PR once to verify the new workflow actually triggers)"
+      smoke="Add Smoke depending on the trigger point"
+      lint="Lint (actionlint if available)"
       ;;
     compose)
-      integration="Integration 必須（multi-container 協同行為）"
-      smoke="視單容器影響補 Smoke"
-      lint="視 compose lint 工具"
+      integration="Integration required (multi-container coordinated behaviour)"
+      smoke="Add Smoke if single-container behaviour is affected"
+      lint="Depending on the compose lint tool"
       ;;
     dockerfile)
-      smoke="Smoke 必須（container 起得來、核心指令可用）"
-      lint="Lint 必須（Hadolint）"
-      integration="視 build flow 補 Integration"
+      smoke="Smoke required (container comes up, core commands work)"
+      lint="Lint required (Hadolint)"
+      integration="Add Integration for the build flow"
       ;;
     shell)
-      unit="Unit 必須（隔離函式邏輯，bats-mock）"
-      lint="Lint 必須（ShellCheck）"
-      smoke="視 path 影響補 Smoke"
-      integration="視流程影響補 Integration"
+      unit="Unit required (isolate function logic, bats-mock)"
+      lint="Lint required (ShellCheck)"
+      smoke="Add Smoke if the path is affected"
+      integration="Add Integration if the flow is affected"
       ;;
   esac
 
   local parts=""
-  (( has_smoke )) && [[ -n "${smoke}" ]] && parts+="${smoke}；"
-  (( has_unit )) && [[ -n "${unit}" ]] && parts+="${unit}；"
-  (( has_integration )) && [[ -n "${integration}" ]] && parts+="${integration}；"
-  [[ -n "${lint}" ]] && parts+="${lint}；"
-  printf '%s' "${parts%；}"
+  (( has_smoke )) && [[ -n "${smoke}" ]] && parts+="${smoke}; "
+  (( has_unit )) && [[ -n "${unit}" ]] && parts+="${unit}; "
+  (( has_integration )) && [[ -n "${integration}" ]] && parts+="${integration}; "
+  [[ -n "${lint}" ]] && parts+="${lint}; "
+  printf '%s' "${parts%; }"
 }
 
 main() {
@@ -131,11 +132,11 @@ main() {
 
   case "${file_path}" in
     */entrypoint.sh)
-      category="entrypoint / 容器啟動行為"
+      category="entrypoint / container startup behaviour"
       key="entrypoint"
       ;;
     *.hadolint.yaml|*/.shellcheckrc|*.shellcheckrc)
-      category="lint 規則調整"
+      category="lint rule change"
       key="hadolint"
       ;;
     */.github/workflows/*.yaml|*/.github/workflows/*.yml)
@@ -143,15 +144,15 @@ main() {
       key="workflow"
       ;;
     */compose.yaml)
-      category="compose / multi-container 行為"
+      category="compose / multi-container behaviour"
       key="compose"
       ;;
     */Dockerfile|*/Dockerfile.*|*Dockerfile)
-      category="Dockerfile（stage / COPY / ENV / ARG 等）"
+      category="Dockerfile (stage / COPY / ENV / ARG, etc.)"
       key="dockerfile"
       ;;
     *.sh)
-      category="shell 函式 / 腳本邏輯"
+      category="shell function / script logic"
       key="shell"
       ;;
   esac
@@ -174,10 +175,10 @@ main() {
 
   local msg
   if [[ -n "${instincts}" ]]; then
-    msg="$(printf 'TDD reminder — 剛動到 %s（類別：%s）\n%s\n對照表：CLAUDE.md「測試分類（TDD 必須涵蓋的 4 個面向）」\n\nApplicable instincts (.claude/instincts.yaml):\n%s' \
+    msg="$(printf 'TDD reminder — just touched %s (category: %s)\n%s\nReference: CLAUDE.md「測試分類（TDD 必須涵蓋的 4 個面向）」 (test categories — the 4 aspects TDD must cover)\n\nApplicable instincts (.claude/instincts.yaml):\n%s' \
       "${file_path}" "${category}" "${reminder}" "${instincts}")"
   else
-    msg="$(printf 'TDD reminder — 剛動到 %s（類別：%s）\n%s\n對照表：CLAUDE.md「測試分類（TDD 必須涵蓋的 4 個面向）」' \
+    msg="$(printf 'TDD reminder — just touched %s (category: %s)\n%s\nReference: CLAUDE.md「測試分類（TDD 必須涵蓋的 4 個面向）」 (test categories — the 4 aspects TDD must cover)' \
       "${file_path}" "${category}" "${reminder}")"
   fi
 

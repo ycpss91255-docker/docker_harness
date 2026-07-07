@@ -13,7 +13,7 @@ teardown() {
 @test "fires on .sh file edit" {
   echo "echo a" > "${TMPDIR}/foo.sh"
   run "$(hook remind_tdd_categories.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/foo.sh\"}}"
-  assert_message_contains "shell 函式"
+  assert_message_contains "shell function"
 }
 
 @test "fires on Dockerfile edit" {
@@ -71,11 +71,11 @@ teardown() {
   mkdir -p "${TMPDIR}/repo/script"
   echo "echo a" > "${TMPDIR}/repo/script/foo.sh"
   run "$(hook remind_tdd_categories.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/repo/script/foo.sh\"}}"
-  assert_message_contains "shell 函式"
+  assert_message_contains "shell function"
   assert_message_contains "Smoke"
   assert_message_contains "Lint"
-  refute_output --partial "Unit 必須"
-  refute_output --partial "Integration 必須"
+  refute_output --partial "Unit required"
+  refute_output --partial "Integration required"
 }
 
 @test "[#220] .sh in repo detected via root justfile only (no Dockerfile) scopes categories" {
@@ -85,8 +85,8 @@ teardown() {
   echo "echo a" > "${TMPDIR}/jrepo/script/foo.sh"
   run "$(hook remind_tdd_categories.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/jrepo/script/foo.sh\"}}"
   assert_message_contains "Smoke"
-  refute_output --partial "Unit 必須"
-  refute_output --partial "Integration 必須"
+  refute_output --partial "Unit required"
+  refute_output --partial "Integration required"
 }
 
 @test "[#75] .sh in repo with full test infra keeps all 4 categories" {
@@ -97,7 +97,7 @@ teardown() {
   mkdir -p "${TMPDIR}/repo/script"
   echo "echo a" > "${TMPDIR}/repo/script/foo.sh"
   run "$(hook remind_tdd_categories.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/repo/script/foo.sh\"}}"
-  assert_message_contains "Unit 必須"
+  assert_message_contains "Unit required"
   assert_message_contains "Smoke"
   assert_message_contains "Integration"
   assert_message_contains "Lint"
@@ -110,7 +110,7 @@ teardown() {
   assert_message_contains "Dockerfile"
   assert_message_contains "Smoke"
   assert_message_contains "Lint"
-  refute_output --partial "Integration 必須"
+  refute_output --partial "Integration required"
 }
 
 @test "[#75] repo without any test/ subdir falls back to all 4 categories" {
@@ -118,6 +118,6 @@ teardown() {
   echo "FROM x" > "${TMPDIR}/repo/Dockerfile"
   echo "echo a" > "${TMPDIR}/repo/script/foo.sh"
   run "$(hook remind_tdd_categories.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/repo/script/foo.sh\"}}"
-  assert_message_contains "Unit 必須"
+  assert_message_contains "Unit required"
   assert_message_contains "Integration"
 }

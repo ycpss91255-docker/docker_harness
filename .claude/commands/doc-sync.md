@@ -1,4 +1,4 @@
-Run the project's "變更完成 checklist" doc-alignment checks against the current working tree, before commit. Report what's missing — don't auto-fix unless asked.
+Run the project's "變更完成 checklist" (change-completion checklist) doc-alignment checks against the current working tree, before commit. Report what's missing — don't auto-fix unless asked.
 
 Usage: `/doc-sync` (no args), or `/doc-sync <repo-path>` to scope to a single repo subtree.
 
@@ -19,10 +19,10 @@ If the working tree (or staged area, when in a git repo) has any modifications u
 Compare `README.md` (root) against `doc/readme/README.zh-TW.md`, `README.zh-CN.md`, `README.ja.md`. Specifically: count `^## ` and `^### ` headings in each — they should match. If counts diverge, list which language is missing/extra which heading. Tree-of-contents-only check; do NOT compare body content.
 
 **5. Emoji scan**
-Run `.claude/hooks/check_no_emoji.sh` against every file changed since HEAD (use `git status --porcelain` if git repo, else `find -newer` against a 24h window as fallback). Report any hits — those violate the project rule "不使用 emoji".
+Run `.claude/hooks/check_no_emoji.sh` against every file changed since HEAD (use `git status --porcelain` if git repo, else `find -newer` against a 24h window as fallback). Report any hits — those violate the project rule "不使用 emoji" (no emoji).
 
 **6. AI attribution scan**
-Grep changed files for these forbidden patterns (CLAUDE.md rule "不加 AI 歸屬標記"):
+Grep changed files for these forbidden patterns (CLAUDE.md rule "不加 AI 歸屬標記", no AI-attribution markers):
 - `Generated with .*Claude Code`
 - `Co-Authored-By: Claude`
 - `🤖 Generated`

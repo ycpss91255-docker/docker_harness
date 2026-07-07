@@ -1,4 +1,4 @@
-Run the project's "變更完成 checklist" (CLAUDE.md) in one pass — shellcheck + hadolint + bats + tree audit + TEST.md drift + doc-scan + diff stats. Stop on the first hard failure (shellcheck / hadolint / bats); soft phases warn and continue.
+Run the project's "變更完成 checklist" (change-completion checklist, CLAUDE.md) in one pass — shellcheck + hadolint + bats + tree audit + TEST.md drift + doc-scan + diff stats. Stop on the first hard failure (shellcheck / hadolint / bats); soft phases warn and continue.
 
 Use this before `git commit` or before opening a PR, when the change touched code / scripts / Dockerfile / workflows / `.claude/**` — anything beyond pure prose. For pure README / CLAUDE.md prose edits, `/verify` is overkill; the relevant PostToolUse hooks already cover doc-only concerns.
 

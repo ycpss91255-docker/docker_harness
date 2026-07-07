@@ -4,7 +4,7 @@
 # Fires on Edit / Write / MultiEdit. Scans the touched file for emoji
 # codepoints. On hits, emits a JSON systemMessage. Non-blocking — exit 0.
 #
-# Project rule (workspace/docker/CLAUDE.md): "不使用 emoji". The detector
+# Project rule (workspace/docker/CLAUDE.md): "不使用 emoji" (no emoji). The detector
 # targets emoji-presentation ranges in the BMP supplemental planes
 # (1F300+) and regional indicators / dingbats. Common typography (arrows,
 # bullets, geometric shapes in 2600-26FF) is intentionally excluded to
@@ -76,7 +76,7 @@ PY
 )"
 
   if [[ -n "${hits}" ]]; then
-    msg="$(printf 'Emoji detected in %s (project rule: 不使用 emoji):\n%s' \
+    msg="$(printf 'Emoji detected in %s (project rule "不使用 emoji" / no emoji):\n%s' \
       "${file_path}" "${hits}")"
     jq -n --arg m "${msg}" '{
       systemMessage: $m,

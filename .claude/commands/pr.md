@@ -25,23 +25,23 @@ Follow this workflow:
    - New feature: `feat: <description>`
    - Refactoring: `refactor: <description>`
    - Docs only: `docs: <description>`
-   - Do NOT add AI attribution lines (e.g. `Co-Authored-By: Claude ...`, `Generated with Claude Code`); CLAUDE.md「不加 AI 歸屬標記」明文禁止。
+   - Do NOT add AI attribution lines (e.g. `Co-Authored-By: Claude ...`, `Generated with Claude Code`); CLAUDE.md「不加 AI 歸屬標記」(no AI-attribution markers) explicitly forbids this.
 
 5. **Push branch, create PR**:
    ```
    git push -u origin <branch-name>
-   # PR body 必須走 --body-file (enforce_gh_body_file.sh hook BLOCK inline --body)
-   # 先 Write 寫到 /tmp/pr-<slug>-body.md,再:
+   # PR body must go through --body-file (enforce_gh_body_file.sh hook BLOCKs inline --body)
+   # Write it to /tmp/pr-<slug>-body.md first, then:
    gh pr create --title "<type>: <title>" --body-file /tmp/pr-<slug>-body.md
    ```
-   arming GitHub auto-merge + 監看落地交給 step 6 的 `auto-merge-on-green` skill(它跑 `gh pr merge --auto --squash --delete-branch`)。所有 active repo 都已開啟 `allow_auto_merge`。`.github` 例外:doc-only PR + paths filter 會讓 status check 永遠 pending,auto-merge 卡死 — 該 repo 改走手動 `gh pr merge`。
+   Arming GitHub auto-merge + watching it land is handled by step 6's `auto-merge-on-green` skill (it runs `gh pr merge --auto --squash --delete-branch`). All active repos already have `allow_auto_merge` enabled. `.github` is the exception: a doc-only PR + paths filter leaves the status check pending forever, so auto-merge stalls — for that repo use a manual `gh pr merge` instead.
 
-   PR body shape 規範參見 `.claude/skills/gh-artifact-format/SKILL.md`(issue body 同 5 sections,但 PR 多一個 `## Test plan` checklist)。Skill 也涵蓋 close-comment 3 tiers / non-closing comment 3 categories / cross-ref keywords (`Closes` / `Fixes` / `refs` / `supersedes` / `closes part of`)。
+   For the PR body shape, see `.claude/skills/gh-artifact-format/SKILL.md` (the issue body has the same 5 sections, but a PR adds a `## Test plan` checklist). The skill also covers close-comment 3 tiers / non-closing comment 3 categories / cross-ref keywords (`Closes` / `Fixes` / `refs` / `supersedes` / `closes part of`).
 
-6. **Land the PR via `auto-merge-on-green`**(canonical 落地單一 PR 流程):
-   - 用 `auto-merge-on-green` skill (`.claude/skills/auto-merge-on-green/SKILL.md`):一個 Monitor 包 `.claude/scripts/auto-merge-on-green.sh --repo <O>/<R> --pr <N>` — 它 arm GitHub auto-merge、輪詢 `mergeStateStatus`、`BEHIND` 自動 `gh pr update-branch`(取代以前手動 `git pull --rebase` + force-push)、CI 失敗回報且保留 armed(fix-push 自動落地)。`remind_ci_auto_merge` hook 會在 `gh pr create` 後提醒。
-   - 純監看(不 merge,例如 base repo 要接 tag + 下游 fanout,或等其他依賴 merged state 的動作)才用 `wait-pr-ci` skill 等 `ALL_DONE`。
-   - dependabot PR 卡 BEHIND:留 `@dependabot rebase` comment。`.github` doc-only PR:auto-merge 卡死,手動 `gh pr merge`。
+6. **Land the PR via `auto-merge-on-green`** (the canonical flow for landing a single PR):
+   - Use the `auto-merge-on-green` skill (`.claude/skills/auto-merge-on-green/SKILL.md`): a single Monitor wraps `.claude/scripts/auto-merge-on-green.sh --repo <O>/<R> --pr <N>` — it arms GitHub auto-merge, polls `mergeStateStatus`, runs `gh pr update-branch` automatically on `BEHIND` (replacing the old manual `git pull --rebase` + force-push), and on CI failure reports back while staying armed (a fix-push lands automatically). The `remind_ci_auto_merge` hook reminds you after `gh pr create`.
+   - Only for pure monitoring (no merge — e.g. the base repo needs a follow-up tag + downstream fanout, or you are waiting on some other action that depends on merged state) use the `wait-pr-ci` skill to wait for `ALL_DONE`.
+   - dependabot PR stuck at BEHIND: leave a `@dependabot rebase` comment. `.github` doc-only PR: auto-merge stalls, so merge manually with `gh pr merge`.
 
 7. **If this PR was on the `base` repo**: after merge + tag, the
    13 downstream repos need the new `.base/` subtree version pulled.

@@ -29,7 +29,7 @@ main() {
   [[ "${cmd}" =~ gh[[:space:]]+repo[[:space:]]+create ]] || return 0
   [[ "${cmd}" == *ycpss91255-docker/* ]] || return 0
 
-  msg="新 repo 提醒：建完之後也去 ycpss91255-docker/.github 開 PR 把這個 repo 加進 topics.yaml 的 repos.* — 否則週一 drift cron 會 fail，PR 會被擋。允許的 tag 看 .github/topics.yaml 的 allowed.* 區段。"
+  msg="New-repo reminder: after creating it, open a PR against ycpss91255-docker/.github to add this repo to the repos.* section of topics.yaml — otherwise Monday's drift cron will fail and the PR will be blocked. See the allowed.* section of .github/topics.yaml for the permitted tags."
 
   jq -n --arg m "${msg}" '{
     systemMessage: $m,

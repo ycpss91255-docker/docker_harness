@@ -81,8 +81,8 @@ main() {
   [[ -z "${final_stage_pkgs}" ]] && return 0
 
   local msg
-  msg="$(printf 'test-tools image 變更提醒：\n  Dockerfile.test-tools 最終 stage apk add 套件: %s\n  release-test-tools.yaml smoke step 驗證的指令: %s\n對照確認每個 user-facing 套件都有對應的 --version / --help smoke 檢查（例：git-subtree 對應 git subtree --help；parallel 對應 parallel --version）。沒對應的話補進 smoke step；ca-certificates / coreutils 之類沒獨立指令的可忽略。' \
-    "${final_stage_pkgs}" "${smoke_cmds:-（無）}")"
+  msg="$(printf 'test-tools image change reminder:\n  Dockerfile.test-tools final-stage apk add packages: %s\n  release-test-tools.yaml smoke step verified commands: %s\nCross-check that every user-facing package has a matching --version / --help smoke check (e.g. git-subtree -> git subtree --help; parallel -> parallel --version). If one is missing, add it to the smoke step; packages without a standalone command such as ca-certificates / coreutils can be ignored.' \
+    "${final_stage_pkgs}" "${smoke_cmds:-(none)}")"
 
   jq -n --arg m "${msg}" '{
     systemMessage: $m,

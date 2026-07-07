@@ -2,17 +2,19 @@
 # remind_no_ai_attribution.sh — Claude Code PreToolUse hook (matcher: Bash)
 #
 # Fires before any Bash command. When the command embeds AI-attribution
-# markers in a git/gh argument (commit -m, gh pr create --body 等)，emit
+# markers in a git/gh argument (commit -m, gh pr create --body, etc.), emit
 # a JSON systemMessage. Non-blocking — exit 0.
 #
-# Why: CLAUDE.md「不加 AI 歸屬標記」明文禁止 commit message / PR body /
-# code comment 出現此類訊息。檔案落地的情況由 check_no_ai_attribution.sh
-# (PostToolUse Edit/Write) 抓；命令列直接帶 inline 字串的情況由本 hook
-# 抓 (e.g. `git commit -m "feat: x\n\nCo-Authored-By: Claude ..."`).
+# Why: CLAUDE.md「不加 AI 歸屬標記」(no AI-attribution markers) expressly
+# forbids such messages in a commit message / PR body / code comment. The
+# on-disk case is caught by check_no_ai_attribution.sh (PostToolUse
+# Edit/Write); the case where an inline string is passed directly on the
+# command line is caught by this hook
+# (e.g. `git commit -m "feat: x\n\nCo-Authored-By: Claude ..."`).
 #
-# Trigger: command 含 `git commit`/`gh pr create`/`gh pr edit`/
-# `gh pr comment`/`gh issue create`/`gh issue edit`/`gh issue comment`，
-# 且 command 字串裡偵測到 AI 歸屬 pattern。
+# Trigger: command contains `git commit`/`gh pr create`/`gh pr edit`/
+# `gh pr comment`/`gh issue create`/`gh issue edit`/`gh issue comment`,
+# and an AI-attribution pattern is detected in the command string.
 
 set -uo pipefail
 
@@ -33,7 +35,7 @@ main() {
     return 0
   fi
 
-  msg="AI 歸屬標記 in command（CLAUDE.md「不加 AI 歸屬標記」: 一律不要加 Generated with Claude Code、Co-Authored-By: Claude 等。對 reviewer 無用、只是視覺噪音）。請從訊息中移除這類行再 commit / open PR。"
+  msg="AI-attribution marker in command (CLAUDE.md「不加 AI 歸屬標記」/ no AI-attribution markers: never add Generated with Claude Code, Co-Authored-By: Claude, etc. Useless to reviewers, just visual noise). Remove these lines from the message before you commit / open the PR."
 
   jq -n --arg m "${msg}" '{
     systemMessage: $m,

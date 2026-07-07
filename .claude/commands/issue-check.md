@@ -42,17 +42,17 @@ For each open issue, place it in exactly one bucket:
 
 ### 4. Output
 
-**輸出一律用繁體中文**（issue 標題保留原文不翻譯，建議 action / 分類 / 摘要用中文）。
+**All output must be in Traditional Chinese** (keep issue titles in their original wording untranslated; write the suggested action / categorization / summary in Chinese).
 
-依 bucket 分組（最需要處理的放最前面），bucket 內依 repo 分。每個 issue 格式：
+Group by bucket (most-urgent first); within each bucket, group by repo. Per-issue format:
 
 ```
-- <repo>#<num> <原文 title>  (建立 <age>，最後活動 <when>)
-  → <一句中文建議 action>
+- <repo>#<num> <original title>  (建立 <age>，最後活動 <when>)
+  → <one-sentence suggested action, in Chinese>
   <url>
 ```
 
-Bucket 標題用中文：
+Bucket titles are rendered in Chinese:
 - 進行中（In progress）
 - 可 merge（Ready to merge）
 - 卡住（Blocked）
@@ -60,12 +60,12 @@ Bucket 標題用中文：
 - 待分類（Untriaged）
 - 孤兒（Orphaned）
 
-最後給一行中文總結：
+End with a one-line summary in Chinese:
 ```
 共 N 個 open · X 進行中 · Y 可 merge · Z 停滯 · ...
 ```
 
-只報告，不要自動下任何 action（加 label / 關 issue / 留言）。要動什麼由使用者決定。
+Report only; do not take any automatic action (add label / close issue / comment). The user decides what to act on.
 
 ## Notes
 

@@ -90,7 +90,7 @@ main() {
     "${cmd}" \
     "${REASON}" \
     "${CANONICAL}" \
-    "See CLAUDE.md > 跨 repo 批次 mutation 規範 for the full rule.")"
+    "See CLAUDE.md > 跨 repo 批次 mutation 規範 (cross-repo batch mutation rule) for the full rule.")"
 
   local deny_msg
   deny_msg="batch-via-script gate (CLAUDE.md cross-repo mutation): inline for-loop with mutating git/gh operations is denied.

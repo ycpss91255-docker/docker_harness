@@ -47,7 +47,7 @@ main() {
     return 0
   fi
 
-  msg="awk/sed parsing JSON/JSONL is fragile — a record can span lines and embed }, backticks, heredoc bodies, so a line-oriented matcher miscounts and silently produces wrong results. 結構化資料(JSON/JSONL)請改用 \`jq\`(取值 / 計數:\`jq -r '...' | sort | uniq -c\`);搜尋程式碼走 Grep 工具。awk/sed/cat pipeline 只保留給乾淨的表格 / 欄位資料(如 \`jq ... | awk '{print \$1}'\` 在 jq 抽完後格式化欄位)。"
+  msg="awk/sed parsing JSON/JSONL is fragile — a record can span lines and embed }, backticks, heredoc bodies, so a line-oriented matcher miscounts and silently produces wrong results. For structured data (JSON/JSONL) use \`jq\` instead (extract values / count: \`jq -r '...' | sort | uniq -c\`); search code with the Grep tool. Reserve awk/sed/cat pipelines for clean tabular / columnar data (e.g. \`jq ... | awk '{print \$1}'\` to format columns after jq has done the extraction)."
 
   jq -n --arg m "${msg}" '{
     systemMessage: $m,

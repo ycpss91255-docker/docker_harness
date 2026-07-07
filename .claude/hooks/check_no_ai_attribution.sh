@@ -5,16 +5,18 @@
 # markers (e.g. "Generated with Claude Code", "Co-Authored-By: Claude ...").
 # Non-blocking — exit 0; emits a JSON systemMessage on hits.
 #
-# Why: CLAUDE.md「不加 AI 歸屬標記」明文禁止 commit message / PR body /
-# code comment 出現此類訊息 — 對 reviewer 無用、只是視覺噪音。當 Claude
-# 寫入 commit message 暫存檔 (-F) 或 PR body file (--body-file) 時，這個
-# hook 會在檔案落地的瞬間把問題抓出來。命令列直接帶字串的情況由
-# remind_no_ai_attribution.sh (PreToolUse Bash) 負責。
+# Why: CLAUDE.md「不加 AI 歸屬標記」(no AI-attribution markers) explicitly
+# forbids such messages in commit message / PR body / code comment — they
+# are useless to reviewers, just visual noise. When Claude writes a commit
+# message temp file (-F) or a PR body file (--body-file), this hook catches
+# the problem the moment the file lands. The case of passing the string
+# directly on the command line is handled by remind_no_ai_attribution.sh
+# (PreToolUse Bash).
 #
 # Patterns (case-insensitive):
 #   - Generated with [Claude Code]  /  Generated with Claude Code
 #   - Co-Authored-By: Claude
-#   - "robot-emoji Generated with" 這類常見 boilerplate (emoji 由 check_no_emoji 抓)
+#   - "robot-emoji Generated with" and similar common boilerplate (the emoji is caught by check_no_emoji)
 
 set -uo pipefail
 
@@ -56,7 +58,7 @@ main() {
 
   [[ -z "${hits}" ]] && return 0
 
-  msg="$(printf 'AI 歸屬標記 in %s（CLAUDE.md「不加 AI 歸屬標記」: PR body / commit message / code comment 一律不要加 Generated with Claude Code、Co-Authored-By: Claude 等）:\n%s' \
+  msg="$(printf 'AI attribution marker in %s (CLAUDE.md「不加 AI 歸屬標記」(no AI-attribution markers): never add Generated with Claude Code, Co-Authored-By: Claude, etc. to PR body / commit message / code comment):\n%s' \
     "${file_path}" "${hits}")"
 
   jq -n --arg m "${msg}" '{

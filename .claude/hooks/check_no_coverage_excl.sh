@@ -6,8 +6,9 @@
 # kcov-excl) and emits a JSON systemMessage on hits. Non-blocking — always
 # exit 0.
 #
-# Why: CLAUDE.md「風格規範」禁止用註解隱藏未覆蓋程式碼。要呈現真實
-# 覆蓋率,未覆蓋的部分用測試補上,不要靠註解掩蓋。
+# Why: CLAUDE.md「風格規範」(style guidelines) forbids hiding uncovered
+# code behind comments. Show the real coverage; fill the uncovered parts
+# with tests instead of masking them with comments.
 #
 # Pattern: extended regex matches LCOV_EXCL_(LINE|START|STOP) and kcov-excl
 # regardless of comment marker (#, //, --, etc.). Skip the hook itself
@@ -48,7 +49,7 @@ main() {
 
   [[ -z "${hits}" ]] && return 0
 
-  msg="$(printf '禁用覆蓋率忽略註解 in %s（CLAUDE.md 風格規範：未覆蓋處用測試補上,不要靠註解掩蓋）:\n%s' \
+  msg="$(printf 'coverage-exclusion comment not allowed in %s (CLAUDE.md「風格規範」(style guidelines): fill uncovered code with tests, do not mask it with comments):\n%s' \
     "${file_path}" "${hits}")"
 
   jq -n --arg m "${msg}" '{

@@ -10,19 +10,21 @@
 #   - With --auto: merge is queued; remind to pull after CI passes
 #   - Without --auto: merge is immediate; remind to pull right after
 #
-# Why: CLAUDE.md「Git 工作流程 > 主 checkout 狀態」要求主 checkout
-# 永遠停在 origin/main HEAD — 意思是「持續 ff-tracking」不是「凍結在
-# 某個 commit」。PR #89 那次踩到正是因為 local main 落後好幾個 PR,
-# 從 stale base 起 worktree branch,後來才被迫 rebase。
+# Why: CLAUDE.md「Git 工作流程 > 主 checkout 狀態」(Git workflow > main
+# checkout state) requires the main checkout to always sit at origin/main
+# HEAD — meaning "continuously ff-tracking", not "frozen at some commit".
+# PR #89 hit exactly this: local main lagged several PRs behind, a worktree
+# branch was started from that stale base, and a forced rebase followed.
 #
-# Trigger pattern: `gh pr merge` 出現在 command 作為實際子指令,不算
-# quoted string 內 substring(避免 `git commit -m "...gh pr merge..."`
-# 之類的 commit message 觸發 false positive)。實作:
-#   1. 用 sed 砍掉雙引號 / 單引號區段(unnested 簡單情況)
-#   2. 在 cleaned 字串上跑 trigger regex
-#   3. 加 command-boundary anchor (^ 或 ; & | $( 之後),`gh pr merge`
-#      必須是 actual subcommand 才 match
-# 不限定 `--squash` / `--merge` / `--rebase`,任何 merge mode 都觸發。
+# Trigger pattern: `gh pr merge` must appear in the command as an actual
+# subcommand, not as a substring inside a quoted string (avoids a false
+# positive from a commit message like `git commit -m "...gh pr merge..."`).
+# Implementation:
+#   1. use sed to strip double-/single-quoted regions (simple unnested case)
+#   2. run the trigger regex on the cleaned string
+#   3. add a command-boundary anchor (start, or after ; & | $( ) so that
+#      `gh pr merge` only matches as an actual subcommand
+# Not limited to `--squash` / `--merge` / `--rebase`; any merge mode fires.
 # Skip read-only `gh pr view` / `gh pr checks` etc.
 
 set -uo pipefail
@@ -58,10 +60,10 @@ main() {
 
   if [[ "${cleaned}" =~ --auto([[:space:]]|$) ]]; then
     variant="queued"
-    msg="Auto-merge queued. After CI passes and GitHub completes the merge, run \`git -C \$(git rev-parse --show-toplevel 2>/dev/null) pull --ff-only origin main\` (or the same from your main checkout) to keep local main tracking origin/main HEAD. See CLAUDE.md 'Git 工作流程 > 主 checkout 狀態'."
+    msg="Auto-merge queued. After CI passes and GitHub completes the merge, run \`git -C \$(git rev-parse --show-toplevel 2>/dev/null) pull --ff-only origin main\` (or the same from your main checkout) to keep local main tracking origin/main HEAD. See CLAUDE.md 'Git 工作流程 > 主 checkout 狀態' (Git workflow > main checkout state)."
   else
     variant="immediate"
-    msg="PR merged. Run \`git pull --ff-only origin main\` on your main checkout now so local main keeps tracking origin/main HEAD (don't let it freeze behind). See CLAUDE.md 'Git 工作流程 > 主 checkout 狀態'."
+    msg="PR merged. Run \`git pull --ff-only origin main\` on your main checkout now so local main keeps tracking origin/main HEAD (don't let it freeze behind). See CLAUDE.md 'Git 工作流程 > 主 checkout 狀態' (Git workflow > main checkout state)."
   fi
 
   jq -n --arg m "${msg}" --arg v "${variant}" '{

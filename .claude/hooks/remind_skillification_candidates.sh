@@ -14,7 +14,9 @@
 # `remind_adr_on_design_decision.sh`, and
 # `remind_proactive_optimization.sh`.
 #
-# Why: CLAUDE.md "## 主動優化建議 > 任務結束時主動列 skill 化候選" requires
+# Why: CLAUDE.md "## 主動優化建議 > 任務結束時主動列 skill 化候選"
+# (Proactive optimisation > proactively list skillification candidates at
+# task end) requires
 # the agent to surface skillification candidates (permanent script /
 # slash command / skill follow-up) at task wrap-up. The rule fires
 # inconsistently today because there is no enforcement layer. Refs
@@ -50,7 +52,8 @@ readonly TMP_DIR="${TMPDIR:-/tmp}"
 
 # Parser-fallback patterns (POSIX ERE, joined by |). Each alternative
 # targets one of the patterns documented in CLAUDE.md's "Bash 命令寫法
-# 的 parser 限制" table. Tested against the .input.command string of
+# 的 parser 限制" (Bash command-writing parser limitations) table. Tested
+# against the .input.command string of
 # each Bash tool_use.
 readonly PARSER_FALLBACK_PATTERNS='<<[A-Z0-9_]+ *>|<<'\''[A-Z0-9_]+'\'' *>|<<-[A-Z0-9_]+ *>|\$\{[A-Za-z_][A-Za-z0-9_]*%[^}]+\}|\$\{[A-Za-z_][A-Za-z0-9_]*#[^}]+\}|<<<|cd [^&;|]+ && (git|gh|make|\./[a-z]+\.sh)|\(cd [^&;|)]+ && '
 

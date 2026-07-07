@@ -10,7 +10,8 @@
 # not support that). Throttled once per session per signal-set via a
 # TMPDIR marker, matching the Stop-hook reminder family.
 #
-# Why: CLAUDE.md "## 主動優化建議 > 工作量大時使用平行 Agent" requires the
+# Why: CLAUDE.md "## 主動優化建議 > 工作量大時使用平行 Agent"
+# (Proactive optimisation > use parallel Agents for large workloads) requires the
 # agent to dispatch parallel Agents (up to 3) when processing 4+
 # independent repos / files / PRs. The rule fires inconsistently
 # today because there is no enforcement layer. Refs issue

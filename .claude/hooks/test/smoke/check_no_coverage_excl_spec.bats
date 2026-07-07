@@ -15,7 +15,7 @@ teardown() {
 echo a  # LCOV_EXCL_LINE
 EOF
   run "$(hook check_no_coverage_excl.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/x.sh\"}}"
-  assert_message_contains "禁用覆蓋率忽略註解"
+  assert_message_contains "coverage-exclusion comment not allowed"
 }
 
 @test "fires on LCOV_EXCL_START / STOP block" {
@@ -25,7 +25,7 @@ echo skip
 # LCOV_EXCL_STOP
 EOF
   run "$(hook check_no_coverage_excl.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/x.sh\"}}"
-  assert_message_contains "禁用覆蓋率忽略註解"
+  assert_message_contains "coverage-exclusion comment not allowed"
 }
 
 @test "fires on kcov-excl" {
@@ -33,7 +33,7 @@ EOF
 echo a  # kcov-excl
 EOF
   run "$(hook check_no_coverage_excl.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/x.sh\"}}"
-  assert_message_contains "禁用覆蓋率忽略註解"
+  assert_message_contains "coverage-exclusion comment not allowed"
 }
 
 @test "silent on clean file" {

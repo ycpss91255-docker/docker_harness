@@ -6,7 +6,7 @@
 # a recognised wrapper, remind that lint/test must run via Docker.
 # Non-blocking (always exit 0).
 #
-# Why: CLAUDE.md "驗證一律走 Docker" forbids bare host invocations —
+# Why: CLAUDE.md "驗證一律走 Docker" (verify-via-Docker) forbids bare host invocations —
 # host bats-mock / bats-support / shellcheck versions may differ from
 # CI, producing inconsistent results. CI's reusable workflow runs the
 # same docker image we use locally.
@@ -73,7 +73,7 @@ main() {
   [[ "${cmd}" =~ (^|[\;\&\|][[:space:]]*)(bats|shellcheck|hadolint|kcov)([[:space:]]|$) ]] || return 0
 
   local tool="${BASH_REMATCH[2]}"
-  msg="$(printf '驗證一律走 Docker 提醒：偵測到直接跑 %s,結果可能與 CI 不一致(本機 bats-mock / shellcheck 版本可能不同)。改用 just test / just test lint(base)、just build test(downstream)、或 make -C .claude/test test(docker_harness;legacy ./build.sh test / make -f Makefile.ci 仍接受)。' "${tool}")"
+  msg="$(printf '"驗證一律走 Docker" (verify-via-Docker) reminder: detected a direct %s invocation; results may differ from CI (local bats-mock / shellcheck versions may vary). Use just test / just test lint (base), just build test (downstream), or make -C .claude/test test (docker_harness; legacy ./build.sh test / make -f Makefile.ci still accepted).' "${tool}")"
 
   jq -n --arg m "${msg}" '{
     systemMessage: $m,

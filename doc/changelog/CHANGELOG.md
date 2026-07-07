@@ -124,6 +124,19 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   single-spec run pattern, so local `make check` mirrors CI.
 
 ### Changed
+- **Agent-facing config converted to English (closes #230).** The 24
+  `.claude/hooks/*.sh` reminder/deny message strings + code comments, the
+  coupled bats specs' Chinese assertions, `.claude/instincts.yaml`, and
+  the 5 `.claude/commands/*.md` with CJK are now English -- the agent
+  reads and acts on these in English, so the Chinese served no purpose
+  (human-facing `README*.md` / i18n files are untouched). Text-only: no
+  hook's detection / deny / allow behaviour changed (all 1047 specs stay
+  green). Deliberately kept in Chinese, each glossed inline: quotes of
+  zh-TW CLAUDE.md section headings / project rules (so the pointer still
+  resolves against the un-translated CLAUDE.md), CJK detection regexes
+  (`remind_no_chinese_in_git_artifacts`, `remind_parallel_when_bulk`),
+  their test fixtures, and `/issue-check` + `/issue-fix`'s documented
+  Traditional-Chinese report output.
 - **`check_prefer_dot_sh` nudges toward `just <verb>` recipes, not the
   retired `./build.sh` wrappers (refs #220).** Base migrated
   container-ops from the `./build.sh` / `./run.sh` / `./exec.sh` /
