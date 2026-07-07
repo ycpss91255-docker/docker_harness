@@ -22,16 +22,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build test image
-        run: make build
+        run: ./ci.sh build
 
       - name: Lint hooks (shellcheck)
-        run: make lint
+        run: ./ci.sh lint
 
       - name: Lint test Dockerfile (hadolint)
-        run: make hadolint
+        run: ./ci.sh hadolint
 
       - name: Run bats specs
-        run: make test
+        run: ./ci.sh test
 
       - name: Audit CLAUDE.md `.claude/` tree drift
-        run: make tree-check
+        run: ./ci.sh tree-check

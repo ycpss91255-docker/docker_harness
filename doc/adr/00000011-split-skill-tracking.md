@@ -81,7 +81,7 @@ real `.claude/skills/` directory (or a broken symlink) fails CI.
   future non-Claude agent.
 - This repo tracks exactly what it owns; the upstream dependency is no
   longer duplicated in git history.
-- `make -C .claude/test check` enforces the layout via the new spec.
+- `just -f .claude/test/justfile check` enforces the layout via the new spec.
 
 **Bad / risks:**
 

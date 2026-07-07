@@ -10,10 +10,11 @@
 # Ceilings are env-overridable so the spec can drive small numbers
 # through fixture content without touching real CLAUDE.md.
 #
-# Wired into `make -C .claude/test check` via the `ceiling-check`
-# target after #127 PR-B lands. PR-A ships this script alone; the
-# Makefile wire-in is deferred so PR-A is not self-failing against the
-# pre-slim 965-line CLAUDE.md.
+# Wired into `just -f .claude/test/justfile check` (CI runs the same
+# `.claude/test/ci.sh check` driver) via the `ceiling-check` target
+# after #127 PR-B lands. PR-A ships this script alone; the wire-in is
+# deferred so PR-A is not self-failing against the pre-slim 965-line
+# CLAUDE.md.
 
 set -euo pipefail
 

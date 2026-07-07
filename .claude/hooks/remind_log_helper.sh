@@ -8,8 +8,9 @@
 # nudge. The intent is to catch new diagnostics before they ship,
 # while the CI lint catches everything that slipped through.
 #
-# Non-blocking. Always exits 0. The CI `make -C .claude/test
-# log-helper-check` target is the gate; this hook is the reminder.
+# Non-blocking. Always exits 0. The CI `.claude/test/ci.sh
+# log-helper-check` target is the gate (local wrapper: `just -f
+# .claude/test/justfile log-helper-check`); this hook is the reminder.
 #
 # Refs: ycpss91255-docker/docker_harness#148 (M5).
 

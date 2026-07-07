@@ -20,7 +20,7 @@
 #
 # Detection (first match wins; order matters -- both base and downstream
 # now carry a root justfile, so the .base/ subtree distinguishes them):
-#   <root>/.claude/test/Makefile      -> docker_harness -> make -C .claude/test check
+#   <root>/.claude/test/ci.sh         -> docker_harness -> .claude/test/ci.sh check
 #   <root>/justfile  +  <root>/.base/ -> downstream      -> just build test
 #   <root>/justfile  (no .base/)      -> base            -> just test && just test lint
 #   none of the above             -> no CI mechanism -> do NOT stamp,
@@ -59,9 +59,9 @@ main() {
   }
 
   local rc
-  if [[ -f "${root}/.claude/test/Makefile" ]]; then
-    _log_info ci-and-stamp ci_start kind=docker_harness cmd="make -C .claude/test check"
-    make -C "${root}/.claude/test" check
+  if [[ -x "${root}/.claude/test/ci.sh" ]]; then
+    _log_info ci-and-stamp ci_start kind=docker_harness cmd=".claude/test/ci.sh check"
+    "${root}/.claude/test/ci.sh" check
     rc=$?
   elif [[ -f "${root}/justfile" && -d "${root}/.base" ]]; then
     _log_info ci-and-stamp ci_start kind=downstream cmd="just build test"

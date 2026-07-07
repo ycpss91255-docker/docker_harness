@@ -135,7 +135,7 @@ Strict TDD (per CLAUDE.md):
 1. Write a regression test FIRST (red). Place it in the right test category per the CLAUDE.md "測試分類" (test categories) table — smoke / unit / integration / lint.
 2. Implement the minimal fix (green).
 3. Verify via `.claude/scripts/ci-and-stamp.sh` (always Docker, never bare `bats` / `shellcheck`) — it auto-detects and runs the repo's full CI mirror and stamps the local-ci-pass marker on green so the PR gate is satisfied (refs #208):
-   - `docker_harness` → `make -C .claude/test check`
+   - `docker_harness` → `just -f .claude/test/justfile check`
    - container repos (`agent/*` / `app/*` / `env/*`; root `justfile` + `.base/`) → `just build test`
    - `base` (root `justfile`, no `.base/`) → `just test` + `just test lint`
 

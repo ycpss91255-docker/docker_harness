@@ -75,7 +75,7 @@ main() {
   # markers are written by ci-and-stamp.sh, which only knows how to run
   # CI for repos carrying one of these (mutually exclusive across the
   # org's repos). A repo with none has no local CI to assert -> allow.
-  if [[ ! -f "${root}/.claude/test/Makefile" \
+  if [[ ! -x "${root}/.claude/test/ci.sh" \
         && ! -f "${root}/justfile.ci" \
         && ! -f "${root}/justfile" ]]; then
     return 0

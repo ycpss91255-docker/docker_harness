@@ -3,16 +3,17 @@
 # Covers .claude/scripts/ci-and-stamp.sh (refs #208) — runs the repo's
 # full CI mirror and, on green, writes the local-ci-pass marker that
 # enforce_local_full_ci_before_pr.sh checks. Detection is by marker
-# file (.claude/test/Makefile -> docker_harness `make check`;
+# file (.claude/test/ci.sh -> docker_harness `.claude/test/ci.sh check`;
 # root justfile + .base/ subtree -> downstream `just build test`;
 # root justfile, no .base/ -> base `just test` + `just test lint`;
 # none -> no stamp, fail-open notice). Detection order matters: the
 # downstream `.base/` check precedes the base check (both have a root
 # justfile; the .base/ subtree is what a consumer repo vendors). Refs #220.
 #
-# The actual CI runner (make / just / ./build.sh) is stubbed via a
-# PATH shim that exits ${STUB_RC:-0}, so no real docker / make / just
-# is needed.
+# The docker_harness runner is a stub `.claude/test/ci.sh` exiting
+# ${STUB_RC:-0} (ci-and-stamp invokes it directly); the base/downstream
+# `just` runner is a PATH shim exiting ${STUB_RC:-0}. No real docker /
+# just is needed.
 
 load '../lib/test_helper'
 
@@ -39,10 +40,10 @@ stub_cmd() {
 
 marker() { echo "${REPO}/.claude/state/local-ci-pass/$(git -C "${REPO}" rev-parse HEAD).ok"; }
 
-@test "docker_harness-style (.claude/test/Makefile) green -> stamps marker" {
+@test "docker_harness-style (.claude/test/ci.sh) green -> stamps marker" {
   mkdir -p "${REPO}/.claude/test"
-  echo "check:" > "${REPO}/.claude/test/Makefile"
-  stub_cmd make
+  printf '#!/usr/bin/env bash\nexit ${STUB_RC:-0}\n' > "${REPO}/.claude/test/ci.sh"
+  chmod +x "${REPO}/.claude/test/ci.sh"
   PATH="${STUB_DIR}:${PATH}" STUB_RC=0 run "$(script ci-and-stamp.sh)" "${REPO}"
   assert_success
   [[ -f "$(marker)" ]] || { echo "marker not written: $(marker)"; return 1; }
@@ -50,8 +51,8 @@ marker() { echo "${REPO}/.claude/state/local-ci-pass/$(git -C "${REPO}" rev-pars
 
 @test "CI command non-zero -> NO marker, propagates failure" {
   mkdir -p "${REPO}/.claude/test"
-  echo "check:" > "${REPO}/.claude/test/Makefile"
-  stub_cmd make
+  printf '#!/usr/bin/env bash\nexit ${STUB_RC:-0}\n' > "${REPO}/.claude/test/ci.sh"
+  chmod +x "${REPO}/.claude/test/ci.sh"
   PATH="${STUB_DIR}:${PATH}" STUB_RC=1 run "$(script ci-and-stamp.sh)" "${REPO}"
   assert_failure
   [[ ! -f "$(marker)" ]] || { echo "marker should NOT exist on CI failure"; return 1; }
@@ -83,8 +84,8 @@ marker() { echo "${REPO}/.claude/state/local-ci-pass/$(git -C "${REPO}" rev-pars
 
 @test "marker filename is the exact HEAD sha" {
   mkdir -p "${REPO}/.claude/test"
-  echo "check:" > "${REPO}/.claude/test/Makefile"
-  stub_cmd make
+  printf '#!/usr/bin/env bash\nexit ${STUB_RC:-0}\n' > "${REPO}/.claude/test/ci.sh"
+  chmod +x "${REPO}/.claude/test/ci.sh"
   local sha; sha="$(git -C "${REPO}" rev-parse HEAD)"
   PATH="${STUB_DIR}:${PATH}" STUB_RC=0 run "$(script ci-and-stamp.sh)" "${REPO}"
   assert_success

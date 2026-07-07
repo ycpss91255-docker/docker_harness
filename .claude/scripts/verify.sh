@@ -10,9 +10,9 @@
 # diff stats) warn and continue.
 #
 # Phases (h = hard, s = soft, i = info-only):
-#   [h] shellcheck    make -C .claude/test lint
-#   [h] hadolint      make -C .claude/test hadolint
-#   [h] bats          make -C .claude/test test
+#   [h] shellcheck    just -f .claude/test/justfile lint
+#   [h] hadolint      just -f .claude/test/justfile hadolint
+#   [h] bats          just -f .claude/test/justfile test
 #   [s] tree-audit    .claude/scripts/check-claude-md-tree.sh
 #   [s] test-md       TEST.md per-section drift vs *.bats @test
 #   [s] doc-scan      emoji + AI attribution scan over changed files
@@ -35,11 +35,11 @@
 #
 # Environment overrides (advanced — testing only):
 #   VERIFY_LINT_CMD       Override shellcheck-phase command. Default:
-#                         make -C <repo>/.claude/test lint
+#                         just -f <repo>/.claude/test/justfile lint
 #   VERIFY_HADOLINT_CMD   Override hadolint-phase command. Default:
-#                         make -C <repo>/.claude/test hadolint
+#                         just -f <repo>/.claude/test/justfile hadolint
 #   VERIFY_TEST_CMD       Override bats-phase command. Default:
-#                         make -C <repo>/.claude/test test
+#                         just -f <repo>/.claude/test/justfile test
 #
 # Exit:
 #   0  All requested phases passed.
@@ -84,7 +84,7 @@ run_shellcheck() {
     ( eval "${VERIFY_LINT_CMD}" )
     return $?
   fi
-  make -C "${REPO_ROOT}/.claude/test" lint
+  just -f "${REPO_ROOT}/.claude/test/justfile" lint
 }
 
 run_hadolint() {
@@ -92,7 +92,7 @@ run_hadolint() {
     ( eval "${VERIFY_HADOLINT_CMD}" )
     return $?
   fi
-  make -C "${REPO_ROOT}/.claude/test" hadolint
+  just -f "${REPO_ROOT}/.claude/test/justfile" hadolint
 }
 
 run_bats() {
@@ -100,7 +100,7 @@ run_bats() {
     ( eval "${VERIFY_TEST_CMD}" )
     return $?
   fi
-  make -C "${REPO_ROOT}/.claude/test" test
+  just -f "${REPO_ROOT}/.claude/test/justfile" test
 }
 
 run_tree_audit() {

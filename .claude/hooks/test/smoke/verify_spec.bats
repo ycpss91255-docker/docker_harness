@@ -9,7 +9,7 @@ setup() {
            "${REPO_DIR}/doc/test" \
            "${REPO_DIR}/.claude/hooks/test/smoke"
 
-  # Default stubs for hard phases — spec runs without docker/make.
+  # Default stubs for hard phases — spec runs without docker/just.
   export VERIFY_LINT_CMD='echo "shellcheck pass"'
   export VERIFY_HADOLINT_CMD='echo "hadolint pass"'
   export VERIFY_TEST_CMD='echo "bats pass"'

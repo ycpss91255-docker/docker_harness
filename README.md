@@ -64,14 +64,16 @@ Claude Code as symlinks at `.claude/skills/<name>`.
 
 All validation runs inside Docker so behaviour matches CI exactly
 (CLAUDE.md「驗證一律走 Docker」). Test infra lives under `.claude/test/`
-— invoke via `make -C .claude/test <target>`:
+— invoke locally via `just -f .claude/test/justfile <target>` (CI
+(`.github/workflows/test.yaml`) calls the same `.claude/test/ci.sh
+<target>` driver directly):
 
 ```bash
-make -C .claude/test build       # build the test image (docker_harness-test:local)
-make -C .claude/test test        # run all bats specs
-make -C .claude/test lint        # shellcheck on all hook + helper scripts
-make -C .claude/test hadolint    # hadolint on .claude/test/Dockerfile
-make -C .claude/test check       # lint + hadolint + test (full CI gate)
+just -f .claude/test/justfile build       # build the test image (docker_harness-test:local)
+just -f .claude/test/justfile test        # run all bats specs
+just -f .claude/test/justfile lint        # shellcheck on all hook + helper scripts
+just -f .claude/test/justfile hadolint    # hadolint on .claude/test/Dockerfile
+just -f .claude/test/justfile check       # lint + hadolint + test (full CI gate)
 ```
 
 See [`doc/test/TEST.md`](doc/test/TEST.md) for the test catalog and

@@ -74,7 +74,7 @@ build_reminder() {
       integration="Add Integration for multi-container"
       ;;
     hadolint)
-      lint="Lint required: run the full suite once (just build test / just test, or make -C .claude/test test) to confirm existing files have no new violations"
+      lint="Lint required: run the full suite once (just build test / just test, or just -f .claude/test/justfile test) to confirm existing files have no new violations"
       smoke="Smoke usually N/A"
       unit="Unit usually N/A"
       integration="Integration usually N/A"
