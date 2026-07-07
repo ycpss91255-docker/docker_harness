@@ -17,19 +17,19 @@ feat: foo
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
   run "$(hook check_no_ai_attribution.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/msg.txt\"}}"
-  assert_message_contains "AI 歸屬標記"
+  assert_message_contains "AI attribution marker"
 }
 
 @test "fires on Generated with [Claude Code]" {
   echo "Generated with [Claude Code]" > "${TMPDIR}/pr.md"
   run "$(hook check_no_ai_attribution.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/pr.md\"}}"
-  assert_message_contains "AI 歸屬標記"
+  assert_message_contains "AI attribution marker"
 }
 
 @test "fires on Generated with Claude Code (no brackets)" {
   echo "Generated with Claude Code" > "${TMPDIR}/pr.md"
   run "$(hook check_no_ai_attribution.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/pr.md\"}}"
-  assert_message_contains "AI 歸屬標記"
+  assert_message_contains "AI attribution marker"
 }
 
 @test "silent on clean file" {

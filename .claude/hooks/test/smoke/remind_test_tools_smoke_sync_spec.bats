@@ -115,5 +115,5 @@ EOF
   run "$(hook remind_test_tools_smoke_sync.sh)" \
     <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/dockerfile/Dockerfile.test-tools\"}}"
   assert_message_contains "bash parallel"
-  assert_message_contains "（無）"
+  assert_message_contains "(none)"
 }

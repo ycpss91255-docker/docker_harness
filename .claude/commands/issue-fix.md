@@ -132,7 +132,7 @@ git -C "<source-tree>" worktree add "$WORKTREE" -b "fix/issue-<num>-<slug>" main
 
 Strict TDD (per CLAUDE.md):
 
-1. Write a regression test FIRST (red). Place it in the right test category per CLAUDE.md "測試分類" table — smoke / unit / integration / lint.
+1. Write a regression test FIRST (red). Place it in the right test category per the CLAUDE.md "測試分類" (test categories) table — smoke / unit / integration / lint.
 2. Implement the minimal fix (green).
 3. Verify via `.claude/scripts/ci-and-stamp.sh` (always Docker, never bare `bats` / `shellcheck`) — it auto-detects and runs the repo's full CI mirror and stamps the local-ci-pass marker on green so the PR gate is satisfied (refs #208):
    - `docker_harness` → `make -C .claude/test check`
@@ -233,7 +233,7 @@ If `--dry-run`, replace the verb breakdown with: `預計修：K · 預計拒絕�
 
 - **Auto-merge on CI green** — matches `/pr.md` and `wait-pr-ci` skill defaults. CI green is the gate; passing CI on a 0-required-review repo means the change is shippable. The user can always revert via PR or pull the auto-merged commit out if something slipped through. CI red still halts (single-issue: report; batch: stop the whole batch).
 - **Batch mode is serial** — one PR's CI must settle (and merge) before the next issue starts. Trades wall-clock time for safety; CI red on issue K means the agent doesn't compound debt by piling on issues K+1, K+2 with potentially conflicting fixes.
-- **Do not stack reject comments** — both modes detect existing `Reviewed by /issue-fix automation` comments and skip without re-commenting. Single-issue mode reports `[REJECT] <repo>#<num>: previously declined`; batch mode counts the issue under "跳過".
+- **Do not stack reject comments** — both modes detect existing `Reviewed by /issue-fix automation` comments and skip without re-commenting. Single-issue mode reports `[REJECT] <repo>#<num>: previously declined`; batch mode counts the issue under "跳過" (Skipped).
 - **Branch protection still applies** — `enforce_admins=true` + `required_status_checks` (strict) on every `ycpss91255-docker` repo means `gh pr merge` will refuse if CI didn't really pass or if the branch is out of date with main. Auto-merge here is just "stop asking the human after CI green", not "skip the branch protection gate".
 - **CJK block** — `remind_no_chinese_in_git_artifacts.sh` (PreToolUse, blocking) prevents CJK in commit / PR / issue comment bodies. The user-facing summary lines (single-issue + batch summary block) stay in Traditional Chinese — terminal output is not a git/GitHub artifact.
 

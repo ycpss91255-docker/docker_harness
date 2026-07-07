@@ -33,7 +33,7 @@ main() {
     return 0
   fi
 
-  msg="Heredoc-to-file redirect (cat <<EOF > path) hits Claude Code parser warning \"Unhandled node type: file_redirect\" → user prompt. 改用 Write 工具直接寫檔（無 parser 警告、不需 prompt）。如果非寫不可（如生成 inline shell 腳本），用 \`bash -c '...'\` 包起來（Bash(bash -c *) 已在 allowlist）。"
+  msg="Heredoc-to-file redirect (cat <<EOF > path) hits Claude Code parser warning \"Unhandled node type: file_redirect\" → user prompt. Use the Write tool to create the file directly (no parser warning, no prompt). If you truly must write inline (e.g. generating an inline shell script), wrap it in \`bash -c '...'\` (Bash(bash -c *) is already in the allowlist)."
 
   jq -n --arg m "${msg}" '{
     systemMessage: $m,

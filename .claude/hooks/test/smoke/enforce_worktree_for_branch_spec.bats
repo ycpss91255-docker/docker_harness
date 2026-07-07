@@ -7,7 +7,7 @@ load '../lib/test_helper'
 # (i.e. not from inside a worktree). The rule: non-main work must live
 # in `<workspace>/worktree/<repo>-<N>/` so the main checkout keeps
 # ff-tracking origin/main HEAD (CLAUDE.md > Git 工作流程 > 主 checkout
-# 狀態, refs PR #89).
+# 狀態 (Git workflow > main checkout state), refs PR #89).
 #
 # Detection method:
 #   - command matches `git [-C <path>] checkout (-b|-B) <branch>`

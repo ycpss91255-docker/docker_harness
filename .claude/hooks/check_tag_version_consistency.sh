@@ -6,11 +6,12 @@
 # repo root has a `.version` file, BLOCKS the command if `.version` content
 # does not match the tag name being created/pushed.
 #
-# Why: CLAUDE.md「Release 流程」要求 release commit 同步 bump
-# `.version`。template v0.18.0 / v0.18.1 那次 ad-hoc 跳過 /release 直接
-# 打 tag，造成 `.version` 留在 v0.17.0、`make upgrade-check` 永遠誤報
-# upgrade available。issue #36 要求 hook layer 補上這個 safety net,
-# 不再依賴 agent 記得走 /release。
+# Why: CLAUDE.md「Release 流程」(release process) requires the release
+# commit to bump `.version` in sync. In the template v0.18.0 / v0.18.1
+# case, an ad-hoc tag was pushed directly, skipping /release, which left
+# `.version` at v0.17.0 and made `make upgrade-check` forever report a
+# false "upgrade available". Issue #36 asked for this safety net at the
+# hook layer, so we no longer rely on the agent remembering to run /release.
 #
 # Detection:
 #   1. Match `git tag -a <tag>` / `git tag <tag>` (lightweight)

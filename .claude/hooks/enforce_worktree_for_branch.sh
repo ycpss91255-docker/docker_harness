@@ -2,7 +2,8 @@
 # enforce_worktree_for_branch.sh -- Claude Code PreToolUse hook (matcher: Bash).
 #
 # DENIES `git checkout -b|-B <branch>` invocations that target the main
-# checkout. CLAUDE.md "Git 工作流程 > 主 checkout 狀態" rule: the main
+# checkout. CLAUDE.md "Git 工作流程 > 主 checkout 狀態" (Git workflow >
+# main checkout state) rule: the main
 # checkout must continuously ff-track origin/main HEAD and never grow a
 # feature branch. Non-main work lives in `<workspace>/worktree/<repo>-<N>/`.
 # PR #89 hit exactly this failure mode -- local main grew a branch from a
@@ -108,7 +109,7 @@ main() {
     "${cmd}" \
     "${REASON}" \
     "${canonical}" \
-    "See CLAUDE.md > Git 工作流程 > git worktree usage for the full rule.")"
+    "See CLAUDE.md > Git 工作流程 (Git workflow) > git worktree usage for the full rule.")"
 
   local deny_msg
   deny_msg="worktree-for-branch gate (PR #89 precedent): \`git checkout -${BASH_REMATCH[2]:-b} ${branch}\` in the main checkout is denied.

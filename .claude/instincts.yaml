@@ -56,7 +56,7 @@
   guidance:
     - no emoji in code, docs, README, section headers, commit messages, PR bodies
     - the `check_no_emoji.sh` PostToolUse hook scans every Edit/Write
-  refs: CLAUDE.md > 風格規範
+  refs: CLAUDE.md > 風格規範 (Style conventions)
 
 - name: no-ai-attribution
   trigger:
@@ -65,7 +65,7 @@
     - no AI-attribution markers in commit messages, PR bodies, or code comments
     - forbidden patterns - `Generated with [Claude Code]`, `Co-Authored-By: Claude`
     - both `check_no_ai_attribution.sh` (PostToolUse) and `remind_no_ai_attribution.sh` (PreToolUse Bash) enforce
-  refs: CLAUDE.md > 風格規範
+  refs: CLAUDE.md > 風格規範 (Style conventions)
 
 - name: commit-title-conventional
   trigger:
@@ -74,7 +74,7 @@
     - first line uses conventional prefix - `feat:` / `fix:` / `docs:` / `refactor:` / `chore:`
     - keep subject under 72 chars; details go in the body
     - NO AI-attribution lines (`Co-Authored-By: Claude`, `Generated with Claude Code`)
-  refs: CLAUDE.md > 變更分類與流程 + 風格規範
+  refs: CLAUDE.md > 變更分類與流程 (Change classification and workflow) + 風格規範 (Style conventions)
 
 - name: pr-title-conventional
   trigger:
@@ -123,7 +123,7 @@
     - before writing a NEW one-shot `batch-*.sh`, evaluate `batch-mutation-pr.sh` (the generic fanout engine, refs #169) + a small `--mutation` script -- most "same file change across many repos" needs are a preset of it, not a fresh script; see `[[batch-mutation-pr]]`
     - read-only loops (gh pr view, git log, grep, cat) are NOT blocked -- only mutation
     - lift the gate via `/tmp` checkpoint protocol (ADR-00000002) -- touch the matching `<ack>` file and re-issue the same loop
-  refs: CLAUDE.md > 跨 repo 批次 mutation 規範
+  refs: CLAUDE.md > 跨 repo 批次 mutation 規範 (Cross-repo batch mutation rules)
 
 - name: wrapper-first-upgrade
   trigger:
@@ -154,7 +154,7 @@
   guidance:
     - never `cd <path> && git ...` -- the cd changes session cwd and breaks Monitor inheritance
     - use `git -C <path> <subcommand>` instead -- same idiom as `make -C`
-  refs: CLAUDE.md > Bash 命令寫法的 parser 限制
+  refs: CLAUDE.md > Bash 命令寫法的 parser 限制 (Bash command parser limitations)
 
 - name: bash-log-via-lib
   trigger:
@@ -190,7 +190,7 @@
     - any code change must consider 4 test categories - smoke / unit / integration / lint
     - decide which apply based on the change shape (see CLAUDE.md table)
     - TEST.md is the single source of truth -- update counts when adding / removing @test
-  refs: CLAUDE.md > 測試分類（TDD 必須涵蓋的 4 個面向）
+  refs: CLAUDE.md > 測試分類（TDD 必須涵蓋的 4 個面向） (Test categories — the 4 aspects TDD must cover)
 
 - name: structured-data-use-jq
   trigger:

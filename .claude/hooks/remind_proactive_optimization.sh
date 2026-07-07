@@ -12,7 +12,8 @@
 # signal-set via a TMPDIR marker, matching `remind_strategic_compact.sh`
 # and `remind_adr_on_design_decision.sh`.
 #
-# Why: CLAUDE.md "## 主動優化建議" requires the agent to surface
+# Why: CLAUDE.md "## 主動優化建議" (Proactive optimisation) requires the
+# agent to surface
 # optimisation candidates (workflow ergonomics / cross-repo inconsistency
 # / doc drift / manual repetition) at task wrap-up. The rule fires
 # inconsistently today because there is no enforcement layer. This Stop

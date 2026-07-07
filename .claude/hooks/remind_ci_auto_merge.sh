@@ -15,7 +15,8 @@
 # -u / main / tag exclusions), and `gh workflow run` / `gh run rerun` by
 # remind_monitor_on_ci_trigger.sh. Keeping them separate avoids double-firing.
 #
-# Trigger pattern: `gh pr create` 出現在 command 任一段（含 chained `&&`）。
+# Trigger pattern: `gh pr create` appears in any segment of the command
+# (including chained `&&`).
 
 set -uo pipefail
 
@@ -28,7 +29,7 @@ main() {
 
   [[ "${cmd}" =~ gh[[:space:]]+pr[[:space:]]+create ]] || return 0
 
-  msg="PR open 提醒：別 sleep 輪詢。開完跑 auto-merge-on-green skill（.claude/skills/auto-merge-on-green/SKILL.md）—— 掛 GitHub 原生 auto-merge（--auto --squash --delete-branch）並用一個 Monitor 包 .claude/scripts/auto-merge-on-green.sh：CI 綠由 GitHub 伺服器端自動合,BEHIND 自動 update-branch,CI 失敗只回報且 auto 保留掛著(fix-push 會自動落地)。純監看(不 merge)才用 wait-pr-ci。"
+  msg="PR open reminder: don't sleep-poll. After opening, run the auto-merge-on-green skill (.claude/skills/auto-merge-on-green/SKILL.md) -- arm GitHub-native auto-merge (--auto --squash --delete-branch) and wrap .claude/scripts/auto-merge-on-green.sh in a single Monitor: on green CI GitHub merges server-side, BEHIND triggers an automatic update-branch, and a CI failure is only reported while auto stays armed (a fix-push lands it automatically). Use wait-pr-ci only for pure monitoring (no merge)."
 
   jq -n --arg m "${msg}" '{
     systemMessage: $m,

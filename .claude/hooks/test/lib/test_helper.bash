@@ -10,9 +10,9 @@
 #       └── integration/*.bats
 #
 # Paths to bats-support / bats-assert match the Dockerfile.test install
-# location (/usr/lib/bats-*). Tests run inside Docker per CLAUDE.md
-# "驗證一律走 Docker"; running these specs on the host directly is not
-# supported.
+# location (/usr/lib/bats-*). Tests run inside Docker per the CLAUDE.md
+# "驗證一律走 Docker" (verify-via-Docker) rule; running these specs on the
+# host directly is not supported.
 
 # Resolve hook + script directories once. BATS_TEST_DIRNAME is the dir
 # of the .bats spec sourcing this helper.
