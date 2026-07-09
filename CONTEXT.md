@@ -562,37 +562,55 @@ Status check 名稱依 repo 類型不同：
 新建 repo 時必須同步設定 branch protection，`/new-repo` slash command
 應自動處理。
 
-## 11. TDD 4-category matrix
+## 11. TDD test taxonomy (ISTQB three-axis)
 
 所有變更採嚴格 TDD：先寫失敗測試 → 寫最少程式碼讓測試通過 → 重構。
-任何變更先思考「這次動到的東西，落在 1～4 哪幾類？」每個受影響的類別都
-要有對應測試覆蓋。
+測試分類對齊 ISTQB（ADR-00000013；base 端 ADR-00000018），三個正交軸：
+**levels**（範圍）、**types**（用途）、**static analysis**（lint）。取代
+舊的 4-category（smoke/unit/integration/lint）混軸模型。
 
-| # | 類型 | 用途 | 本專案位置 / 工具 |
-|---|------|------|------------------|
-| 1 | Smoke test | 確認最基本 path 可運作（腳本能啟動、`-h` 可印出、容器能起來） | `test/smoke/*.bats`、`.base/test/smoke/`（共用：`script_help.bats` / `display_env.bats` / `test_helper.bash`），透過 Dockerfile `test` stage 在 build 時跑 |
-| 2 | Unit test | 隔離單一 shell 函式 / 模組邏輯 | `.base/test/unit/`（如 `setup_spec.bats`），`bats-mock` 隔離外部呼叫；下游 container repo 通常無自己的 unit，重用 base 的 |
-| 3 | System / Integration test | 驗證多元件協同行為（完整流程、跨腳本互動） | `.base/test/integration/`（如 `upgrade_spec.bats`、`init.sh` 流程驗證） |
-| 4 | Lint / static analysis | 編譯期 / commit 期靜態檢查 | ShellCheck（所有 `.sh`）、Hadolint（Dockerfile）、`.hadolint.yaml` 規則；CI 強制，本地透過 `./build.sh test` 或 `just -f justfile.ci lint` 觸發 |
+### 軸 1 — 靜態分析（static analysis）
 
-### 變更類型 → 應該寫哪幾類測試
+Lint：ShellCheck（所有 `.sh`）+ Hadolint（Dockerfile）。不是動態測試
+level。base 住 `test/lint/<tool>/`；CI 強制。
 
-| 變更內容 | Smoke | Unit | Integration | Lint |
-|----------|:-----:|:----:|:-----------:|:----:|
-| 改 shell 函式邏輯（setup.sh、build.sh 等） | 視 path 影響 | **必須** | 視流程影響 | **必須** |
-| 改 Dockerfile（新增 stage、調整 COPY） | **必須** | N/A | 視 build flow | **必須**（Hadolint） |
-| 改 entrypoint.sh / 容器啟動行為 | **必須** | 視函式拆分 | 視 multi-container | **必須** |
-| 改 multi-container compose 行為 | 視單容器影響 | N/A | **必須** | **必須**（compose lint 若有） |
-| 改 CI workflow / reusable workflow | 視觸發點 | N/A | **必須**（PR 跑一次驗證） | **必須**（actionlint 若有） |
-| 純 lint 規則調整（`.hadolint.yaml` 等） | N/A | N/A | N/A | **必須**（跑全套確認無新 violation） |
-| 文件 / 翻譯 | N/A | N/A | N/A | N/A（只看 doc-sync） |
+### 軸 2 — Levels（範圍階梯）
+
+| Level | 範圍 | 本專案位置 / 工具 |
+|-------|------|------------------|
+| Unit（Component） | 隔離單一函式 / 腳本 | base `test/bats/unit/`；docker_harness `.claude/test/bats/unit/`（每個 hook 隔離觸發）|
+| Integration | 多元件協同（init / upgrade / dispatch、多 hook 同一 input） | base `test/bats/integration/`；docker_harness `.claude/test/bats/integration/` |
+| System | 整個 built image 端到端（build→run→exec→stop）、build-gate 機制 | base `test/bats/system/`；docker_harness `.claude/test/bats/system/`（框架自我結構稽核）|
+| Acceptance | 下游 consumer 收到的（scaffold 框架 + UX；UAT/OAT） | base `test/bats/acceptance/`；docker_harness `.claude/test/bats/acceptance/`（settings/skills 完整性）|
+
+頂層是 **System**（ISTQB）。「End-to-end」是在 System/Acceptance level
+執行的一種 *type*，不是 level 名稱。
+
+### 軸 3 — Types（用途；套在某個 level 上）
+
+- **Smoke** — build-verification：「容器起不起得來」的關鍵子集，在每個
+  Dockerfile `-test` stage build 時跑。**docker_harness 無產品 image → N/A**。
+- **End-to-end** — 完整流程頭到尾。
+- **Regression** — 守住已修的 defect（如 build-gate-fires，前身 `behavioural`）。
+
+### 變更類型 → 應該寫哪些測試（level / type + static）
+
+| 變更內容 | Level（含 type） | Static |
+|----------|------------------|--------|
+| 改 shell 函式邏輯（setup.sh、build.sh 等） | Unit **必須**；視流程加 Integration | ShellCheck **必須** |
+| 改 Dockerfile（新增 stage、調整 COPY） | System **必須**（Smoke type：image 起得來）；視 build flow 加 Integration | Hadolint **必須** |
+| 改 entrypoint.sh / 容器啟動行為 | System **必須**（Smoke type）；視函式拆分加 Unit；視 multi-container 加 Integration | ShellCheck **必須** |
+| 改 multi-container compose 行為 | Integration **必須**；視單容器加 System | compose lint 若有 |
+| 改 CI workflow / reusable workflow | System **必須**（E2E type：PR 跑一次驗證觸發）；視協同加 Integration | actionlint 若有 |
+| 純 lint 規則調整（`.hadolint.yaml` 等） | 通常 N/A | **必須**（跑全套確認無新 violation） |
+| 文件 / 翻譯 | N/A | N/A（只看 doc-sync） |
 
 ### Rules
 
-- **Lint 也算測試**：雖然不是「跑得起來」型，但同樣在 CI 強制；新檔 / 新規則要先讓 linter 失敗才修，不靠人工檢查
-- **Unit 對 Dockerfile 通常 N/A**：純宣告式內容無邏輯可隔離；改 Dockerfile 改用 smoke + lint 覆蓋
-- **TEST.md 是 single source of truth**：4 類測試的數量與位置都記在 `doc/test/TEST.md`，每次新增 / 刪除 / 改名測試必須同步（hook `check_test_md_drift.sh` 會自動比對）
-- **驗證一律走 Docker**：4 類都透過 `./build.sh test` 或 `just -f justfile.ci test` 在 Docker image 內執行，不接受本機 bats / shellcheck 通過作為驗證
+- **Lint（static）也算測試**：雖非「跑得起來」型，但同樣在 CI 強制；新檔 / 新規則要先讓 linter 失敗才修，不靠人工檢查
+- **Smoke 是 type 不是 level**：base 在 Dockerfile `-test` stage build 時跑；docker_harness 無產品 image 故 N/A（原 `test/smoke/` 內容實為 Unit，已歸位 `.claude/test/bats/unit/`）
+- **TEST.md 是 single source of truth**：各 level 的數量與位置記在 `doc/test/`（TEST.md 索引 + 每 level catalog：unit/integration/system/acceptance/smoke），每次新增 / 刪除 / 改名測試必須同步
+- **驗證一律走 Docker**：所有 level 都透過 `just build test` / `just test`（base）或 `just -f .claude/test/justfile test`（docker_harness）在 Docker image 內執行，不接受本機 bats / shellcheck 通過作為驗證
 
 ## 12. Docker-only verification
 
