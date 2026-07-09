@@ -60,7 +60,7 @@ downstream not yet fanned out may still use `make <verb>`.
 
 See [CONTEXT.md §2.2](CONTEXT.md) for the per-repo file layout
 (Dockerfile / compose.yaml / wrapper symlinks / `.base/` subtree /
-`doc/` / `test/smoke/` / etc.).
+`doc/` / `test/bats/` / etc.).
 
 ## Git 設定
 
