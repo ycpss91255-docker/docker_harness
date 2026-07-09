@@ -116,16 +116,14 @@ from prose.
   inline as decisions crystallise)
 - Break a plan / PRD into independently-grabbable issues: `[[to-issues]]`
 - Diagnose hard bugs / performance regressions (reproduce → minimise
-  → instrument → fix → regression-test): `[[diagnose]]`
+  → instrument → fix → regression-test): `[[diagnosing-bugs]]`
 - Throwaway prototype to flesh out a design before committing:
   `[[prototype]]`
 - Audit codebase for architecture / refactoring opportunities:
   `[[improve-codebase-architecture]]`
-- Re-perspective on a stuck big design: `[[zoom-out]]`
 - Compact current conversation into a handoff document: `[[handoff]]`
 - Author a new skill (skill scaffolding + progressive disclosure):
-  `[[write-a-skill]]`
-- Caveman mode (low-token communication): `[[caveman]]`
+  `[[writing-great-skills]]`
 - Skill layout: repo-owned skills tracked under `.agents/skills/<name>/`
   + `.claude/skills/` symlink; third-party (`mattpocock/skills`)
   machine-local, reinstall `npx skills@latest add mattpocock/skills`
