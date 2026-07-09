@@ -24,6 +24,10 @@ HOOKS_DIR="$(cd "${BATS_TEST_DIRNAME}/../../../hooks" && pwd)"
 export HOOKS_DIR
 SCRIPTS_DIR="$(cd "${BATS_TEST_DIRNAME}/../../../scripts" && pwd)"
 export SCRIPTS_DIR
+# Repo root (two up from .claude/hooks) — system / acceptance specs assert
+# against the whole delivered framework (settings.json, CLAUDE.md, skills).
+PROJECT_ROOT="$(cd "${HOOKS_DIR}/../.." && pwd)"
+export PROJECT_ROOT
 
 # shellcheck disable=SC1091
 load '/usr/lib/bats-support/load'
