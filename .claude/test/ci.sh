@@ -14,7 +14,7 @@
 #
 # Usage: ci.sh <target>
 #   build             build the test docker image
-#   test              run bats specs (smoke + integration) inside docker
+#   test              run bats specs (unit/integration/system/acceptance) inside docker
 #   lint              shellcheck all hook + helper scripts inside docker
 #   hadolint          hadolint the test Dockerfile
 #   tree-check        audit CONTEXT.md .claude/ tree vs filesystem (host)

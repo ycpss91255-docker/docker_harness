@@ -161,7 +161,7 @@ run_doc_scan() {
     case "${abs}" in
       */CLAUDE.md|*/.claude/commands/*.md|*/.claude/skills/*/SKILL.md) continue ;;
       */doc/test/TEST.md|*/doc/changelog/CHANGELOG.md) continue ;;
-      */.claude/hooks/test/*) continue ;;
+      */.claude/test/bats/*) continue ;;
       */.claude/instincts.yaml) continue ;;
     esac
     if file --mime "${abs}" 2>/dev/null | grep -qE 'charset=binary'; then

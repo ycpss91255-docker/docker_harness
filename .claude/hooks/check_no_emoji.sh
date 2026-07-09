@@ -31,8 +31,8 @@ main() {
     */CLAUDE.md|*/.claude/commands/*.md|*/.claude/skills/*/SKILL.md) return 0 ;;
     */.claude/instincts.yaml) return 0 ;;
     */doc/test/TEST.md|*/doc/changelog/CHANGELOG.md) return 0 ;;
-    # Hook-test fixtures may legitimately contain emoji bytes for detection tests.
-    */.claude/hooks/test/*) return 0 ;;
+    # Test specs / fixtures may legitimately contain emoji bytes for detection tests.
+    */.claude/test/bats/*) return 0 ;;
   esac
 
   if file --mime "${file_path}" 2>/dev/null | grep -qE 'charset=binary'; then

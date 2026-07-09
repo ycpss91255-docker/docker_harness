@@ -179,8 +179,7 @@ docker/
     │   ├── remind_skillification_candidates.sh # Stop hook：偵測 /tmp/*.sh 反覆呼叫 (>=3 次) 或 parser-fallback Bash pattern 重複 (>=3 次) 且 session 未提任何 skillification 候選時 remind 配 [[skillification-candidates]] skill,configurable via SKILLIFICATION_REMIND_DISABLE + SKILLIFICATION_{TMP,PARSER}_THRESHOLD;refs #125
     │   ├── remind_parallel_when_bulk.sh # UserPromptSubmit hook：scan user prompt 偵測 bulk-work 訊號 (N >= 4 + plural noun / all|every + noun / 逗號分隔 4+ tokens / CJK 量詞) 且 prompt 未提 parallel/agent 時 remind 配 [[parallel-agents]] skill,configurable via PARALLEL_REMIND_{DISABLE,THRESHOLD};refs #126
     │   ├── remind_log_helper.sh        # PostToolUse hook：Edit/Write .claude/scripts/*.sh 後 delegate 到 check-log-helper-usage.sh,若該檔案有 bare printf|echo (usage()/allowlist marker 外) 則 systemMessage nudge 提醒走 _log_*,refs #148 M5
-    │   ├── warn_structured_data_text_tools.sh # PreToolUse hook：bash 指令用 awk/sed 處理 .json/.jsonl 且無 jq 時 systemMessage nudge 改用 jq / Grep 工具(line-oriented 解析 JSONL 會誤計);non-blocking,配 structured-data-use-jq instinct
-    │   └── test/                       # bats specs (smoke + integration) — 跑法見 .claude/test/justfile / ci.sh
+    │   └── warn_structured_data_text_tools.sh # PreToolUse hook：bash 指令用 awk/sed 處理 .json/.jsonl 且無 jq 時 systemMessage nudge 改用 jq / Grep 工具(line-oriented 解析 JSONL 會誤計);non-blocking,配 structured-data-use-jq instinct
     ├── skills/                         # repo-owned; each a symlink -> ../../.agents/skills/<name>/ (third-party mattpocock skills machine-local, omitted; ADR-11)
     │   ├── auto-merge-on-green/SKILL.md # 開 PR 後落地單一 PR:arm GitHub auto-merge + Monitor 包 auto-merge-on-green.sh,配 remind_ci_auto_merge hook;refs #211
     │   ├── update-stale-pr/SKILL.md    # PR BEHIND/CONFLICTING 時 merge origin/main + 一般 push(不 rebase/force)的 one-shot 流程,配 update-stale-pr.sh + wait-pr-ci FAIL hint,refs #87/#221
@@ -194,7 +193,8 @@ docker/
     │   ├── parallel-agents/SKILL.md    # bulk workload (N>=4 獨立 items) 時用最多 3 個 parallel Agent 並行 (single response 內多 Agent 呼叫),配 remind_parallel_when_bulk.sh UserPromptSubmit hook;refs #126
     │   └── batch-mutation-pr/SKILL.md  # generic batch-mutation-PR 引擎 (跨 repo fan-out line edits),配 batch-mutation-pr.sh + batch-line-edit.sh preset;refs #169/#207
     ├── test/                           # docker_harness 自己的 hook 測試 infra（與下游 repo 的 Dockerfile 無關）
-    │   ├── Dockerfile                  # bats 1.11 + shellcheck on Alpine（COPY .claude/hooks/ + .claude/scripts/）
+    │   ├── Dockerfile                  # bats 1.11 + shellcheck on Alpine（COPY .claude/hooks/ + .claude/scripts/ + .claude/test/）
+    │   ├── bats/                       # ISTQB 測試 specs — unit/integration/system/acceptance + lib/test_helper.bash（見 doc/test/,ADR-00000013）
     │   ├── ci.sh                       # CI runner driver — both CI (.github/workflows/test.yaml) 與 local justfile 都呼叫；targets build / test / lint / hadolint / check / tree-check / ceiling-check / log-helper-check / clean
     │   └── justfile                    # local just wrapper：just -f .claude/test/justfile <target> 轉呼 ci.sh <target>
     ├── settings.json                   # hooks 註冊 + permissions + sandbox（**唯一一份,無 settings.local.json**）

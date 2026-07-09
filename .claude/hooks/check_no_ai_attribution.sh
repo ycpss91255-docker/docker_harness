@@ -39,8 +39,8 @@ main() {
     */.claude/instincts.yaml) return 0 ;;
     # Project doc conventions that catalog/describe rule violations.
     */doc/test/TEST.md|*/doc/changelog/CHANGELOG.md) return 0 ;;
-    # Hook-test fixtures must contain the forbidden patterns to assert detection.
-    */.claude/hooks/test/*) return 0 ;;
+    # Test specs / fixtures must contain the forbidden patterns to assert detection.
+    */.claude/test/bats/*) return 0 ;;
   esac
 
   if file --mime "${file_path}" 2>/dev/null | grep -qE 'charset=binary'; then

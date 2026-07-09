@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Shared bats test helpers for .claude/hooks/test/.
+# Shared bats test helpers for .claude/test/bats/.
 #
-# Layout:
-#   .claude/hooks/
-#   ├── *.sh                  # hooks under test
-#   └── test/
+# Layout (ISTQB-aligned levels, ADR-00000013):
+#   .claude/
+#   ├── hooks/*.sh            # hooks under test
+#   ├── scripts/*.sh          # helper scripts under test
+#   └── test/bats/
 #       ├── lib/test_helper.bash
-#       ├── smoke/*.bats
-#       └── integration/*.bats
+#       ├── unit/*.bats          # one hook / script in isolation
+#       ├── integration/*.bats   # several components together
+#       ├── system/*.bats        # whole framework / gate end-to-end
+#       └── acceptance/*.bats    # what a consumer session receives
 #
 # Paths to bats-support / bats-assert match the Dockerfile.test install
 # location (/usr/lib/bats-*). Tests run inside Docker per the CLAUDE.md
@@ -15,8 +18,9 @@
 # host directly is not supported.
 
 # Resolve hook + script directories once. BATS_TEST_DIRNAME is the dir
-# of the .bats spec sourcing this helper.
-HOOKS_DIR="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
+# of the .bats spec sourcing this helper, i.e. .claude/test/bats/<level>/.
+# From there, .claude/hooks and .claude/scripts are three levels up.
+HOOKS_DIR="$(cd "${BATS_TEST_DIRNAME}/../../../hooks" && pwd)"
 export HOOKS_DIR
 SCRIPTS_DIR="$(cd "${BATS_TEST_DIRNAME}/../../../scripts" && pwd)"
 export SCRIPTS_DIR
