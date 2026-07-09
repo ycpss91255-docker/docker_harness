@@ -38,18 +38,16 @@ permissions go in `.claude/settings.local.json` (gitignored).
 Skills live canonically under `.agents/skills/<name>/`, surfaced to
 Claude Code as symlinks at `.claude/skills/<name>`.
 
-- **Repo-owned skills** (this repo's own — `gh-artifact-format`,
-  `semver-bump`, `wait-pr-ci`, `rebase-pr`, `wait-gh-state`,
-  `strategic-compact`, `proactive-optimization`,
-  `skillification-candidates`, `parallel-agents`, `batch-mutation-pr`)
+- **Repo-owned skills** (this repo's own — `auto-merge-on-green`,
+  `batch-mutation-pr`, `gh-artifact-format`, `parallel-agents`,
+  `proactive-optimization`, `semver-bump`, `skillification-candidates`,
+  `strategic-compact`, `update-stale-pr`, `wait-gh-state`, `wait-pr-ci`)
   are tracked in git at both ends, so they are present on a fresh clone.
-- **Third-party skills** (vendored from
-  [`mattpocock/skills`](https://github.com/mattpocock/skills) — `tdd`,
-  `grill-me`, `diagnose`, `handoff`, `prototype`, `to-issues`,
-  `zoom-out`, `caveman`, `grill-with-docs`, `write-a-skill`,
-  `improve-codebase-architecture`) are **machine-local and not tracked
-  in git**. A fresh clone does not have them; install or refresh them
-  with:
+- **Third-party skills** (the full
+  [`mattpocock/skills`](https://github.com/mattpocock/skills) set) are
+  **machine-local and not tracked in git** — the exact roster tracks
+  upstream and is intentionally not enumerated here. A fresh clone does
+  not have them; install or refresh the whole set with:
 
   ```bash
   npx skills@latest add mattpocock/skills
