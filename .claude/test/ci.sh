@@ -29,6 +29,19 @@ set -euo pipefail
 readonly IMAGE='docker_harness-test:local'
 readonly HADOLINT_IMAGE='hadolint/hadolint:latest-alpine'
 
+# Flags for the docker runs that bind-mount the live worktree read-write.
+# Without them the container runs as root and CPython writes bytecode caches
+# (.claude/scripts/__pycache__/*.pyc) into the mount as root, which then breaks
+# `git worktree remove` / host-side cleanup (refs #252):
+#   --user maps writes to the invoking host user (also sidesteps git's
+#          "dubious ownership" on the host-owned /work repo);
+#   PYTHONDONTWRITEBYTECODE stops the .pyc litter at the source (CI is a single
+#          run and gains nothing from a bytecode cache).
+# id -u/-g are unset in CI's GitHub-hosted runner default (already the invoking
+# user there), but harmless; locally they map to the developer's uid/gid.
+WORKTREE_MOUNT_FLAGS=(--user "$(id -u):$(id -g)" -e PYTHONDONTWRITEBYTECODE=1)
+readonly WORKTREE_MOUNT_FLAGS
+
 # This script lives at <repo>/.claude/test/ci.sh; repo root is two up.
 TEST_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly TEST_DIR
@@ -44,14 +57,15 @@ t_test() {
   # -v mounts the live worktree so bats runs the working-tree specs, not the
   # build-time COPY baked into the image (refs #214). The local-CI-pass
   # marker is written by ci-and-stamp.sh, not here (refs #208).
-  docker run --rm -v "${REPO_ROOT}:/work" "${IMAGE}"
+  docker run --rm "${WORKTREE_MOUNT_FLAGS[@]}" -v "${REPO_ROOT}:/work" "${IMAGE}"
 }
 
 t_lint() {
   t_build
   # -v mounts the live worktree so shellcheck lints the working-tree
   # scripts, not the build-time COPY (refs #214).
-  docker run --rm -v "${REPO_ROOT}:/work" --entrypoint sh "${IMAGE}" -c \
+  docker run --rm "${WORKTREE_MOUNT_FLAGS[@]}" -v "${REPO_ROOT}:/work" \
+    --entrypoint sh "${IMAGE}" -c \
     'shellcheck /work/.claude/hooks/*.sh /work/.claude/scripts/*.sh /work/.claude/scripts/lib/*.sh'
 }
 
