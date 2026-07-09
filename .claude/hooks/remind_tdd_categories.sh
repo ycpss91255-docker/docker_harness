@@ -4,8 +4,11 @@
 # Fires on Edit / Write / MultiEdit. When the touched file falls into a
 # TDD-relevant category (shell logic / entrypoint / Dockerfile / compose /
 # CI workflow / lint rules), emit a JSON systemMessage reminding Claude
-# which of the 4 test categories (smoke / unit / integration / lint) the
-# change is expected to cover. Non-blocking — exit 0.
+# which tests the change is expected to cover, in the ISTQB three-axis
+# model (ADR-00000013): levels (unit / integration / system / acceptance),
+# types (smoke / e2e / regression), and static analysis (lint). Smoke is a
+# TYPE applied at the system level, not a level of its own. Non-blocking —
+# exit 0.
 #
 # Mapping is intentionally a soft reminder, not enforcement: the hook does
 # NOT verify that tests were actually written. It just nags by re-injecting
@@ -45,67 +48,68 @@ detect_repo_root() {
   return 1
 }
 
-# Build a `;`-joined reminder string with one clause per applicable
-# TDD test category for the repo. Lint always applies; the other
-# three (smoke / unit / integration) apply iff the matching
-# `test/<cat>/` dir exists under repo_root. Fallback: if repo_root
-# is empty OR none of the three test subdirs exist, claim all three
-# applicable so the generic guidance still fires (matches the
-# pre-#75 behaviour for fresh / unstructured repos).
+# Build a `;`-joined reminder string with one clause per applicable ISTQB
+# test LEVEL for the repo, plus static analysis. Static (lint) always
+# applies; the levels (unit / integration / system) apply iff the matching
+# `test/bats/<level>/` dir exists under repo_root (base / downstream moved
+# to test/bats/<level>/ post-taxonomy, ADR-00000013 / base ADR-00000018).
+# Smoke is emitted as a TYPE inside the system clause, not a level. Fallback:
+# if repo_root is empty OR none of the level dirs exist, claim all
+# applicable so the generic guidance still fires (fresh / unmigrated repos).
 build_reminder() {
   local key="$1"
   local repo_root="$2"
-  local has_smoke=0 has_unit=0 has_integration=0
+  local has_unit=0 has_integration=0 has_system=0
   if [[ -n "${repo_root}" ]]; then
-    [[ -d "${repo_root}/test/smoke" ]] && has_smoke=1
-    [[ -d "${repo_root}/test/unit" ]] && has_unit=1
-    [[ -d "${repo_root}/test/integration" ]] && has_integration=1
+    [[ -d "${repo_root}/test/bats/unit" ]] && has_unit=1
+    [[ -d "${repo_root}/test/bats/integration" ]] && has_integration=1
+    [[ -d "${repo_root}/test/bats/system" ]] && has_system=1
   fi
-  if (( has_smoke == 0 && has_unit == 0 && has_integration == 0 )); then
-    has_smoke=1; has_unit=1; has_integration=1
+  if (( has_unit == 0 && has_integration == 0 && has_system == 0 )); then
+    has_unit=1; has_integration=1; has_system=1
   fi
 
-  local smoke="" unit="" integration="" lint=""
+  local unit="" integration="" system="" lint=""
   case "${key}" in
     entrypoint)
-      smoke="Smoke required (core path runs once the container is up)"
-      lint="Lint required (ShellCheck)"
+      system="System required (Smoke type: core path runs once the container is up)"
+      lint="Static: ShellCheck required"
       unit="Add Unit if functions are split out"
       integration="Add Integration for multi-container"
       ;;
     hadolint)
-      lint="Lint required: run the full suite once (just build test / just test, or just -f .claude/test/justfile test) to confirm existing files have no new violations"
-      smoke="Smoke usually N/A"
+      lint="Static: run the full suite once (just build test / just test, or just -f .claude/test/justfile test) to confirm existing files have no new violations"
+      system="System usually N/A"
       unit="Unit usually N/A"
       integration="Integration usually N/A"
       ;;
     workflow)
-      integration="Integration required (run the PR once to verify the new workflow actually triggers)"
-      smoke="Add Smoke depending on the trigger point"
-      lint="Lint (actionlint if available)"
+      system="System required (E2E type: run the PR once to verify the new workflow actually triggers)"
+      integration="Add Integration if it coordinates multiple jobs"
+      lint="Static: actionlint if available"
       ;;
     compose)
       integration="Integration required (multi-container coordinated behaviour)"
-      smoke="Add Smoke if single-container behaviour is affected"
-      lint="Depending on the compose lint tool"
+      system="Add System if single-container behaviour is affected"
+      lint="Static: compose lint tool if available"
       ;;
     dockerfile)
-      smoke="Smoke required (container comes up, core commands work)"
-      lint="Lint required (Hadolint)"
+      system="System required (Smoke type: container builds + comes up, core commands work)"
+      lint="Static: Hadolint required"
       integration="Add Integration for the build flow"
       ;;
     shell)
       unit="Unit required (isolate function logic, bats-mock)"
-      lint="Lint required (ShellCheck)"
-      smoke="Add Smoke if the path is affected"
+      lint="Static: ShellCheck required"
+      system="Add System if the runtime path is affected"
       integration="Add Integration if the flow is affected"
       ;;
   esac
 
   local parts=""
-  (( has_smoke )) && [[ -n "${smoke}" ]] && parts+="${smoke}; "
   (( has_unit )) && [[ -n "${unit}" ]] && parts+="${unit}; "
   (( has_integration )) && [[ -n "${integration}" ]] && parts+="${integration}; "
+  (( has_system )) && [[ -n "${system}" ]] && parts+="${system}; "
   [[ -n "${lint}" ]] && parts+="${lint}; "
   printf '%s' "${parts%; }"
 }
@@ -175,10 +179,10 @@ main() {
 
   local msg
   if [[ -n "${instincts}" ]]; then
-    msg="$(printf 'TDD reminder — just touched %s (category: %s)\n%s\nReference: CLAUDE.md「測試分類（TDD 必須涵蓋的 4 個面向）」 (test categories — the 4 aspects TDD must cover)\n\nApplicable instincts (.claude/instincts.yaml):\n%s' \
+    msg="$(printf 'TDD reminder — just touched %s (category: %s)\n%s\nReference: CONTEXT.md §11 test taxonomy (ISTQB levels / types / static analysis, ADR-00000013)\n\nApplicable instincts (.claude/instincts.yaml):\n%s' \
       "${file_path}" "${category}" "${reminder}" "${instincts}")"
   else
-    msg="$(printf 'TDD reminder — just touched %s (category: %s)\n%s\nReference: CLAUDE.md「測試分類（TDD 必須涵蓋的 4 個面向）」 (test categories — the 4 aspects TDD must cover)' \
+    msg="$(printf 'TDD reminder — just touched %s (category: %s)\n%s\nReference: CONTEXT.md §11 test taxonomy (ISTQB levels / types / static analysis, ADR-00000013)' \
       "${file_path}" "${category}" "${reminder}")"
   fi
 
