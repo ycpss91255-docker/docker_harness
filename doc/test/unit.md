@@ -1,7 +1,7 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1044 tests** across
-75 specs under `.claude/test/bats/unit/`. These were the former
+Unit level (ISTQB): one hook or script in isolation. **1047 tests** across
+76 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
 in isolation), not the Smoke *type* (see [smoke.md](smoke.md)).
@@ -1752,3 +1752,10 @@ directory or a broken symlink. New in #210; see ADR-00000011.
 | every repo-owned .claude/skills/<name> is a symlink to ../../.agents/skills/<name> | symlink shape + target |
 | every repo-owned skill resolves its SKILL.md through the symlink | functional reachability |
 | every repo-owned skill canonical dir is a real directory under .agents/skills | canonical store is a real dir, not nested symlink |
+
+### .claude/test/bats/unit/ci_sh_worktree_mount_ownership_spec.bats (3)
+| Test | Scenario |
+|------|----------|
+| ci.sh exists and is readable | driver present |
+| WORKTREE_MOUNT_FLAGS carries --user and PYTHONDONTWRITEBYTECODE | flags defined (refs #252) |
+| every worktree-mounting docker run routes through WORKTREE_MOUNT_FLAGS | no raw root-mount bypass |

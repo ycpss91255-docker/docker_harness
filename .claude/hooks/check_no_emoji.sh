@@ -30,7 +30,7 @@ main() {
     # (mirrors check_no_ai_attribution.sh skip list).
     */CLAUDE.md|*/.claude/commands/*.md|*/.claude/skills/*/SKILL.md) return 0 ;;
     */.claude/instincts.yaml) return 0 ;;
-    */doc/test/TEST.md|*/doc/changelog/CHANGELOG.md) return 0 ;;
+    */doc/test/*.md|*/doc/changelog/CHANGELOG.md) return 0 ;;
     # Test specs / fixtures may legitimately contain emoji bytes for detection tests.
     */.claude/test/bats/*) return 0 ;;
   esac

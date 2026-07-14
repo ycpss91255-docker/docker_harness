@@ -38,7 +38,7 @@ main() {
     */CLAUDE.md|*/.claude/commands/*.md|*/.claude/skills/*/SKILL.md) return 0 ;;
     */.claude/instincts.yaml) return 0 ;;
     # Project doc conventions that catalog/describe rule violations.
-    */doc/test/TEST.md|*/doc/changelog/CHANGELOG.md) return 0 ;;
+    */doc/test/*.md|*/doc/changelog/CHANGELOG.md) return 0 ;;
     # Test specs / fixtures must contain the forbidden patterns to assert detection.
     */.claude/test/bats/*) return 0 ;;
   esac

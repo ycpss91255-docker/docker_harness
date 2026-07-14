@@ -160,7 +160,7 @@ run_doc_scan() {
     [[ -f "${abs}" ]] || continue
     case "${abs}" in
       */CLAUDE.md|*/.claude/commands/*.md|*/.claude/skills/*/SKILL.md) continue ;;
-      */doc/test/TEST.md|*/doc/changelog/CHANGELOG.md) continue ;;
+      */doc/test/*.md|*/doc/changelog/CHANGELOG.md) continue ;;
       */.claude/test/bats/*) continue ;;
       */.claude/instincts.yaml) continue ;;
     esac
