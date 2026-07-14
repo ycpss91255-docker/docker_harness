@@ -7,6 +7,20 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **ISTQB-aligned test taxonomy + a real four-level pyramid (#237,
+  ADR-00000013).** Adopt the three-axis model base uses (levels: unit ->
+  integration -> system -> acceptance; types: smoke / e2e / regression;
+  static: lint), retiring the mixed-axis "4-category" (smoke / unit /
+  integration / lint) matrix. Every level now carries real content:
+  `.claude/test/bats/system/repo_self_audit_spec.bats` asserts the
+  delivered framework passes its own tree / ceiling / log-helper audits
+  end-to-end, and `.claude/test/bats/acceptance/framework_integrity_spec.bats`
+  asserts every settings.json-registered hook resolves to a script and
+  every `.claude/skills` symlink points at a real `SKILL.md`. Grand total
+  1052 tests (1044 unit + 3 integration + 3 system + 2 acceptance).
+  `doc/test/` split into an index (`TEST.md`) plus per-level catalogs
+  (`unit` / `integration` / `system` / `acceptance` / `smoke`), mirroring
+  base. New `doc/adr/00000013-istqb-test-taxonomy.md`.
 - **`enforce_serial_merge_gate.sh` routes same-repo batch auto-merge
   through `serial-merge.sh` (closes #236).** A PreToolUse Bash hook that,
   on a `gh pr merge ... --auto` arm, queries the target repo's open PRs
@@ -124,6 +138,19 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   single-spec run pattern, so local `make check` mirrors CI.
 
 ### Changed
+- **bats suite relocated to `.claude/test/bats/{unit,integration,system,acceptance}/`
+  and hook vocabulary re-based to the ISTQB axes (#237).** The suite moved
+  out of `.claude/hooks/test/` (a misnomer -- it also tests
+  `.claude/scripts/`) into `.claude/test/bats/`, co-located with the
+  harness; the former `smoke/` specs are Unit (a hook in isolation),
+  `chain_spec` is Integration. `test_helper.bash` resolves `HOOKS_DIR`
+  three levels up and exports `PROJECT_ROOT`; the Dockerfile COPYs
+  `.claude/test/` and points its CMD at `.claude/test/bats/`; content-scan
+  hooks + `verify.sh` skip `.claude/test/bats/*`. `remind_tdd_categories.sh`
+  now speaks levels / types / static and detects `test/bats/<level>/`;
+  `check_readme_framework.sh` guidance points at the `## Tests` heading
+  (retiring `## Smoke Tests`). CONTEXT.md §11 rewritten to the three-axis
+  model.
 - **`.claude/test` harness migrated from `make` to a `just` + driver
   model (refs #220; drops `make` as a docker_harness dependency).** The
   `.claude/test/Makefile` is replaced by `.claude/test/ci.sh` (a driver

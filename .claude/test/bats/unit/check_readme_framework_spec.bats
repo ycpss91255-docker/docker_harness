@@ -38,7 +38,7 @@ One-liner.
 ./build.sh && ./run.sh
 ```
 
-## Smoke Tests
+## Tests
 
 See [TEST.md](doc/test/TEST.md) for details.
 EOF

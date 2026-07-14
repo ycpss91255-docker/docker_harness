@@ -16,7 +16,7 @@
 #       (must be `.base/script/docker/build.sh` since v0.1.0)
 #   [5] No `.template_version` reference
 #       (version pin moved to `.base/.version` since v0.16.0)
-#   [6] Smoke Tests section links to TEST.md
+#   [6] Tests section links to TEST.md
 #       (regex: \(doc/test/TEST.md\) somewhere in file)
 #   [7] No stale paths in the Directory Structure tree
 #       (walks the code-fence following `## Directory Structure`
@@ -197,7 +197,7 @@ check_one() {
   fi
 
   if ! grep -q '(doc/test/TEST.md)' <<< "${contents}"; then
-    findings+="  ${prefix}[6] missing 'See [TEST.md](doc/test/TEST.md) for details.' under '## Smoke Tests'"$'\n'
+    findings+="  ${prefix}[6] missing 'See [TEST.md](doc/test/TEST.md) for details.' under '## Tests'"$'\n'
   fi
 
   # [7] Directory Structure tree must not list paths that do not exist

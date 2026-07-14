@@ -48,7 +48,7 @@ main() {
   case "${file_path}" in
     */.git/*|*/node_modules/*) return 0 ;;
     */check_no_stale_template_refs.sh) return 0 ;;
-    */.claude/hooks/test/*) return 0 ;;
+    */.claude/test/bats/*) return 0 ;;
     *.md) return 0 ;;
   esac
 

@@ -45,6 +45,8 @@ RUN git clone --depth 1 --branch "${BATS_SUPPORT_VERSION}" \
 WORKDIR /work
 COPY .claude/hooks/ /work/.claude/hooks/
 COPY .claude/scripts/ /work/.claude/scripts/
+COPY .claude/test/ /work/.claude/test/
 
 # bats/bats image already has ENTRYPOINT ["bats"]; CMD becomes its args.
-CMD ["--recursive", "/work/.claude/hooks/test/"]
+# Specs live under .claude/test/bats/<level>/ (ISTQB layout, ADR-00000013).
+CMD ["--recursive", "/work/.claude/test/bats/"]

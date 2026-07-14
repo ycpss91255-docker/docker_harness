@@ -59,65 +59,67 @@ teardown() {
   assert_silent
 }
 
-# Repo-detection / TDD-capability adaptation (refs #75). Reminder
-# should list ONLY the test categories the repo actually has infra for,
-# rather than the legacy generic 4-category claim. When the repo has
-# no test/<cat>/ at all, fall back to the 4-category baseline so the
-# pre-#75 behaviour (and existing tests above) keep working.
+# Repo-detection / TDD-capability adaptation (refs #75, #237). Reminder
+# lists ONLY the ISTQB levels the repo has infra for (test/bats/<level>/),
+# plus static analysis. When the repo has no level dir, fall back to the
+# all-levels baseline so the generic guidance (and the tests above) keep
+# working. Smoke is a TYPE inside the system clause, not a level.
 
-@test "[#75] .sh in downstream repo with only test/smoke/ drops Unit + Integration" {
-  mkdir -p "${TMPDIR}/repo/test/smoke"
+@test "[#75/#237] .sh in repo with only test/bats/system/ drops Unit + Integration" {
+  mkdir -p "${TMPDIR}/repo/test/bats/system"
   echo "FROM x" > "${TMPDIR}/repo/Dockerfile"
   mkdir -p "${TMPDIR}/repo/script"
   echo "echo a" > "${TMPDIR}/repo/script/foo.sh"
   run "$(hook remind_tdd_categories.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/repo/script/foo.sh\"}}"
   assert_message_contains "shell function"
-  assert_message_contains "Smoke"
-  assert_message_contains "Lint"
+  assert_message_contains "System"
+  assert_message_contains "Static"
   refute_output --partial "Unit required"
-  refute_output --partial "Integration required"
+  refute_output --partial "Add Integration"
 }
 
-@test "[#220] .sh in repo detected via root justfile only (no Dockerfile) scopes categories" {
-  mkdir -p "${TMPDIR}/jrepo/test/smoke"
+@test "[#220/#237] .sh in repo detected via root justfile only (no Dockerfile) scopes levels" {
+  mkdir -p "${TMPDIR}/jrepo/test/bats/system"
   echo "test:" > "${TMPDIR}/jrepo/justfile"
   mkdir -p "${TMPDIR}/jrepo/script"
   echo "echo a" > "${TMPDIR}/jrepo/script/foo.sh"
   run "$(hook remind_tdd_categories.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/jrepo/script/foo.sh\"}}"
-  assert_message_contains "Smoke"
+  assert_message_contains "System"
   refute_output --partial "Unit required"
-  refute_output --partial "Integration required"
+  refute_output --partial "Add Integration"
 }
 
-@test "[#75] .sh in repo with full test infra keeps all 4 categories" {
-  mkdir -p "${TMPDIR}/repo/test/smoke" \
-           "${TMPDIR}/repo/test/unit" \
-           "${TMPDIR}/repo/test/integration"
+@test "[#75/#237] .sh in repo with full level infra keeps unit + integration + system" {
+  mkdir -p "${TMPDIR}/repo/test/bats/unit" \
+           "${TMPDIR}/repo/test/bats/integration" \
+           "${TMPDIR}/repo/test/bats/system"
   echo "FROM x" > "${TMPDIR}/repo/Dockerfile"
   mkdir -p "${TMPDIR}/repo/script"
   echo "echo a" > "${TMPDIR}/repo/script/foo.sh"
   run "$(hook remind_tdd_categories.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/repo/script/foo.sh\"}}"
   assert_message_contains "Unit required"
-  assert_message_contains "Smoke"
   assert_message_contains "Integration"
-  assert_message_contains "Lint"
+  assert_message_contains "System"
+  assert_message_contains "Static"
 }
 
-@test "[#75] Dockerfile in repo with only test/smoke/ keeps Smoke + Lint" {
-  mkdir -p "${TMPDIR}/repo/test/smoke"
+@test "[#75/#237] Dockerfile in repo with only test/bats/system/ keeps System (Smoke type) + static" {
+  mkdir -p "${TMPDIR}/repo/test/bats/system"
   echo "FROM x" > "${TMPDIR}/repo/Dockerfile"
   run "$(hook remind_tdd_categories.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/repo/Dockerfile\"}}"
   assert_message_contains "Dockerfile"
-  assert_message_contains "Smoke"
-  assert_message_contains "Lint"
-  refute_output --partial "Integration required"
+  assert_message_contains "System"
+  assert_message_contains "Smoke type"
+  assert_message_contains "Static"
+  refute_output --partial "Add Integration"
 }
 
-@test "[#75] repo without any test/ subdir falls back to all 4 categories" {
+@test "[#75/#237] repo without any test/bats level dir falls back to all levels" {
   mkdir -p "${TMPDIR}/repo/script"
   echo "FROM x" > "${TMPDIR}/repo/Dockerfile"
   echo "echo a" > "${TMPDIR}/repo/script/foo.sh"
   run "$(hook remind_tdd_categories.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/repo/script/foo.sh\"}}"
   assert_message_contains "Unit required"
   assert_message_contains "Integration"
+  assert_message_contains "System"
 }
