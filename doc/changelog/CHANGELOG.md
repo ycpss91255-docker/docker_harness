@@ -93,6 +93,17 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ci-and-stamp.sh`.
 
 ### Fixed
+- **`enforce_gh_body_file.sh` scopes all detection to the gh command's
+  own segment (fixes #255).** The `--body` / `--comment` / `--body-file`
+  / `--label` and parser-fallback checks matched against the whole
+  command line, so a flag belonging to a different program in a chained
+  command (a trailing `echo "... --body ..."`, `python3 -c`), or a
+  `gh ...` merely mentioned inside another command's quoted argument,
+  could drive a false deny (and, symmetrically, a foreign `--body-file`
+  could mask a real missing-body-file violation). Generalized the #219
+  close-only `close_segment` into `gh_segment` -- split on `&& || | ;`,
+  take the first segment whose command word is `gh` -- and route every
+  rule through it. 3 regression specs.
 - **`enforce_serial_merge_gate.sh` detection hardened (fixes the #236
   gate merged in #241).** Two defects: (1) `gh pr merge --auto` was
   matched anywhere in the command, so a commit message mentioning the

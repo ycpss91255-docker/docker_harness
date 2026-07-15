@@ -357,3 +357,26 @@ stub_gh_fail() {
   run "$(hook enforce_gh_body_file.sh)" <<< '{"tool_input":{"command":"gh issue close 5 --reason completed"}}'
   assert_silent
 }
+
+# #255: detection must be scoped to the gh subcommand's own segment, not
+# the whole command line. A --body/--comment/--body-file belonging to a
+# DIFFERENT program in a chained command (a trailing echo, a quoted
+# mention) must not drive the verdict.
+
+@test "#255: real gh uses --body-file; trailing echo mentioning --body= is silent" {
+  local bf="${TMP}/c.md"; printf 'comment\n' > "${bf}"
+  local long="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh pr comment 9 --body-file ${bf} && echo 'never inline --body=${long}'\"}}"
+  assert_silent
+}
+
+@test "#255: a quoted gh-comment mention before a real gh pr view is silent" {
+  local long="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"echo 'todo: gh issue comment 5 --body=${long}' && gh pr view 9\"}}"
+  assert_silent
+}
+
+@test "#255: gh issue create missing --body-file still denied despite trailing echo mentioning one" {
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh issue create --title T --label bug && echo 'remember --body-file /tmp/x.md'\"}}"
+  assert_permission_decision "deny"
+}
