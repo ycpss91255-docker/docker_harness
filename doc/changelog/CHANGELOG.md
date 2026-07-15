@@ -138,6 +138,15 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   single-spec run pattern, so local `make check` mirrors CI.
 
 ### Changed
+- **close-flow gh commands relaxed from `ask` to `allow` (#218).** Removed
+  `Bash(gh issue close:*)` / `Bash(gh issue reopen:*)` / `Bash(gh pr close:*)`
+  from the `settings.json` `ask` bucket; they fall through to the existing
+  broad `Bash(gh:*)` allow, so closing an issue/PR no longer prompts. The
+  `ask` confirmation was redundant double-gating: `enforce_gh_body_file.sh`
+  runs regardless of bucket and still BLOCKS any close lacking a decision
+  record (#196 / #204), so the guardrail is intact. The `ask` bucket now
+  holds only genuinely destructive ops (git force/reset/clean, rm, dd,
+  truncate, docker mutations).
 - **bats suite relocated to `.claude/test/bats/{unit,integration,system,acceptance}/`
   and hook vocabulary re-based to the ISTQB axes (#237).** The suite moved
   out of `.claude/hooks/test/` (a misnomer -- it also tests
