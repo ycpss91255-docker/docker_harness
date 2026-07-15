@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1047 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1050 tests** across
 76 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -381,7 +381,7 @@ exempt from `--body-file` scanning.
 | silent when Dockerfile.test-tools has no final-stage apk add | no final apk → SILENT |
 | handles empty smoke step gracefully | YAML run block empty → no crash |
 
-### .claude/test/bats/unit/enforce_gh_body_file_spec.bats (54)
+### .claude/test/bats/unit/enforce_gh_body_file_spec.bats (57)
 
 Covers `.claude/hooks/enforce_gh_body_file.sh` -- the PreToolUse hook
 that BLOCKS gh routing violations from issue #64. Renamed + upgraded
@@ -445,6 +445,9 @@ threshold for short inline bodies.
 | #196 B: issue close WITH ## Decision comment allowed | Decision marker equivalent |
 | #196 B: issue close fails open when gh errors (network) | fail-open on gh failure |
 | #196 B: issue close N --reason still passes Check B with marker comment | reason flag + marker → SILENT |
+| #255: real gh uses --body-file; trailing echo mentioning --body= is silent | detection scoped to the gh segment |
+| #255: a quoted gh-comment mention before a real gh pr view is silent | quoted gh in another command ignored |
+| #255: gh issue create missing --body-file still denied despite trailing echo mentioning one | foreign --body-file does not satisfy the rule |
 
 ### .claude/test/bats/unit/wait_pr_ci_spec.bats (32)
 

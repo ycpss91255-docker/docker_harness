@@ -165,20 +165,32 @@ detect_subcmd() {
   fi
 }
 
-# close_segment <cmd> -- the `gh issue close ...` slice only, from the first
-# `gh issue close` up to the next command separator (&&, ||, |, ;). Rule 3's
-# -c/--comment detection must scope to this slice, else a -c belonging to a
-# different program in a chained / quoted command (python3 -c, bash -c,
-# git log -S '... -c ...') false-triggers the deny (refs #219).
-close_segment() {
-  local cmd="$1" seg=""
-  if [[ "${cmd}" =~ (gh[[:space:]]+issue[[:space:]]+close.*) ]]; then
-    seg="${BASH_REMATCH[1]}"
-  fi
-  seg="${seg%%&&*}"
-  seg="${seg%%|*}"
-  seg="${seg%%;*}"
-  printf '%s' "${seg}"
+# gh_segment <cmd> -- the segment of <cmd> whose command word is `gh`:
+# split <cmd> on the shell separators (&&, ||, |, ;) and return the first
+# piece whose first token is `gh`. ALL flag detection (--body / --comment /
+# --body-file / --label, the cat / stdin parser-fallback checks, the
+# subcommand parse) must scope to this segment, else a flag belonging to a
+# different program in a chained command (a trailing `echo "... --body ..."`,
+# `python3 -c`, `git log -S`) or a `gh ...` merely mentioned inside a quoted
+# argument of another command false-triggers the verdict. Generalizes the
+# #219 close-only slice to every rule (refs #255). Naive w.r.t. quotes (a
+# separator inside a quoted body truncates the segment) -- the goal is
+# cross-command isolation, not a full shell parser; the truncation only
+# affects the flag VALUE, never the presence of the gh subcommand + flag.
+gh_segment() {
+  local cmd="$1" seg
+  cmd="${cmd//&&/$'\n'}"
+  cmd="${cmd//||/$'\n'}"
+  cmd="${cmd//|/$'\n'}"
+  cmd="${cmd//;/$'\n'}"
+  while IFS= read -r seg; do
+    seg="${seg#"${seg%%[![:space:]]*}"}"   # ltrim leading whitespace
+    if [[ "${seg}" =~ ^gh[[:space:]] ]]; then
+      printf '%s' "${seg}"
+      return 0
+    fi
+  done <<< "${cmd}"
+  return 1
 }
 
 deny() {
@@ -194,7 +206,7 @@ deny() {
 }
 
 main() {
-  local input cmd subcmd body len
+  local input cmd seg subcmd body len
   input="$(cat)"
   cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
   [[ -z "${cmd}" ]] && return 0
@@ -203,26 +215,34 @@ main() {
     return 0
   fi
 
-  if has_cat_substitution "${cmd}"; then
+  # Scope every rule to the gh command's own segment (refs #255): a
+  # --body / --comment / --body-file / --label from a chained non-gh
+  # command, or a `gh ...` mentioned inside another command's quoted
+  # argument, must not drive the verdict. No real gh command word ->
+  # nothing to enforce.
+  seg="$(gh_segment "${cmd}")" || return 0
+  [[ -z "${seg}" ]] && return 0
+
+  if has_cat_substitution "${seg}"; then
     deny "gh long-body via --body \"\$(cat ...)\" triggers Claude bash AST parser fallback (Unhandled node type: string). Canonical: Write the body to /tmp/<name>.md, then gh ... --body-file /tmp/<name>.md. Rule 8 of #64."
     return 0
   fi
-  if has_stdin_body_file "${cmd}"; then
+  if has_stdin_body_file "${seg}"; then
     deny "gh --body-file - <<EOF (stdin heredoc) triggers Claude bash AST parser fallback. Write the body to /tmp/<name>.md, then gh ... --body-file /tmp/<name>.md. Rule 8 of #64."
     return 0
   fi
 
-  subcmd="$(detect_subcmd "${cmd}")"
+  subcmd="$(detect_subcmd "${seg}")"
 
   case "${subcmd}" in
     "issue create"|"pr create")
-      if ! has_real_body_file "${cmd}"; then
+      if ! has_real_body_file "${seg}"; then
         deny "gh ${subcmd} needs --body-file <path>. Write the body to /tmp/<name>.md, then gh ${subcmd} ... --body-file /tmp/<name>.md. Rules 1/4 of #64 (creation artifacts are reviewer-visible, must land in a real file)."
         return 0
       fi
       # Rule 9 (#91): `gh issue create` must carry --label <non-empty>.
       # PRs are exempt -- they inherit labels from the issue they close.
-      if [[ "${subcmd}" == "issue create" ]] && ! has_label "${cmd}"; then
+      if [[ "${subcmd}" == "issue create" ]] && ! has_label "${seg}"; then
         deny "gh issue create needs --label <name> (Rule 9 of #91). Map the title type prefix to a stock GitHub label per .claude/skills/gh-artifact-format/SKILL.md Section 6: feat/refactor/chore/track -> enhancement, fix -> bug, docs -> documentation. Example: gh issue create ... --body-file /tmp/x.md --label enhancement"
         return 0
       fi
@@ -234,7 +254,7 @@ main() {
       # unaffected (future-only behaviour).
       if [[ "${subcmd}" == "pr create" ]]; then
         local bf
-        if bf="$(body_file_path "${cmd}")" && [[ -r "${bf}" ]]; then
+        if bf="$(body_file_path "${seg}")" && [[ -r "${bf}" ]]; then
           if grep -qiE "${CLOSING_KEYWORD_RE}" "${bf}" \
              && ! grep -qE "${DECISION_MARKER_RE}" "${bf}"; then
             deny "This PR closes an issue but its body records no decision / resolution. Add a \`## Resolution\` or \`## Decision\` section to ${bf} stating what was decided and how it was resolved, then re-run. The PR body is the canonical decision record for PR-closed issues (refs #196)."
@@ -245,7 +265,7 @@ main() {
       return 0
       ;;
     "issue close")
-      if printf '%s' "$(close_segment "${cmd}")" | grep -qE -e '(--comment|-c)([[:space:]]+|=)'; then
+      if printf '%s' "${seg}" | grep -qE -e '(--comment|-c)([[:space:]]+|=)'; then
         deny "gh issue close --comment is denied. Use two-step close: gh issue comment N --body-file X (or short --body \"<le 80 chars>\"), then gh issue close N [--reason completed|not\\ planned]. Rule 3 of #64."
         return 0
       fi
@@ -256,7 +276,7 @@ main() {
       # installed) -- never block a close on a transient gh failure.
       # PR-merge auto-close does NOT run `gh issue close`, so PR-closed
       # issues are unaffected (the PR body is their decision record).
-      if [[ "${cmd}" =~ gh[[:space:]]+issue[[:space:]]+close[[:space:]]+([0-9]+) ]]; then
+      if [[ "${seg}" =~ gh[[:space:]]+issue[[:space:]]+close[[:space:]]+([0-9]+) ]]; then
         local close_num="${BASH_REMATCH[1]}"
         local issue_comments
         if issue_comments="$(gh issue view "${close_num}" --json comments --jq '.comments[].body' 2>/dev/null)"; then
@@ -269,15 +289,15 @@ main() {
       return 0
       ;;
     "pr edit")
-      if printf '%s' "${cmd}" | grep -qE -e '--body([[:space:]]+|=)' \
-         && ! has_real_body_file "${cmd}"; then
+      if printf '%s' "${seg}" | grep -qE -e '--body([[:space:]]+|=)' \
+         && ! has_real_body_file "${seg}"; then
         deny "gh pr edit --body inline is denied. Always use gh pr edit ... --body-file /tmp/<name>.md. Rule 6 of #64 (pr-edit overwrites the entire body, file form keeps the diff reviewable)."
         return 0
       fi
       return 0
       ;;
     "issue comment"|"pr comment"|"pr review")
-      body="$(extract_body "${cmd}")"
+      body="$(extract_body "${seg}")"
       if [[ -n "${body}" ]] && ! short_body_ok "${body}"; then
         len="${#body}"
         deny "gh ${subcmd} body is too long for inline (${len} chars or multi-line; SHORT_LIMIT=${SHORT_LIMIT} single line). Write to /tmp/<name>.md and pass --body-file. Rule 2/5/7 of #64."
