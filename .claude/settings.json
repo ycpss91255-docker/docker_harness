@@ -76,9 +76,6 @@
       "Bash(git filter-branch:*)",
       "Bash(truncate:*)",
       "Bash(dd:*)",
-      "Bash(gh issue close:*)",
-      "Bash(gh issue reopen:*)",
-      "Bash(gh pr close:*)",
       "Bash(/tmp/*.sh)",
       "Bash(bash -c:*)"
     ]
