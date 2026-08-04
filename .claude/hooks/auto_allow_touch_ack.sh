@@ -29,8 +29,22 @@ set -uo pipefail
 readonly ACK_PREFIX_RE='^(\$TMPDIR|/tmp)/claude-checkpoint-[A-Za-z0-9_-]+\.ack$'
 
 main() {
-  local input cmd
+  local input cmd agent_marker
   input="$(cat)"
+
+  # An ack records a HUMAN's intent to lift a Tier 2 E2 gate, so the
+  # one-click lift is for the interactive session only. Hooks do fire for
+  # subagent tool calls, and a subagent payload carries `agent_id` /
+  # `agent_type` that a main-session payload does not. Stay silent for those:
+  # the ack falls through to the normal ask flow and the human answers it,
+  # instead of an autonomous implementer acking its own way past the gate
+  # (refs #267). Note `session_id` cannot serve here -- it is identical for
+  # parent and child.
+  local agent_marker
+  agent_marker="$(printf '%s' "${input}" \
+    | jq -r '(.agent_id // "") + (.agent_type // "")' 2>/dev/null)"
+  [[ -n "${agent_marker}" ]] && return 0
+
   cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
 
   [[ -z "${cmd}" ]] && return 0
