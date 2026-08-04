@@ -93,6 +93,42 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ci-and-stamp.sh`.
 
 ### Fixed
+- **`.claude/test/ci.sh` pins the hadolint image; DL3066 settled in
+  `.hadolint.yaml` (fixes #263).** `HADOLINT_IMAGE` floated on
+  `hadolint/hadolint:latest-alpine`, so hadolint 2.15's new `DL3066`
+  ("Non-numeric user-id may not be resolvable by host system") turned
+  `main` -- and every open PR at once -- red on `.claude/test/Dockerfile`'s
+  long-standing `USER root`, with no commit in this repo and the failure
+  surfacing attached to whichever PR happened to be in flight. Pinned to
+  `hadolint/hadolint:v2.15.1-alpine` with an in-line comment saying why
+  the pin exists, matching base's `rhysd/actionlint:1.7.7` convention, so
+  a rule set only ever changes on purpose, in its own commit. DL3066 is
+  then ignored explicitly in `.hadolint.yaml` next to the existing DL3002
+  / DL3018 entries rather than by lowering the global `--failure-threshold`
+  (which would mask unrelated findings): `root` is the one user name every
+  host resolves without a passwd lookup (uid 0), this is a test-runner
+  image whose runtime user `ci.sh` overrides anyway
+  (`--user "$(id -u):$(id -g)"`), and `USER root` states the intent that
+  `USER 0` only encodes. New
+  `.claude/test/bats/unit/ci_sh_tool_image_pin_spec.bats` (3 tests) is a
+  lexical guard against floating any externally pulled tool image back to
+  `latest`.
+- **`ci-and-stamp.sh` writes the local-CI-pass marker if and only if the
+  mirror was green (fixes #261).** A run was observed exiting 1 while the
+  marker `.claude/state/local-ci-pass/<HEAD>.ok` had been written during
+  that same run -- the caller sees red, the filesystem says green, and
+  the next `gh pr create` sails through `enforce_local_full_ci_before_pr.sh`
+  on an unverified HEAD, which is exactly the GitHub round-trip the gate
+  (#176 / #208) exists to prevent. Detection, running and stamping are now
+  separate functions (`detect_kind` / `run_ci` / `stamp` / `unstamp`), the
+  mirror yields a single verdict, and the script branches on it exactly
+  once, so the two states are mutually exclusive by construction rather
+  than by statement ordering. A red run additionally REMOVES a marker an
+  earlier green left on the same sha (a stale green must not outlive a
+  later red on the same HEAD), scoped to that sha alone; and `stamp` no
+  longer swallows a failed `mkdir` / write -- an unrecordable green exits
+  1 with `marker_write_failed` instead of reporting a pass with no
+  attestation. 4 regression spec cases.
 - **`prune-merged-worktrees.sh` is cwd-independent and its `--dry-run`
   no longer lies (fixes #260).** Every `git worktree` / `git branch`
   call used to inherit the repo of the caller's cwd while `--dry-run`
