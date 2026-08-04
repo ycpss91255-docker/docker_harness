@@ -59,10 +59,12 @@ to Workflow-spawned agents.
 
 ## Dispatching the implementer
 
-```
-Workflow({script: ...})     # one agent per slice-chain, isolation via the
-                            # worktree the planner already created
-```
+Start from [`workflow-template.js`](workflow-template.js) in this directory --
+fill its CONFIG block and pass it as `Workflow({script: ...})`. It already
+encodes the contract below; the template lives here rather than in a new
+`.claude/workflows/` directory, which would add a CONTEXT.md obligation with
+no lint behind it (`check-claude-md-tree.sh` audits `commands/` / `scripts/` /
+`hooks/` only).
 
 The prompt must be self-contained. Include:
 
@@ -91,12 +93,22 @@ green, not on correct.
 
 ## Landing the work
 
-- The **planner** opens the PR and decides about merge. `/pr` step 5 shape;
-  the PR body is the canonical decision record and needs `## Resolution` or
-  `## Decision` when it closes an issue.
-- **Arming auto-merge is opt-in per run, not the default.** Autonomously
-  produced code reaches `main` only after a human has looked at it. When the
-  human says go, `auto-merge-on-green` lands it.
+- The **planner** opens the PR. `/pr` step 5 shape; the PR body is the
+  canonical decision record and needs `## Resolution` or `## Decision` when it
+  closes an issue.
+- **Auto-merge is armed on open, same as any other PR here** -- green CI lands
+  it without a separate ask. Autonomously produced code is held to the repo's
+  standing bar, not a stricter one. What carries the risk is therefore the
+  gate: it must actually discriminate, because nothing downstream will.
+- The stopping condition below is what keeps "green" meaningful. A run that
+  grinds toward a passing test rather than a correct one must hit its bound
+  and stop, not keep going until the gate happens to agree.
+
+**A bug found after merge is a gate defect, not a review failure.** The fix is
+to add the test that would have caught it, so the gate is strictly stronger
+than it was -- not to insert a human read-through that the next bug would slip
+past just as quietly. Treat every escape as the gate telling you where it is
+thin.
 - `enforce_local_full_ci_before_pr.sh` wants a marker written by
   `ci-and-stamp.sh` for the exact HEAD; that runs planner-side.
 
