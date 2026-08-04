@@ -1,7 +1,7 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1057 tests** across
-77 specs under `.claude/test/bats/unit/`. These were the former
+Unit level (ISTQB): one hook or script in isolation. **1072 tests** across
+78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
 in isolation), not the Smoke *type* (see [smoke.md](smoke.md)).
@@ -1783,3 +1783,33 @@ here -- hadolint 2.15 did exactly that by adding DL3066. New in #263.
 | HADOLINT_IMAGE pins an explicit hadolint version | `hadolint/hadolint:vX.Y.Z-*`, never `latest` |
 | no externally pulled tool image in ci.sh uses a floating tag | generalises to any future registry image |
 | the HADOLINT_IMAGE pin carries a comment explaining why it is pinned | the pin survives a "tidy-up" bump |
+
+### .claude/test/bats/unit/prune_merged_worktrees_spec.bats (15)
+
+Covers `.claude/scripts/prune-merged-worktrees.sh` (issue #260) — batch
+removal of worktrees whose branch has a MERGED PR. Fixtures are real
+throwaway git repos + linked worktrees under `BATS_TEST_TMPDIR` (never the
+developer's live worktrees), and `gh` is PATH-stubbed to a constant state
+token (`GH_PR_STATE`, default `MERGED`) because the MERGED-PR probe itself
+is out of scope. The property under test is that every verdict is derived
+from the WORKTREE PATH rather than the caller's cwd, and that `--dry-run`
+runs the same resolution and validation as the real run — so a "would
+remove" preview is never followed by a `fatal: ... is not a working tree`.
+
+| Test | Scenario |
+|------|----------|
+| --help prints usage and exits 0 | help path |
+| arg validation: missing --repo -> exit 2 | required-arg validation |
+| arg validation: no worktree path -> exit 2 | required-arg validation |
+| removes a merged worktree when invoked from an unrelated git repo | cwd-independence, real run |
+| --dry-run previews from an unrelated git repo without removing | cwd-independence, dry-run |
+| verdict is identical from inside and from outside the target repo | cwd cannot change a verdict |
+| a directory inside a worktree FAILs in dry-run, not just in the real run | dry-run no longer lies |
+| dry-run and the real run agree on a directory inside a worktree | preview == real verdict |
+| the main working tree FAILs in dry-run and in the real run | main-checkout guard, both modes |
+| a path outside any git repository FAILs with a named reason | unresolvable path |
+| FAIL names the path, the repo consulted and what was expected | diagnosable error |
+| summary counts failures alongside removed / skipped | failed=N in summary |
+| skips a worktree whose PR is not MERGED | unmerged branch untouched |
+| skips a dirty worktree | dirty-tree guard |
+| skips a path that does not exist | missing path is a skip, not a failure |
