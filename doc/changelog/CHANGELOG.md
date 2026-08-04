@@ -93,6 +93,29 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ci-and-stamp.sh`.
 
 ### Fixed
+- **`prune-merged-worktrees.sh` is cwd-independent and its `--dry-run`
+  no longer lies (fixes #260).** Every `git worktree` / `git branch`
+  call used to inherit the repo of the caller's cwd while `--dry-run`
+  only asked `gh` whether the branch had a MERGED PR, so a run from
+  outside the target repo (typically the workspace root, itself a git
+  repo) previewed "would remove" and then died with a bare `fatal:
+  '<path>' is not a working tree` -- same arguments, opposite verdicts,
+  and an absolute path did not help. The target repo is now derived from
+  each worktree path (`git -C <path> rev-parse --path-format=absolute
+  --git-common-dir`) and every mutation runs as `git -C <repo> ...`,
+  including the final `worktree prune` (once per resolved repo).
+  `--dry-run` performs the identical resolution and validation --
+  in-a-repo, worktree-root (not a subdirectory), linked (not the main
+  working tree) -- and short-circuits only the mutating calls, so a
+  preview verdict is the real verdict. Unresolvable paths report `FAIL
+  <name> (path=... repo=...) <reason> -- expected the root of a linked
+  git worktree`, naming the repo git actually consulted, are counted in
+  the `failed=N` summary, and exit 1 (0 = ran, 2 = arg error). The
+  MERGED-PR probe is untouched: squash-merge makes `--is-ancestor`
+  useless, so asking `gh` remains the right signal. The script itself
+  was until now untracked in the workspace root; it lands here with 15
+  unit specs driven against throwaway git repos under
+  `BATS_TEST_TMPDIR`.
 - **`enforce_gh_body_file.sh` scopes all detection to the gh command's
   own segment (fixes #255).** The `--body` / `--comment` / `--body-file`
   / `--label` and parser-fallback checks matched against the whole
