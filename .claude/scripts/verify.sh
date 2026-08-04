@@ -107,14 +107,23 @@ run_tree_audit() {
   "${REPO_ROOT}/.claude/scripts/check-claude-md-tree.sh" "${REPO_ROOT}/CLAUDE.md"
 }
 
+# run_test_md -- per-section `### <spec> (N)` drift across doc/test/*.md.
+#
+# The heading path may carry a `.claude/` or `.base/` prefix: this repo's own
+# specs moved to `.claude/test/bats/<level>/` with the ISTQB split (#237), and
+# without that alternative the pattern below matched NOTHING here, so the
+# phase reported clean while the catalogs rotted (#265). The authoritative
+# gate is `sync-doc-test-counts.sh --check` (a generator, so drift cannot
+# survive a regeneration); this phase stays the cheap read-only sweep that
+# also works on repos with no generator.
 run_test_md() {
   local test_md="${REPO_ROOT}/doc/test/TEST.md"
   [[ -f "${test_md}" ]] || { _log_info verify lint_pass kind=test-md detail=missing; return 0; }
 
   local drifts=0 line rel claimed actual file
   while IFS= read -r line; do
-    rel="$(printf '%s' "${line}" | sed -E 's/^### (test\/.+\.bats) \(([0-9]+)\)$/\1/')"
-    claimed="$(printf '%s' "${line}" | sed -E 's/^### (test\/.+\.bats) \(([0-9]+)\)$/\2/')"
+    rel="$(printf '%s' "${line}" | sed -E 's/^### ((\.claude\/|\.base\/)?test\/.+\.bats) \(([0-9]+)\)$/\1/')"
+    claimed="$(printf '%s' "${line}" | sed -E 's/^### ((\.claude\/|\.base\/)?test\/.+\.bats) \(([0-9]+)\)$/\3/')"
     file="${REPO_ROOT}/.claude/hooks/${rel}"
     [[ -f "${file}" ]] || file="${REPO_ROOT}/${rel}"
     if [[ ! -f "${file}" ]]; then
@@ -127,7 +136,8 @@ run_test_md() {
       _log_warn verify drift_detected kind=test-md file="${rel}" claimed="${claimed}" actual="${actual}"
       drifts=$((drifts + 1))
     fi
-  done < <(grep -hE '^### test/.+\.bats \([0-9]+\)$' "${REPO_ROOT}"/doc/test/*.md 2>/dev/null || true)
+  done < <(grep -hE '^### (\.claude/|\.base/)?test/.+\.bats \([0-9]+\)$' \
+    "${REPO_ROOT}"/doc/test/*.md 2>/dev/null || true)
 
   if (( drifts > 0 )); then
     _log_err verify lint_fail kind=test-md count="${drifts}"

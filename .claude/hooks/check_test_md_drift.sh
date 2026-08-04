@@ -11,12 +11,23 @@
 #   ### test/unit/setup_spec.bats (166)
 #   ### test/integration/upgrade_spec.bats (6)
 #   ### .base/test/smoke/script_help.bats (27)   # subtree-shared (refs #156)
+#   ### .claude/test/bats/unit/log_spec.bats (48) # this repo's own layout
 #   ### test/unit/widget_test.py (12)            # pytest (refs #198)
 # Per-section count is authoritative; some sections summarise by category
 # rather than per-test, so a row-count grep does not work. Per-file count
 # does. The optional `.base/` prefix lets downstream repos pin counts on
 # tests vendored via the `.base/` subtree (otherwise a base subtree pull
-# that lands new @test stanzas would drift TEST.md silently).
+# that lands new @test stanzas would drift TEST.md silently); the optional
+# `.claude/` prefix is docker_harness's own layout, where the specs moved to
+# `.claude/test/bats/<level>/` with the ISTQB split (#237). Without it this
+# hook matched NOTHING in this repo and reported clean while the catalogs
+# rotted -- which is how #265's drift accumulated unseen.
+#
+# This hook stays advisory (report-only, exit 0). The GATE is
+# `.claude/scripts/sync-doc-test-counts.sh --check`, which regenerates the
+# catalogs rather than policing them; the hook is the in-session nudge that
+# fires the moment a spec is edited, and it is deliberately self-contained
+# so it still works in a repo (or a test fixture) that has no generator.
 #
 # Counting unit per extension:
 #   .bats -> `^@test` stanza count.
@@ -69,7 +80,7 @@ main() {
   # silently mis-runs under mawk / POSIX awk.
   mismatches=""
   while IFS= read -r line; do
-    [[ "${line}" =~ ^\#\#\#[[:space:]]((\.base/)?test/[^[:space:]]+\.(bats|py))[[:space:]]\(([0-9]+)\) ]] || continue
+    [[ "${line}" =~ ^\#\#\#[[:space:]]((\.base/|\.claude/)?test/[^[:space:]]+\.(bats|py))[[:space:]]\(([0-9]+)\) ]] || continue
     local rel="${BASH_REMATCH[1]}"
     local ext="${BASH_REMATCH[3]}"
     local expected="${BASH_REMATCH[4]}"
