@@ -110,6 +110,7 @@ docker/
     │   ├── update-stale-pr.sh               # one-shot merge origin/main + normal push (NO rebase/force) for a PR whose base moved (BEHIND/CONFLICTING);auto-resolve worktree by branch via $WORKSPACE_DIR scan,refs #87/#221
     │   ├── auto-merge-on-green.sh           # auto-merge-on-green skill 的腳本:arm gh pr merge --auto + poll mergeStateStatus(MERGED/BEHIND→update-branch/DIRTY/FAIL/grace),refs #211
     │   ├── serial-merge.sh                  # 同 repo 多 PR 依序落地:逐一 delegate auto-merge-on-green.sh(只 arm 隊首→≤1 armed→CI O(N²)→O(N)),skip-and-continue + summary,refs #235
+    │   ├── prune-merged-worktrees.sh        # 批次清掉「branch 有 MERGED PR」的 worktree + local branch(squash-merge 讓 --is-ancestor 失效,故問 gh);每個 path 自己解析所屬 repo(rev-parse --git-common-dir)後用 git -C <repo> 操作→cwd-independent,--dry-run 走同一套 resolution/validation 只跳過 mutation,refs #260
     │   ├── wait-pr-ci.sh                    # wait-pr-ci skill 的 PR-scoped polling loop（避開 Monitor parser warning）
     │   ├── wait-pr-ci-batch.sh              # 多 repo 多 PR 同一個 Monitor 的 batch 版本（取代 N 個平行 Monitor stream）
     │   ├── wait-tag-ci.sh                   # 同 skill 的 tag/branch-scoped 版本（gh run list --branch <tag>）
