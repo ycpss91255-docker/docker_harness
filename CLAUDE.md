@@ -18,10 +18,18 @@ deployment. All repos under the `ycpss91255-docker` GitHub org.
 
 ## 檔案命名慣例
 
+**The standard name is ours; a suffix marks a local variant.** Ours =
+shipped or generated, replaced on update, not hand-edited per
+instance -- `Dockerfile`, `compose.yaml`, `.env`. Suffixed = the
+user's / operator's, never touched by tooling -- `.env.local`, which
+overrides `.env` and enters the container alongside it.
+`.env.generated` is ours despite the suffix: it is an interpolation
+cache that never enters the container, so the suffix marks a category,
+not ownership. See §1 of the workspace-root `CONTEXT.md`.
+
 - Traditional Chinese README: **`README.zh-TW.md`** (hyphen, not
   underscore)
 - English README: `README.md`
-- Env template: `.env.example` (contains only `IMAGE_NAME=<name>`)
 - Docker Compose: `compose.yaml` (not `docker-compose.yaml`)
 
 ## 目錄結構

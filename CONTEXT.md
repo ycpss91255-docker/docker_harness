@@ -19,9 +19,18 @@ goes in an ADR. New domain knowledge should never land in `CLAUDE.md`
 
 ## 1. Naming & file conventions
 
+命名規則：**標準名字是我們的，後綴標記本機變體。**「我們的」＝隨版本
+出貨或由工具產生、升級時會被取代、不逐台手改（`Dockerfile`、
+`compose.yaml`、`.env`）；帶後綴的屬於使用者／現場操作者，工具不會動它
+（`.env.local`，覆寫 `.env`，兩者都會進容器）。
+
+`.env.generated` 是唯一「我們的卻帶後綴」的情況：它只用來填
+`compose.yaml` 的 `${VAR}`，不會進容器（見 ADR-00000003 與 §3），後綴
+標的是類別而非歸屬。此規則的理由、被否決的替代方案與遷移程序記在
+`ycpss91255-docker/base#868`。
+
 - 繁體中文 README：**`README.zh-TW.md`**（連字號，非底線）
 - 英文 README：`README.md`
-- 環境範本：`.env.example`（只含 `IMAGE_NAME=<name>`）
 - Docker Compose：`compose.yaml`（非 `docker-compose.yaml`）
 
 ## 2. Container architecture
