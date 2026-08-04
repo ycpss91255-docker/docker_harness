@@ -1,7 +1,7 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1050 tests** across
-76 specs under `.claude/test/bats/unit/`. These were the former
+Unit level (ISTQB): one hook or script in isolation. **1057 tests** across
+77 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
 in isolation), not the Smoke *type* (see [smoke.md](smoke.md)).
@@ -1302,7 +1302,7 @@ nothing can stamp it (refs #176 / #208).
 | allows when only doc/ + TEST.md changed since the green marker | multi-doc-only → ALLOW |
 | fail-open: repo with no detectable CI mechanism is silent | no ci.sh/justfile.ci/justfile → SILENT (issue #208) |
 
-### .claude/test/bats/unit/ci_and_stamp_spec.bats (6)
+### .claude/test/bats/unit/ci_and_stamp_spec.bats (10)
 
 Covers `.claude/scripts/ci-and-stamp.sh` (refs #208) — runs a repo's
 full CI mirror and, on green, writes the local-ci-pass marker the gate
@@ -1313,7 +1313,11 @@ check`; root `justfile` + `.base/` → `just build test`;
 root `justfile` without `.base/` → `just test` + `just test lint`;
 none → no stamp + notice; the `.base/` subtree distinguishes a
 downstream consumer from base since both carry a root justfile). The CI
-runner is stubbed via a PATH shim exiting 0/1 (no real docker).
+runner is stubbed via a PATH shim exiting 0/1 (no real docker). Exit
+status and marker presence must agree in both directions (#261): exit 0
+IFF a marker for HEAD is on disk afterwards, so a red run also clears a
+stale marker left by an earlier green on the same sha, and a green run
+that cannot write its marker reports red.
 
 | Test | Scenario |
 |------|----------|
@@ -1323,6 +1327,10 @@ runner is stubbed via a PATH shim exiting 0/1 (no real docker).
 | downstream (root justfile + .base subtree) green -> runs just build test + stamps | downstream detection (#220) |
 | no CI mechanism -> no stamp, exit 0, notice | fail-open passthrough |
 | marker filename is the exact HEAD sha | sha-keyed marker |
+| green run writes exactly one marker | exactly-one attestation (#261) |
+| failing run REMOVES a stale marker for the same HEAD | stale green cleared (#261) |
+| failing run keeps markers belonging to other shas | removal scoped to HEAD (#261) |
+| green run whose marker cannot be written exits non-zero | unrecordable green -> red (#261) |
 
 ### .claude/test/bats/unit/enforce_worktree_for_branch_spec.bats (14)
 
@@ -1762,3 +1770,16 @@ directory or a broken symlink. New in #210; see ADR-00000011.
 | ci.sh exists and is readable | driver present |
 | WORKTREE_MOUNT_FLAGS carries --user and PYTHONDONTWRITEBYTECODE | flags defined (refs #252) |
 | every worktree-mounting docker run routes through WORKTREE_MOUNT_FLAGS | no raw root-mount bypass |
+
+### .claude/test/bats/unit/ci_sh_tool_image_pin_spec.bats (3)
+
+Lexical guard on the third-party tool images `.claude/test/ci.sh` pulls.
+A floating tag makes the gate depend on whatever upstream published last,
+so an upstream release can redden `main` and every open PR with no commit
+here -- hadolint 2.15 did exactly that by adding DL3066. New in #263.
+
+| Test | Scenario |
+|------|----------|
+| HADOLINT_IMAGE pins an explicit hadolint version | `hadolint/hadolint:vX.Y.Z-*`, never `latest` |
+| no externally pulled tool image in ci.sh uses a floating tag | generalises to any future registry image |
+| the HADOLINT_IMAGE pin carries a comment explaining why it is pinned | the pin survives a "tidy-up" bump |

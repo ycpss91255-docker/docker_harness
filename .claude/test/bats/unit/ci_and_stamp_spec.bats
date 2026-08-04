@@ -14,6 +14,12 @@
 # ${STUB_RC:-0} (ci-and-stamp invokes it directly); the base/downstream
 # `just` runner is a PATH shim exiting ${STUB_RC:-0}. No real docker /
 # just is needed.
+#
+# The marker is a green light another tool consumes, so exit status and
+# marker presence must be mutually exclusive by construction: exit 0 IFF
+# a marker for HEAD exists afterwards. A red run therefore also has to
+# REMOVE a marker an earlier green run left on the same sha, and a green
+# run that cannot write its marker has to report red.
 
 load '../lib/test_helper'
 
@@ -39,6 +45,14 @@ stub_cmd() {
 }
 
 marker() { echo "${REPO}/.claude/state/local-ci-pass/$(git -C "${REPO}" rev-parse HEAD).ok"; }
+
+# stub_harness_ci — install the docker_harness-style runner (a
+# `.claude/test/ci.sh` exiting ${STUB_RC:-0}) in the fixture repo.
+stub_harness_ci() {
+  mkdir -p "${REPO}/.claude/test"
+  printf '#!/usr/bin/env bash\nexit ${STUB_RC:-0}\n' > "${REPO}/.claude/test/ci.sh"
+  chmod +x "${REPO}/.claude/test/ci.sh"
+}
 
 @test "docker_harness-style (.claude/test/ci.sh) green -> stamps marker" {
   mkdir -p "${REPO}/.claude/test"
@@ -90,4 +104,46 @@ marker() { echo "${REPO}/.claude/state/local-ci-pass/$(git -C "${REPO}" rev-pars
   PATH="${STUB_DIR}:${PATH}" STUB_RC=0 run "$(script ci-and-stamp.sh)" "${REPO}"
   assert_success
   [[ -f "${REPO}/.claude/state/local-ci-pass/${sha}.ok" ]] || { echo "marker not keyed by HEAD sha"; return 1; }
+}
+
+@test "green run writes exactly one marker" {
+  stub_harness_ci
+  PATH="${STUB_DIR}:${PATH}" STUB_RC=0 run "$(script ci-and-stamp.sh)" "${REPO}"
+  assert_success
+  local n
+  n="$(find "${REPO}/.claude/state/local-ci-pass" -name '*.ok' | wc -l)"
+  [[ "${n}" -eq 1 ]] || { echo "expected exactly 1 marker, found ${n}"; return 1; }
+}
+
+@test "failing run REMOVES a stale marker for the same HEAD" {
+  stub_harness_ci
+  mkdir -p "${REPO}/.claude/state/local-ci-pass"
+  : > "$(marker)"
+  PATH="${STUB_DIR}:${PATH}" STUB_RC=1 run "$(script ci-and-stamp.sh)" "${REPO}"
+  assert_failure
+  [[ ! -f "$(marker)" ]] || { echo "stale green survived a red run on the same sha"; return 1; }
+}
+
+@test "failing run keeps markers belonging to other shas" {
+  stub_harness_ci
+  mkdir -p "${REPO}/.claude/state/local-ci-pass"
+  local other="${REPO}/.claude/state/local-ci-pass/0000000000000000000000000000000000000000.ok"
+  : > "${other}"
+  : > "$(marker)"
+  PATH="${STUB_DIR}:${PATH}" STUB_RC=1 run "$(script ci-and-stamp.sh)" "${REPO}"
+  assert_failure
+  [[ ! -f "$(marker)" ]] || { echo "HEAD marker should be removed"; return 1; }
+  [[ -f "${other}" ]] || { echo "unrelated sha marker should be left alone"; return 1; }
+}
+
+@test "green run whose marker cannot be written exits non-zero" {
+  stub_harness_ci
+  # A regular file where the marker directory belongs makes both the
+  # mkdir -p and the marker write fail.
+  mkdir -p "${REPO}/.claude/state"
+  : > "${REPO}/.claude/state/local-ci-pass"
+  PATH="${STUB_DIR}:${PATH}" STUB_RC=0 run "$(script ci-and-stamp.sh)" "${REPO}"
+  assert_failure
+  assert_output --partial "marker_write_failed"
+  [[ ! -f "$(marker)" ]] || { echo "no marker can exist when the write failed"; return 1; }
 }
