@@ -7,6 +7,33 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **`plan-and-build` skill: planner / implementer role separation (#267).**
+  The session the user talks to plans; implementation is delegated to a
+  Workflow-spawned agent working in an isolated worktree under `/tdd`. The
+  skill is a thin sequencer over existing artifacts (`grill-me` ->
+  `to-issues` -> `tdd` -> `/pr` -> `auto-merge-on-green` -> `/verify`), so
+  its content is the handoff contract rather than new machinery. Two probes
+  established the ground truth it records: a Workflow-spawned agent commits,
+  runs docker and runs `just` with zero permission prompts and zero sandbox
+  denials, and reaches `1..1065` / 1065 ok on the real gate inside a worktree
+  in 96 s -- the per-command prompting previously recorded for Agent-tool
+  subagents does not apply to it. The contract fixes three things that bite
+  otherwise: the planner hands over seams + gate + the FIRST slice only (a
+  complete behaviour list would be the horizontal-slicing anti-pattern
+  `/tdd` warns about); the `tdd` skill is unreachable via a worktree path
+  (machine-local third-party install, ADR-00000011) so dispatch prompts must
+  use the workspace path; and every run is bounded by cycle count and wall
+  clock, because a gate proves tests pass, not that the implementation is
+  right. Merge stays human-gated: arming auto-merge is opt-in per run.
+  Human-intent gates (`enforce_worktree_for_branch` /
+  `enforce_batch_via_script` / `enforce_wrapper_first_upgrade`) are lifted by
+  an ack file any agent could write, and no signal separates an autonomous
+  agent from the interactive session (`CLAUDE_CODE_CHILD_SESSION=1` and
+  `session_id` are identical in both), so the separation is enforced by scope
+  instead: the implementer edits, gates and commits inside a worktree the
+  planner already made, and never branches, batches, upgrades `.base`, or
+  opens PRs. `skills_canonical_layout_spec.bats` additionally picks up
+  `auto-merge-on-green`, which the list had drifted past.
 - **ISTQB-aligned test taxonomy + a real four-level pyramid (#237,
   ADR-00000013).** Adopt the three-axis model base uses (levels: unit ->
   integration -> system -> acceptance; types: smoke / e2e / regression;
