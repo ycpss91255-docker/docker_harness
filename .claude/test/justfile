@@ -43,7 +43,11 @@ ceiling-check:
 log-helper-check:
     {{_driver}} log-helper-check
 
-# Full CI gate: lint + hadolint + test + tree-check + ceiling-check + log-helper-check.
+# Assert doc/test/*.md matches the spec tree (host).
+doc-count-check:
+    {{_driver}} doc-count-check
+
+# Full CI gate: lint + hadolint + test + tree/ceiling/log-helper/doc-count checks.
 check:
     {{_driver}} check
 
