@@ -128,6 +128,7 @@ docker/
     │   ├── new-adr.sh                         # /adr 的實作:auto-number 8 位數補零,從 doc/adr/[0-9]*.md 掃 max+1,渲染 5-section 模板 (Date/Status/Context/Decision/Alternatives/Consequences),refs #97
     │   ├── check-log-helper-usage.sh           # CI lint：scan .claude/scripts/*.sh 偵測 bare printf|echo（usage() 內 + log-allow:script/start..end allowlist marker 外）為違反 lib/log.sh adoption,refs #148 M5
     │   ├── _instinct_parser.py               # instinct-query.sh 用的 stdlib-only YAML parser helper (避免 PyYAML dep 在 Alpine test image 缺失)
+    │   ├── sync-doc-test-counts.sh           # doc/test/*.md generator：per-spec `### <path> (N)` heading、per-test catalogue rows、per-level `**N tests**` 與 TEST.md 索引全部從 spec tree 推導；`--check` 用同一條 code path 產生 scratch copy 再 diff（ci.sh doc-count-check / system spec 的 gate),取代手抄目錄,refs #265
     │   ├── sync-org-repo-settings.sh         # idempotent org-wide repo settings sync (fork PR approval / merge defaults / branch protection); supports --dry-run + --repo <name>; private repos skip fork-PR + protection per API constraints
     │   └── lib/
     │       ├── checkpoint.sh                  # /tmp checkpoint protocol helper — write_checkpoint + is_acked,Tier 2 E2 hook 共享 deny/ack 契約,refs ADR-00000002 / #117
@@ -196,7 +197,7 @@ docker/
     ├── test/                           # docker_harness 自己的 hook 測試 infra（與下游 repo 的 Dockerfile 無關）
     │   ├── Dockerfile                  # bats 1.11 + shellcheck on Alpine（COPY .claude/hooks/ + .claude/scripts/ + .claude/test/）
     │   ├── bats/                       # ISTQB 測試 specs — unit/integration/system/acceptance + lib/test_helper.bash（見 doc/test/,ADR-00000013）
-    │   ├── ci.sh                       # CI runner driver — both CI (.github/workflows/test.yaml) 與 local justfile 都呼叫；targets build / test / lint / hadolint / check / tree-check / ceiling-check / log-helper-check / clean
+    │   ├── ci.sh                       # CI runner driver — both CI (.github/workflows/test.yaml) 與 local justfile 都呼叫；targets build / test / lint / hadolint / check / tree-check / ceiling-check / log-helper-check / doc-count-check / clean
     │   └── justfile                    # local just wrapper：just -f .claude/test/justfile <target> 轉呼 ci.sh <target>
     ├── settings.json                   # hooks 註冊 + permissions + sandbox（**唯一一份,無 settings.local.json**）
     └── instincts.yaml                  # 結構化 repo conventions (#95 pilot) — hooks/skills/commands 用 `instinct-query.sh` 查詢,取代 CLAUDE.md prose grep
