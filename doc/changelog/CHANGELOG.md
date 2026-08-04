@@ -113,6 +113,22 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `.claude/test/bats/unit/ci_sh_tool_image_pin_spec.bats` (3 tests) is a
   lexical guard against floating any externally pulled tool image back to
   `latest`.
+- **`ci-and-stamp.sh` writes the local-CI-pass marker if and only if the
+  mirror was green (fixes #261).** A run was observed exiting 1 while the
+  marker `.claude/state/local-ci-pass/<HEAD>.ok` had been written during
+  that same run -- the caller sees red, the filesystem says green, and
+  the next `gh pr create` sails through `enforce_local_full_ci_before_pr.sh`
+  on an unverified HEAD, which is exactly the GitHub round-trip the gate
+  (#176 / #208) exists to prevent. Detection, running and stamping are now
+  separate functions (`detect_kind` / `run_ci` / `stamp` / `unstamp`), the
+  mirror yields a single verdict, and the script branches on it exactly
+  once, so the two states are mutually exclusive by construction rather
+  than by statement ordering. A red run additionally REMOVES a marker an
+  earlier green left on the same sha (a stale green must not outlive a
+  later red on the same HEAD), scoped to that sha alone; and `stamp` no
+  longer swallows a failed `mkdir` / write -- an unrecordable green exits
+  1 with `marker_write_failed` instead of reporting a pass with no
+  attestation. 4 regression spec cases.
 - **`enforce_gh_body_file.sh` scopes all detection to the gh command's
   own segment (fixes #255).** The `--body` / `--comment` / `--body-file`
   / `--label` and parser-fallback checks matched against the whole

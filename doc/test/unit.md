@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1053 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1057 tests** across
 77 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -1302,7 +1302,7 @@ nothing can stamp it (refs #176 / #208).
 | allows when only doc/ + TEST.md changed since the green marker | multi-doc-only → ALLOW |
 | fail-open: repo with no detectable CI mechanism is silent | no ci.sh/justfile.ci/justfile → SILENT (issue #208) |
 
-### .claude/test/bats/unit/ci_and_stamp_spec.bats (6)
+### .claude/test/bats/unit/ci_and_stamp_spec.bats (10)
 
 Covers `.claude/scripts/ci-and-stamp.sh` (refs #208) — runs a repo's
 full CI mirror and, on green, writes the local-ci-pass marker the gate
@@ -1313,7 +1313,11 @@ check`; root `justfile` + `.base/` → `just build test`;
 root `justfile` without `.base/` → `just test` + `just test lint`;
 none → no stamp + notice; the `.base/` subtree distinguishes a
 downstream consumer from base since both carry a root justfile). The CI
-runner is stubbed via a PATH shim exiting 0/1 (no real docker).
+runner is stubbed via a PATH shim exiting 0/1 (no real docker). Exit
+status and marker presence must agree in both directions (#261): exit 0
+IFF a marker for HEAD is on disk afterwards, so a red run also clears a
+stale marker left by an earlier green on the same sha, and a green run
+that cannot write its marker reports red.
 
 | Test | Scenario |
 |------|----------|
@@ -1323,6 +1327,10 @@ runner is stubbed via a PATH shim exiting 0/1 (no real docker).
 | downstream (root justfile + .base subtree) green -> runs just build test + stamps | downstream detection (#220) |
 | no CI mechanism -> no stamp, exit 0, notice | fail-open passthrough |
 | marker filename is the exact HEAD sha | sha-keyed marker |
+| green run writes exactly one marker | exactly-one attestation (#261) |
+| failing run REMOVES a stale marker for the same HEAD | stale green cleared (#261) |
+| failing run keeps markers belonging to other shas | removal scoped to HEAD (#261) |
+| green run whose marker cannot be written exits non-zero | unrecordable green -> red (#261) |
 
 ### .claude/test/bats/unit/enforce_worktree_for_branch_spec.bats (14)
 

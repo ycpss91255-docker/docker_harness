@@ -98,7 +98,7 @@ docker/
     │   ├── batch-gitignore-add-line.sh      # 通用 .gitignore 追加任意行的 17 repo fanout（PR #23）
     │   ├── batch-mutation-pr.sh             # 通用跨 repo fanout 引擎：--mutation <script> 套到每個 repo,worktree->mutate->commit->push->PR;取代 one-shot batch-*.sh sprawl(refs #169,配 [[batch-mutation-pr]] skill)
     │   ├── batch-line-edit.sh               # batch-mutation-pr 的第一個 preset:--file/--line 跨 repo append-line-if-missing,delegate 給引擎(refs #169)
-    │   ├── ci-and-stamp.sh                  # 開 PR 前跑該 repo 的完整 CI mirror(auto-detect: .claude/test/ci.sh→ci.sh check / justfile.ci→just -f justfile.ci test+lint / justfile→./build.sh test),綠燈才寫 .claude/state/local-ci-pass/<sha>.ok marker;集中 marker-write 讓 enforce_local_full_ci_before_pr 對所有 repo 可滿足(refs #208/#176)
+    │   ├── ci-and-stamp.sh                  # 開 PR 前跑該 repo 的完整 CI mirror(auto-detect: .claude/test/ci.sh→ci.sh check / justfile+.base/→just build test / justfile→just test+just test lint),exit 0 ⟺ 全綠且 .claude/state/local-ci-pass/<sha>.ok marker 存在(單一 verdict 只 branch 一次;紅燈會刪同 sha 的 stale marker,寫不出 marker 就回非 0,refs #261);集中 marker-write 讓 enforce_local_full_ci_before_pr 對所有 repo 可滿足(refs #208/#176)
     │   ├── batch-pr-merge.sh                # 批次 squash-merge 多個 <repo>:<pr>（接 short / full repo 名都可）
     │   ├── batch-pr-close.sh                # 批次 close 多個 <repo>:<pr>，--reason 必填（superseded-by 場景，例如 hotfix 後重 fanout 取代既有批次 PR）
     │   ├── check-template-versions.sh       # HTTPS curl 13 repo `.base/.version` 對齊檢查（release 後驗證）
