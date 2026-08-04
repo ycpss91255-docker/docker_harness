@@ -93,6 +93,26 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ci-and-stamp.sh`.
 
 ### Fixed
+- **`.claude/test/ci.sh` pins the hadolint image; DL3066 settled in
+  `.hadolint.yaml` (fixes #263).** `HADOLINT_IMAGE` floated on
+  `hadolint/hadolint:latest-alpine`, so hadolint 2.15's new `DL3066`
+  ("Non-numeric user-id may not be resolvable by host system") turned
+  `main` -- and every open PR at once -- red on `.claude/test/Dockerfile`'s
+  long-standing `USER root`, with no commit in this repo and the failure
+  surfacing attached to whichever PR happened to be in flight. Pinned to
+  `hadolint/hadolint:v2.15.1-alpine` with an in-line comment saying why
+  the pin exists, matching base's `rhysd/actionlint:1.7.7` convention, so
+  a rule set only ever changes on purpose, in its own commit. DL3066 is
+  then ignored explicitly in `.hadolint.yaml` next to the existing DL3002
+  / DL3018 entries rather than by lowering the global `--failure-threshold`
+  (which would mask unrelated findings): `root` is the one user name every
+  host resolves without a passwd lookup (uid 0), this is a test-runner
+  image whose runtime user `ci.sh` overrides anyway
+  (`--user "$(id -u):$(id -g)"`), and `USER root` states the intent that
+  `USER 0` only encodes. New
+  `.claude/test/bats/unit/ci_sh_tool_image_pin_spec.bats` (3 tests) is a
+  lexical guard against floating any externally pulled tool image back to
+  `latest`.
 - **`enforce_gh_body_file.sh` scopes all detection to the gh command's
   own segment (fixes #255).** The `--body` / `--comment` / `--body-file`
   / `--label` and parser-fallback checks matched against the whole

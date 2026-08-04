@@ -27,7 +27,15 @@
 set -euo pipefail
 
 readonly IMAGE='docker_harness-test:local'
-readonly HADOLINT_IMAGE='hadolint/hadolint:latest-alpine'
+
+# Pinned deliberately -- do NOT float this back to `latest-alpine` as a
+# tidy-up. hadolint is a linter whose rule set grows between releases, so a
+# floating tag lets an upstream publish turn `main` (and every open PR at
+# once) red with no commit in this repo: 2.15 added DL3066 and did exactly
+# that, and the failure surfaces attached to whatever PR is in flight
+# (refs #263). Same convention as base's `rhysd/actionlint:1.7.7`. Bump on
+# purpose, in its own commit, after re-running `ci.sh hadolint`.
+readonly HADOLINT_IMAGE='hadolint/hadolint:v2.15.1-alpine'
 
 # Flags for the docker runs that bind-mount the live worktree read-write.
 # Without them the container runs as root and CPython writes bytecode caches

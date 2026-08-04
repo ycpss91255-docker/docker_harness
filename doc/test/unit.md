@@ -1,7 +1,7 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1050 tests** across
-76 specs under `.claude/test/bats/unit/`. These were the former
+Unit level (ISTQB): one hook or script in isolation. **1053 tests** across
+77 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
 in isolation), not the Smoke *type* (see [smoke.md](smoke.md)).
@@ -1762,3 +1762,16 @@ directory or a broken symlink. New in #210; see ADR-00000011.
 | ci.sh exists and is readable | driver present |
 | WORKTREE_MOUNT_FLAGS carries --user and PYTHONDONTWRITEBYTECODE | flags defined (refs #252) |
 | every worktree-mounting docker run routes through WORKTREE_MOUNT_FLAGS | no raw root-mount bypass |
+
+### .claude/test/bats/unit/ci_sh_tool_image_pin_spec.bats (3)
+
+Lexical guard on the third-party tool images `.claude/test/ci.sh` pulls.
+A floating tag makes the gate depend on whatever upstream published last,
+so an upstream release can redden `main` and every open PR with no commit
+here -- hadolint 2.15 did exactly that by adding DL3066. New in #263.
+
+| Test | Scenario |
+|------|----------|
+| HADOLINT_IMAGE pins an explicit hadolint version | `hadolint/hadolint:vX.Y.Z-*`, never `latest` |
+| no externally pulled tool image in ci.sh uses a floating tag | generalises to any future registry image |
+| the HADOLINT_IMAGE pin carries a comment explaining why it is pinned | the pin survives a "tidy-up" bump |
