@@ -7,6 +7,21 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **`doc/test/*.md` is generated, not hand-maintained (closes #265).** New
+  `.claude/scripts/sync-doc-test-counts.sh` derives every figure in the test
+  catalogs from the spec tree: the per-spec `### <path> (N)` headings, the
+  per-test `| Test | Scenario |` rows, the per-level `**N tests**` totals,
+  and TEST.md's grand total / index table / `(N hooks + N helper scripts)`
+  tallies. Descriptions are preserved verbatim (rows are keyed on the test
+  name), a deleted test loses its row, a deleted spec loses its whole
+  section, a rename is delete-plus-add with a `-` placeholder, and rows
+  follow spec-file order so reordering a spec produces a matching doc diff.
+  `--check` is the same code path (regenerate into a scratch copy, then
+  diff), so the gate cannot disagree with the generator. Wired as `ci.sh
+  doc-count-check` / `just -f .claude/test/justfile doc-count-check`, into
+  `ci.sh check`, as a named step in `.github/workflows/test.yaml`, and as a
+  System spec (`repo_self_audit_spec.bats`) so it gates a PR through two
+  independent paths rather than living in a local-only phase.
 - **ISTQB-aligned test taxonomy + a real four-level pyramid (#237,
   ADR-00000013).** Adopt the three-axis model base uses (levels: unit ->
   integration -> system -> acceptance; types: smoke / e2e / regression;
@@ -93,6 +108,17 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ci-and-stamp.sh`.
 
 ### Fixed
+- **The two existing TEST.md drift checkers matched nothing in this repo
+  (refs #265).** `check_test_md_drift.sh` and `verify.sh`'s `test-md` phase
+  both anchored their heading pattern on `test/...` (optionally `.base/`),
+  but the specs moved to `.claude/test/bats/<level>/` with the ISTQB split
+  (#237) -- so both reported clean while the catalogs rotted. Both now
+  accept the `.claude/` prefix. Backfilled the drift this hid: two stale
+  counts (`check_test_md_drift_spec.bats` 15 -> 17,
+  `batch_pr_merge_spec.bats` 14 -> 18), one section for a spec file that no
+  longer exists (`batch_template_upgrade_spec.bats`), and four specs that
+  were never listed (`batch_base_upgrade`, `remind_topics_yaml_on_new_repo`,
+  `sync_org_repo_settings`, `warn_structured_data_text_tools`).
 - **`.claude/test/ci.sh` pins the hadolint image; DL3066 settled in
   `.hadolint.yaml` (fixes #263).** `HADOLINT_IMAGE` floated on
   `hadolint/hadolint:latest-alpine`, so hadolint 2.15's new `DL3066`
