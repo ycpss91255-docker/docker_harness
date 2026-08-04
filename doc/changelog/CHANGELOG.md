@@ -152,6 +152,17 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   was until now untracked in the workspace root; it lands here with 15
   unit specs driven against throwaway git repos under
   `BATS_TEST_TMPDIR`.
+- **Shared `CLAUDE.md` relative `CONTEXT.md` links no longer misresolve
+  under the `base/` symlink (fixes #258).** The `## 目錄結構` and
+  `## 標準容器結構` rows linked `[CONTEXT.md §2.1](CONTEXT.md)` /
+  `[CONTEXT.md §2.2](CONTEXT.md)`; a relative link cannot be correct from
+  both the workspace root and a repo that symlinks the file (from `base/`
+  it resolved to `base/CONTEXT.md`, a different domain doc with no
+  `§2.1/§2.2`), which once drove a doc-align review agent to misdiagnose
+  the sections as dangling. Reworded to non-link, vantage-independent
+  prose ("§2.1 of the workspace-root `CONTEXT.md`") so the reference is
+  unambiguous wherever the file is read. No code, lint, or on-disk file
+  changed.
 - **`enforce_gh_body_file.sh` scopes all detection to the gh command's
   own segment (fixes #255).** The `--body` / `--comment` / `--body-file`
   / `--label` and parser-fallback checks matched against the whole

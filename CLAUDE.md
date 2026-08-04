@@ -26,8 +26,8 @@ deployment. All repos under the `ycpss91255-docker` GitHub org.
 
 ## 目錄結構
 
-See [CONTEXT.md §2.1](CONTEXT.md) for the full directory tree
-(`docker/` top-level + `.claude/` internals). The
+See §2.1 of the workspace-root `CONTEXT.md` for the full directory
+tree (`docker/` top-level + `.claude/` internals). The
 `check-claude-md-tree.sh` lint diffs that listing against the
 filesystem.
 
@@ -58,9 +58,9 @@ downstream not yet fanned out may still use `make <verb>`.
 
 ## 標準容器結構
 
-See [CONTEXT.md §2.2](CONTEXT.md) for the per-repo file layout
-(Dockerfile / compose.yaml / wrapper symlinks / `.base/` subtree /
-`doc/` / `test/bats/` / etc.).
+See §2.2 of the workspace-root `CONTEXT.md` for the per-repo file
+layout (Dockerfile / compose.yaml / wrapper symlinks / `.base/`
+subtree / `doc/` / `test/bats/` / etc.).
 
 ## Git 設定
 
