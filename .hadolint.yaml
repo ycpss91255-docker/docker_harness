@@ -6,3 +6,4 @@
 ignored:
   - DL3002  # Last USER should not be root  — test image stays as root
   - DL3018  # Pin versions in apk add       — Alpine apk meta-versions are stable enough for a test image
+  - DL3066  # Non-numeric user-id           — `USER root` is kept over `USER 0`: root is the one name every host resolves (uid 0), and ci.sh overrides the runtime user anyway (refs #263)
