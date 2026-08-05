@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1100 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1106 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -1921,3 +1921,14 @@ escaping, and the read-only `--check` gate.
 | regeneration is idempotent | second run is a no-op |
 | a Description column header is accepted as well as Scenario | both catalog column headers supported |
 | a one-line @test stanza is catalogued like a multi-line one | row set matches the `grep -c '^@test'` count for both stanza shapes |
+
+### .claude/test/bats/unit/ci_required_jobs_spec.bats (6)
+
+| Test | Scenario |
+|------|----------|
+| ci_required_jobs derives ci-rollup's needs from the workflow | - |
+| ci_required_jobs is silent + non-zero when the workflow has no rollup | - |
+| base stamp classifies EVERY job ci-rollup requires (refs #272) | - |
+| base stamp records the deliberately-excluded jobs with a reason | - |
+| a required job in neither list aborts the stamp instead of passing | - |
+| base mirror runs actionlint at the pin the workflow declares | - |
