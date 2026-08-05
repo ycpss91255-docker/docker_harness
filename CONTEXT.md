@@ -107,7 +107,7 @@ docker/
     │   ├── batch-gitignore-add-line.sh      # 通用 .gitignore 追加任意行的 17 repo fanout（PR #23）
     │   ├── batch-mutation-pr.sh             # 通用跨 repo fanout 引擎：--mutation <script> 套到每個 repo,worktree->mutate->commit->push->PR;取代 one-shot batch-*.sh sprawl(refs #169,配 [[batch-mutation-pr]] skill)
     │   ├── batch-line-edit.sh               # batch-mutation-pr 的第一個 preset:--file/--line 跨 repo append-line-if-missing,delegate 給引擎(refs #169)
-    │   ├── ci-and-stamp.sh                  # 開 PR 前跑該 repo 的完整 CI mirror(auto-detect: .claude/test/ci.sh→ci.sh check / justfile+.base/→just build test / justfile→just test+just test lint),exit 0 ⟺ 全綠且 .claude/state/local-ci-pass/<sha>.ok marker 存在(單一 verdict 只 branch 一次;紅燈會刪同 sha 的 stale marker,寫不出 marker 就回非 0,refs #261);集中 marker-write 讓 enforce_local_full_ci_before_pr 對所有 repo 可滿足(refs #208/#176)
+    │   ├── ci-and-stamp.sh                  # 開 PR 前跑該 repo 的 local CI mirror(auto-detect: .claude/test/ci.sh→ci.sh check / justfile+.base/→just build test / justfile→actionlint + just test + just test lint),exit 0 ⟺ 全綠且 .claude/state/local-ci-pass/<sha>.ok marker 存在(單一 verdict 只 branch 一次;紅燈會刪同 sha 的 stale marker,寫不出 marker 就回非 0,refs #261);集中 marker-write 讓 enforce_local_full_ci_before_pr 對所有 repo 可滿足(refs #208/#176)。required set 由 lib/ci-required-jobs.sh 從 repo 自己的 workflow 推導(base=ci-rollup needs、docker_harness=workflow 的 ci.sh steps),每個 required job 必須被歸成 attested 或 excluded(附理由),兩份清單寫進 marker 並在 stamp 時印出;歸不了類就 exit 3 不跑不 stamp — marker 因此是「本機跑過這些」而非「GH CI 會過」,refs #272
     │   ├── batch-pr-merge.sh                # 批次 squash-merge 多個 <repo>:<pr>（接 short / full repo 名都可）
     │   ├── batch-pr-close.sh                # 批次 close 多個 <repo>:<pr>，--reason 必填（superseded-by 場景，例如 hotfix 後重 fanout 取代既有批次 PR）
     │   ├── check-template-versions.sh       # HTTPS curl 13 repo `.base/.version` 對齊檢查（release 後驗證）
@@ -143,7 +143,8 @@ docker/
     │       ├── checkpoint.sh                  # /tmp checkpoint protocol helper — write_checkpoint + is_acked,Tier 2 E2 hook 共享 deny/ack 契約,refs ADR-00000002 / #117
     │       ├── log.sh                          # OTel-aligned 5-level JSON logger; mirror of ycpss91255-docker/base@v0.37.0 (script/docker/lib/log.sh),refs base#423 / base#438 / #148
     │       ├── log-events.txt                 # registered body enum for _log_*; unregistered body 觸發 fatal exit
-    │       └── log.lnav-format.json           # lnav format file for the JSON logger output
+    │       ├── log.lnav-format.json           # lnav format file for the JSON logger output
+    │       └── ci-required-jobs.sh             # 從 repo 自己的 workflow 推導「CI 到底要求什麼」的純讀函式庫:ci_required_jobs(ci-rollup needs,flow/block 兩種 YAML seq)、ci_ci_sh_targets / ci_check_targets(docker_harness 兩邊 target 集合)、ci_actionlint_image / ci_actionlint_ignores(pin + 抑制規則);ci-and-stamp.sh 用它把 marker 的宣稱釘在 workflow 上而非手抄表,refs #272
     ├── memory/               # Claude Code per-project memory（auto-loaded via symlink）
     │   ├── MEMORY.md         # 入口索引(被 Claude Code 自動讀進 system prompt 開頭)
     │   ├── feedback_*.md     # 個別 feedback / workflow rule（每檔有 name + description + type frontmatter）

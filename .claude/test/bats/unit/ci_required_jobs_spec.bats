@@ -33,9 +33,12 @@ teardown() {
 }
 
 # stub_cmd <name> -- PATH shim exiting ${STUB_RC:-0}, recording its argv.
+# The log path is interpolated at GENERATION time: a literal `$1` inside the
+# generated script would be the shim's own first argument at run time
+# (`docker run ...` -> `run.argv`), not the command's name.
 stub_cmd() {
-  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "%s/$1.argv"\nexit ${STUB_RC:-0}\n' \
-    "${STUB_DIR}" > "${STUB_DIR}/$1"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "%s"\nexit ${STUB_RC:-0}\n' \
+    "${STUB_DIR}/$1.argv" > "${STUB_DIR}/$1"
   chmod +x "${STUB_DIR}/$1"
 }
 

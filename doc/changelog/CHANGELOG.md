@@ -6,6 +6,39 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **the local-CI marker states what it ran, and derives what it owes, from
+  `ci-rollup` itself (refs #272).** `enforce_local_full_ci_before_pr.sh`
+  denies `gh pr create` until `.claude/state/local-ci-pass/<sha>.ok` exists,
+  and `ci-and-stamp.sh` claimed that marker attested *"GH CI will pass"*. For
+  a `base` checkout it ran `just test && just test lint`; `ci-rollup`'s
+  `needs:` lists thirteen jobs, and nothing compared the two -- which is how
+  one PR went red three times on checks the marker had already blessed, and
+  why the `COVERAGE_MIN` 50 -> 80 bump landed on a gate the marker did not
+  model at all. The required set is now **derived from the repo's own
+  workflow on every run** (new `lib/ci-required-jobs.sh`: `ci-rollup`'s
+  `needs:` for base, the workflow's enumerated `ci.sh` steps for
+  docker_harness), every derived job is classified `attested` or `excluded`
+  **with a reason**, both lists are written into the marker and printed at
+  stamp time, and a required job in neither list exits 3 without running or
+  stamping anything -- the `lint-static` completeness-guard shape, so a new
+  required job fails here instead of on someone's PR. `actionlint` moved from
+  excluded to attested (it is one container, run at the pin and with the
+  `-ignore` suppressions read out of the workflow, so a CI bump cannot leave
+  the mirror behind); `classify`, `coverage`, `coverage-gate`, `acceptance`,
+  `system` and `worker-selftest` are excluded on the record. The hook's deny
+  message says the same thing, so "stamped" stops reading as "CI will pass".
+
+### Fixed
+- **three `ci-and-stamp.sh` error paths printed a logger complaint instead of
+  their diagnostic (refs #272).** `marker_write_failed`,
+  `stale_marker_removed` and `stale_marker_removal_failed` were never added to
+  `lib/log-events.txt`, and an unregistered body makes `_log_dispatch` print
+  `FATAL: unregistered log body` and return 1 instead of emitting the record --
+  so the "green but could not write the marker" and "stale marker removed"
+  cases reported nothing usable at exactly the moment somebody needed to know
+  why the stamp disagreed with the run. Registered.
+
 ### Added
 - **`doc/test/*.md` is generated, not hand-maintained (closes #265).** New
   `.claude/scripts/sync-doc-test-counts.sh` derives every figure in the test

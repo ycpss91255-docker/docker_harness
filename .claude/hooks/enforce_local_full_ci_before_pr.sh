@@ -110,7 +110,7 @@ main() {
   fi
 
   # 4. Deny.
-  deny "Local CI has not passed on HEAD ${short}. Run \`.claude/scripts/ci-and-stamp.sh\` from the repo (it auto-detects the repo's CI -- make / just / build.sh -- runs the full mirror, and writes ${MARKER_SUBDIR}/<sha>.ok on green). Then re-open the PR. If you have a reason to skip (and accept the GH CI round-trip risk), override for this exact HEAD: LOCAL_CI_ACK=${head} gh pr create ... (refs #176 / #208)."
+  deny "Local CI has not passed on HEAD ${short}. Run \`.claude/scripts/ci-and-stamp.sh\` from the repo (it auto-detects the repo's CI -- ci.sh / just -- runs the mirror, and writes ${MARKER_SUBDIR}/<sha>.ok on green). Then re-open the PR. NOTE: the marker attests the part of the required set that runs locally, NOT that GH CI will pass -- it names the required jobs the mirror deliberately skips (kcov coverage, the coverage floor, the two-arch acceptance matrix, the system gate, worker-selftest), and ci-and-stamp prints them at stamp time (refs #272). If you have a reason to skip (and accept the GH CI round-trip risk), override for this exact HEAD: LOCAL_CI_ACK=${head} gh pr create ... (refs #176 / #208)."
   return 0
 }
 
