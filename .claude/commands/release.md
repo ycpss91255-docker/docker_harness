@@ -15,12 +15,11 @@ Parse the argument for both VERSION and TARGET:
   - `MAJOR.MINOR.0-rcN` — explicit Release Candidate.
   - User can override via context — if the argument explicitly includes `-rcN`, honour it.
 
-- **Target repo(s)**:
-  - `env` — ros_distro, ros2_distro
-  - `agent` — ai_agent, claude_code, gemini_cli, codex_cli
-  - `app` — ros1_bridge, urg_node_humble, urg_node_noetic, realsense_ros2, realsense_noetic, sick_humble, sick_noetic
-  - `base` — base repo (its own `.version` line, separate from the rest)
-  - Or specify individual repos
+- **Target repo(s)**: named by their workspace path in
+  `.claude/scripts/lib/roster.tsv`, the one roster (`env/*`, `agent/*`,
+  `app/*` groups; `.claude/scripts/batch-base-upgrade.sh --list-repos`
+  prints the active set). `base` is its own target — it carries a
+  `.version` line the rest do not. Or specify individual repos.
 
 ## 2. Branch + bump
 
@@ -146,12 +145,18 @@ If RC CI (step 4) or tag workflows (step 7) fail:
 
 After tagging `base@vX.Y.Z`:
 
-- Each downstream repo (the 17 in env / agent / app) needs its `.base/`
-  subtree pulled to the new tag.
-- Use `/batch-base-upgrade vX.Y.Z` to mass-upgrade all 17 in one batch
+- Every **active** downstream repo needs its `.base/` subtree pulled to
+  the new tag. Which repos those are is not stated here and must not be
+  retyped anywhere: `.claude/scripts/lib/roster.tsv` is the one roster,
+  and `batch-base-upgrade.sh --list-repos` prints the effective set.
+- Use `/batch-base-upgrade vX.Y.Z` to mass-upgrade them in one batch
   (one PR per downstream repo, parallel CI). The command name keeps
   the `template` prefix for backward compatibility with existing scripts
   / muscle memory; it has always upgraded the `.base/` subtree.
+- Verify with `.claude/scripts/check-template-versions.sh --expect vX.Y.Z`.
+  It reads the SAME roster call, so it covers exactly what the upgrader
+  touched and fails (rather than exiting 0 over an empty list) when the
+  selection is empty (refs #272).
 - This is its own multi-PR workflow — run `/batch-base-upgrade` after
   the base tag's CI is fully green; do not interleave with the release
   itself.

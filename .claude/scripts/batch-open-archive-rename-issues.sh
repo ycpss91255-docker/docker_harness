@@ -50,6 +50,9 @@ readonly DEFAULT_OWNER='ycpss91255-docker'
 readonly TMP_DIR="${TMPDIR:-/tmp}"
 
 # Archive entries: <repo_basename>|<reason_short>
+# roster-exempt: these two tables are the archive / rename PROPOSAL -- the
+# per-repo reason text of a one-time issue-opening run. The roster records
+# the resulting lifecycle state; this records what was proposed and why.
 readonly ARCHIVE_REPOS=(
   'ai_agent|no concrete container plan'
   'claude_code|no concrete container plan'

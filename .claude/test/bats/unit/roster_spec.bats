@@ -91,21 +91,28 @@ roster_lib() { echo "${SCRIPTS_DIR}/lib/roster.sh"; }
   assert_output 'call-docker-build / docker-build'
 }
 
-@test "one roster: no other tracked file declares its own downstream list" {
-  # The divergence detector. `realsense_ros2` is the repo the four copies
-  # disagreed about, so it is the canary: it may appear in the roster and in
-  # prose that points AT the roster, never in a second list a script iterates.
-  local hits
-  hits="$(grep -rlE '^[[:space:]]*#?[[:space:]]*(app|env|agent)/realsense_ros2[[:space:]]*$' \
-            "${SCRIPTS_DIR}" 2>/dev/null || true)"
-  [[ -z "${hits}" ]] \
-    || fail "a script still carries its own roster entry:
-${hits}"
+@test "one roster: a second repo list needs an explicit, reasoned exemption" {
+  # The divergence detector, and the reason it is shaped as an exemption rather
+  # than a ban: the executed one-shot fanouts (`batch-gitignore-fix.sh` and
+  # friends) legitimately keep the list they RAN against -- that is a record,
+  # not a scope, and rewriting it from the roster would rewrite history. Every
+  # such file says so on the line above its array. Everything live reads the
+  # roster, so it has nothing to diverge from.
+  local offenders="" f
+  for f in "${SCRIPTS_DIR}"/*.sh; do
+    grep -qE '^[[:space:]]*(readonly )?[A-Z_]*REPOS=\([^)]*$' "${f}" || continue
+    grep -q '# roster-exempt:' "${f}" && continue
+    offenders+="${f}"$'\n'
+  done
+  [[ -z "${offenders}" ]] || fail "these scripts declare their own repo list with no '# roster-exempt: <why>':
+${offenders}"
+}
 
-  # The `/pr` command's inline `for repo in ...` fan-out list is the fourth
-  # copy; it must point at the script instead of restating the repos.
+@test "one roster: /pr's fan-out step points at the script, not a fourth copy" {
   run grep -nE 'for repo in .*(env|app|agent)/' "${PROJECT_ROOT}/.claude/commands/pr.md"
   assert_failure
+  run grep -c 'batch-base-upgrade.sh' "${PROJECT_ROOT}/.claude/commands/pr.md"
+  assert_success
 }
 
 @test "verifier and upgrader iterate the same list" {

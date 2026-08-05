@@ -56,6 +56,8 @@ readonly BASE_REPO="${ORG}/base"
 readonly BASE_REMOTE="https://github.com/${BASE_REPO}.git"
 readonly DEFAULT_VERSION="v0.25.0"
 
+# roster-exempt: one-shot #263 Phase 6 migration (template/ -> .base subtree),
+# already executed. The list records which repos that wave migrated.
 readonly DEFAULT_REPOS=(
   agent/ai_agent
   agent/claude_code

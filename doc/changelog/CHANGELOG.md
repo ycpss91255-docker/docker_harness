@@ -28,6 +28,46 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the mirror behind); `classify`, `coverage`, `coverage-gate`, `acceptance`,
   `system` and `worker-selftest` are excluded on the record. The hook's deny
   message says the same thing, so "stamped" stops reading as "CI will pass".
+- **one downstream roster, in one file (refs #272).** The list of org repos
+  lived in four places -- `batch-base-upgrade.sh`'s `DEFAULT_REPOS`,
+  `check-template-versions.sh`'s, `sync-org-repo-settings.sh`'s `ALL_REPOS`,
+  and an inline `for repo in ...` in `.claude/commands/pr.md` -- and two of
+  them had already diverged: the upgrader listed `app/realsense_ros2` as
+  active while the verifier had it commented out with a **contradicting**
+  note. So the documented fanout step "verify each downstream main is at the
+  target tag" iterated 2 repos while the upgrader had opened PRs for 3, and
+  `--expect` exited 0 because it only ever loops over its own list -- a
+  verification step that structurally could not fail for the repo most likely
+  to need it. New `lib/roster.tsv` holds one row per org repo with the
+  lifecycle state each consumer needs (`fanout` / `mutation` / `settings` /
+  `check`), and `lib/roster.sh` is its only reader; the upgrader and the
+  verifier now make the *same call*, and `--list-repos` on either prints it.
+  Seven live consumers were converted (adding `batch-mutation-pr.sh`,
+  `batch-gitignore-add-line.sh`, `fix-dockerfile-lint-lib.sh` and
+  `fix-dockerfile-copy-script.sh`, whose own copies had rotted further still:
+  the first defaulted to `realsense_humble` / `realsense_noetic`, renamed away
+  long ago). Executed one-shot fanouts keep their list, which is a record of
+  what they ran against rather than current scope, behind an explicit
+  `# roster-exempt: <why>` marker -- and a spec fails any script that carries
+  a repo list without one.
+
+  The `realsense_ros2` contradiction was resolved on evidence, not by picking
+  a side: its main really does carry `.base/.version`, and the active entry
+  landed deliberately in #199 with #238 updating it again, while
+  `check-template-versions.sh` received neither edit. Active is current. The
+  same probe shows every parked downstream also already carries `.base`, so
+  "pending the template -> .base migration" was stale wherever it appeared;
+  the parked rows now record the reason that is still true (archive pending,
+  rename pending, or -- for `realsense_ros1` -- that the *local* checkout is
+  still `app/realsense_noetic`, which would make an active row skip on
+  missing-local-dir). `sync-org-repo-settings.sh` listing both `base` and
+  `template` turned out to be correct rather than pre-rename residue:
+  `template` is a separate, live GitHub Template repo created after the
+  rename, and the roster says so on its row.
+- **`check-template-versions.sh` fails on an empty selection (refs #272).**
+  Selecting no repos (`--skip` everything, or a roster with nothing active)
+  left the mismatch counter untouched, so `--expect` reported a clean fanout
+  having checked nothing. It now exits 2 and names the roster.
 
 ### Fixed
 - **three `ci-and-stamp.sh` error paths printed a logger complaint instead of

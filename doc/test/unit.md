@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1114 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1115 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -1933,7 +1933,7 @@ escaping, and the read-only `--check` gate.
 | a required job in neither list aborts the stamp instead of passing | - |
 | base mirror runs actionlint at the pin the workflow declares | - |
 
-### .claude/test/bats/unit/roster_spec.bats (8)
+### .claude/test/bats/unit/roster_spec.bats (9)
 
 | Test | Scenario |
 |------|----------|
@@ -1942,6 +1942,7 @@ escaping, and the read-only `--check` gate.
 | roster_fanout_paths parked lists the rest, and the two sets are disjoint | - |
 | roster_settings_repos covers the org, and names both base and template | - |
 | roster_required_check answers per repo, empty for .github | - |
-| one roster: no other tracked file declares its own downstream list | - |
+| one roster: a second repo list needs an explicit, reasoned exemption | - |
+| one roster: /pr's fan-out step points at the script, not a fourth copy | - |
 | verifier and upgrader iterate the same list | - |
 | --expect over an empty selection fails instead of passing vacuously | - |

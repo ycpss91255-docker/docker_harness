@@ -43,9 +43,15 @@ state (which repos are active vs archive-pending vs rename-pending
 vs `.base` migration-pending) lives in two stable sources of truth,
 not duplicated here:
 
-- `.claude/scripts/batch-base-upgrade.sh` `DEFAULT_REPOS` -- the
-  current active batch-upgrade scope (active entries uncommented;
-  pending entries comment-out with rationale).
+- `.claude/scripts/lib/roster.tsv` -- THE roster (refs #272). One row
+  per org repo; the `fanout` column (`active` / `parked` / `n-a`)
+  carries the batch-upgrade scope and each parked row's rationale,
+  `mutation` the generic fanout engine's scope, `settings` the
+  org-settings sync scope, `check` the required status check. The
+  upgrader (`batch-base-upgrade.sh`) and the verifier
+  (`check-template-versions.sh`) read the SAME call, so they cannot
+  again cover different sets. It replaced four hand-kept copies, two of
+  which had already diverged over `app/realsense_ros2`.
 - GitHub issues opened via
   `.claude/scripts/batch-open-archive-rename-issues.sh` -- per-repo
   archive / rename / migration follow-up.
@@ -144,6 +150,8 @@ docker/
     │       ├── log.sh                          # OTel-aligned 5-level JSON logger; mirror of ycpss91255-docker/base@v0.37.0 (script/docker/lib/log.sh),refs base#423 / base#438 / #148
     │       ├── log-events.txt                 # registered body enum for _log_*; unregistered body 觸發 fatal exit
     │       ├── log.lnav-format.json           # lnav format file for the JSON logger output
+    │       ├── roster.tsv                      # THE 一份 org repo 名冊(取代先前散在 4 支 script + pr.md 的複本):欄位 repo/path/fanout(active|parked|n-a)/mutation/settings/check/note;fanout 欄同時餵 batch-base-upgrade(開 PR)與 check-template-versions(驗證),所以兩邊不可能再看不同集合,refs #272
+    │       ├── roster.sh                       # roster.tsv 的唯一 reader:roster_fanout_paths/_repos <active|parked|all>、roster_mutation_paths/_repos、roster_settings_repos、roster_required_check <repo>、roster_file;純讀不改,refs #272
     │       └── ci-required-jobs.sh             # 從 repo 自己的 workflow 推導「CI 到底要求什麼」的純讀函式庫:ci_required_jobs(ci-rollup needs,flow/block 兩種 YAML seq)、ci_ci_sh_targets / ci_check_targets(docker_harness 兩邊 target 集合)、ci_actionlint_image / ci_actionlint_ignores(pin + 抑制規則);ci-and-stamp.sh 用它把 marker 的宣稱釘在 workflow 上而非手抄表,refs #272
     ├── memory/               # Claude Code per-project memory（auto-loaded via symlink）
     │   ├── MEMORY.md         # 入口索引(被 Claude Code 自動讀進 system prompt 開頭)

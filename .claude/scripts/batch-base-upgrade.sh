@@ -19,6 +19,8 @@
 #   --only <r1,r2,...>     Limit to listed repos (relative paths, e.g. agent/ai_agent)
 #   --skip <r1,r2,...>     Exclude listed repos
 #   --continue-on-error    Keep going past failed repos; print summary at end
+#   --list-repos           Print the effective repo list and exit (the shared
+#                          roster call, for comparing scopes)
 #   -h, --help             Show this help
 #
 # Designed to be run from the main session (not a subagent) because subagent
@@ -30,34 +32,14 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 readonly SCRIPT_DIR
 # shellcheck source=lib/log.sh disable=SC1091
 source "${SCRIPT_DIR}/lib/log.sh"
+# The active fanout scope, and its parked entries' rationale, live in
+# lib/roster.tsv -- the SAME call check-template-versions.sh makes, so the
+# verifier can no longer iterate a different set than this opens PRs for
+# (refs #272).
+# shellcheck source=lib/roster.sh disable=SC1091
+source "${SCRIPT_DIR}/lib/roster.sh"
 readonly DEFAULT_PR_BODY_TEMPLATE="${SCRIPT_DIR}/batch-base-pr-body.template.md"
 readonly ORG="ycpss91255-docker"
-
-readonly DEFAULT_REPOS=(
-  # NOTE: 10 downstream repos parked pending follow-up.
-  #   - 4 agent repos: archive pending (no concrete container plan)
-  #   - 3 app repos (ros1_bridge, sick_humble, sick_noetic): archive pending
-  #     (functionally covered by env/ros_distro + env/ros2_distro)
-  #   - 3 sensor repos still parked (urg_node_humble/noetic,
-  #     realsense_ros1): pending template->base subtree migration; the
-  #     realsense rename is done (realsense_noetic -> realsense_ros1),
-  #     urg_node still pending rename to urg_node_ros{,2}.
-  #     realsense_ros2 migrated + renamed (active below).
-  # Uncomment a repo's line once its prerequisite work merges.
-  # agent/ai_agent
-  # agent/claude_code
-  # agent/codex_cli
-  # agent/gemini_cli
-  # app/realsense_ros1
-  # app/ros1_bridge
-  # app/sick_humble
-  # app/sick_noetic
-  # app/urg_node_humble
-  # app/urg_node_noetic
-  app/realsense_ros2
-  env/ros2_distro
-  env/ros_distro
-)
 
 usage() {
   sed -n '/^# Usage:/,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
@@ -72,6 +54,7 @@ main() {
   local continue_on_error=0
   local only_csv=""
   local skip_csv=""
+  local list_only=0
 
   while (( $# > 0 )); do
     case "$1" in
@@ -83,10 +66,33 @@ main() {
       --continue-on-error) continue_on_error=1; shift ;;
       --only) only_csv="$2"; shift 2 ;;
       --skip) skip_csv="$2"; shift 2 ;;
+      --list-repos) list_only=1; shift ;;
       v[0-9]*) version="$1"; shift ;;
       *) _log_fatal batch-base-upgrade unrecognised_arg arg="${1}"; usage; exit 2 ;;
     esac
   done
+
+  # Scope enumeration short-circuits the version / --why preconditions: it
+  # mutates nothing, and the point is that this list and the verifier's are
+  # cheap to compare (there is a spec that does exactly that).
+  if (( list_only )); then
+    local listed=()
+    if [[ -n "${only_csv}" ]]; then
+      IFS=',' read -ra listed <<< "${only_csv}"
+    else
+      mapfile -t listed < <(roster_fanout_paths active)
+    fi
+    if [[ -n "${skip_csv}" ]]; then
+      local skip_set=" ${skip_csv//,/ } "
+      local kept=() r
+      for r in "${listed[@]}"; do
+        [[ "${skip_set}" == *" ${r} "* ]] || kept+=("${r}")
+      done
+      listed=("${kept[@]}")
+    fi
+    (( ${#listed[@]} )) && printf '%s\n' "${listed[@]}"
+    return 0
+  fi
 
   if [[ -z "${version}" ]]; then
     _log_fatal batch-base-upgrade precondition_missing arg="<version>" hint="e.g. v0.12.1"
@@ -117,7 +123,7 @@ main() {
   if [[ -n "${only_csv}" ]]; then
     IFS=',' read -ra repos <<< "${only_csv}"
   else
-    repos=("${DEFAULT_REPOS[@]}")
+    mapfile -t repos < <(roster_fanout_paths active)
   fi
 
   if [[ -n "${skip_csv}" ]]; then

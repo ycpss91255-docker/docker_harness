@@ -1,0 +1,67 @@
+# roster.tsv -- the ONE list of ycpss91255-docker repos (refs #272).
+#
+# This file replaced four copies that had already diverged:
+# batch-base-upgrade.sh's DEFAULT_REPOS listed app/realsense_ros2 as active,
+# check-template-versions.sh had the same repo commented out with a
+# CONTRADICTING note, sync-org-repo-settings.sh hardcoded a third list, and
+# .claude/commands/pr.md carried a fourth inline. The consequence was a fanout
+# whose verification step iterated 2 repos while the upgrader had opened PRs
+# for 3, and `--expect` exited 0 regardless, because it only ever looped over
+# its own list. Divergence needs two copies; keep it at one.
+#
+# HOW THE realsense_ros2 CONTRADICTION WAS RESOLVED. The two notes disagreed
+# about whether its template -> .base subtree migration had happened. It has:
+# ycpss91255-docker/realsense_ros2's main carries `.base/.version`, and the
+# re-add landed deliberately in #199 ("re-add realsense_ros2 to DEFAULT_REPOS
+# after rename") with #238 updating the note again. check-template-versions.sh
+# never got either edit, so its comment was simply the older of the two. The
+# upgrader's state -- active -- is the current one, and the same probe shows
+# every parked downstream ALSO already carries `.base`, so "pending the
+# template -> .base migration" is stale wherever it still appears; the parked
+# entries below now record the reason that is actually still true (archive
+# pending / rename pending), not that one.
+#
+# COLUMNS (tab-separated; no tabs inside a field):
+#   repo      GitHub repo name under ycpss91255-docker.
+#   path      Workspace-relative checkout, for the tooling that iterates by
+#             path. `-` when no tooling here iterates that repo by path.
+#   fanout    active | parked | n-a -- scope of the `.base` subtree fanout
+#             (batch-base-upgrade.sh opens the PRs, check-template-versions.sh
+#             verifies them; they MUST see the same set, which is the point).
+#             `n-a` = not a `.base` consumer at all.
+#   mutation  yes | no -- default scope of the generic cross-repo mutation
+#             engine (batch-mutation-pr.sh and its presets). Wider than the
+#             fanout: it includes `template`, whose subtree is reseeded by
+#             init.sh rather than by the upgrade fanout.
+#   settings  yes | no -- in scope for sync-org-repo-settings.sh.
+#   check     Required status-check context on main. `-` = none required.
+#   note      Why this row is in the state it is in.
+#
+# Adding a repo to the org means adding a row here; nothing else has a list to
+# forget to update.
+#
+# repo	path	fanout	mutation	settings	check	note
+.github	-	n-a	no	yes	-	org profile + shared workflows; protection on but no required check, because a doc-only PR never runs the lint job and would hang the rollup forever
+ai_agent	agent/ai_agent	parked	no	yes	call-docker-build / docker-build	fanout parked: archive pending, no concrete container plan
+base	-	n-a	no	yes	ci-rollup	the .base subtree SOURCE -- what the fanout upgrades every consumer TO
+claude_code	agent/claude_code	parked	no	yes	call-docker-build / docker-build	fanout parked: archive pending, no concrete container plan
+codex_cli	agent/codex_cli	parked	no	yes	call-docker-build / docker-build	fanout parked: archive pending, no concrete container plan
+docker_harness	-	n-a	no	yes	bats + shellcheck + hadolint	this repo -- the Claude Code harness; carries no .base subtree
+gemini_cli	agent/gemini_cli	parked	no	yes	call-docker-build / docker-build	fanout parked: archive pending, no concrete container plan
+github_runner	-	n-a	no	no	-	self-hosted runner provisioning (ADR-0012); does not follow the base workflow, so settings sync is deliberately out of scope
+isaac	-	n-a	no	yes	call-docker-build / docker-build	adjacent tooling repo, not a .base consumer
+jetson_sdk_manager	-	n-a	no	yes	call-docker-build / docker-build	adjacent tooling repo, not a .base consumer
+multi_run	-	n-a	no	yes	test	adjacent tooling: the multi-instance compose runner
+omniverse_web_viewer	-	n-a	no	yes	call-docker-build / docker-build	adjacent tooling repo, not a .base consumer
+realsense_ros1	app/realsense_ros1	parked	no	yes	call-docker-build / docker-build	fanout parked pending the LOCAL checkout rename -- the workspace dir is still app/realsense_noetic, so an active row here would skip on missing-local-dir; the GitHub rename landed and main already carries .base
+realsense_ros2	app/realsense_ros2	active	yes	yes	call-docker-build / docker-build	ACTIVE -- rename (realsense_humble -> realsense_ros2) and the template -> .base migration both landed (#199 / #238) and main carries .base
+ros1_bridge	app/ros1_bridge	parked	no	yes	ci-summary	fanout parked: archive pending, functionally covered by env/ros_distro
+ros2_distro	env/ros2_distro	active	yes	yes	ci-passed	ACTIVE
+ros_distro	env/ros_distro	active	yes	yes	ci-passed	ACTIVE
+sam_manager	-	n-a	no	yes	build	adjacent tooling repo, not a .base consumer
+seggpt	-	n-a	no	yes	call-docker-build / docker-build	adjacent tooling repo, not a .base consumer
+sick_humble	app/sick_humble	parked	no	yes	call-docker-build / docker-build	fanout parked: archive pending, functionally covered by env/ros2_distro
+sick_noetic	app/sick_noetic	parked	no	yes	call-docker-build / docker-build	fanout parked: archive pending, functionally covered by env/ros_distro
+template	template	n-a	yes	yes	test	NOT the pre-rename name of base -- a separate GitHub Template repo (is_template) created AFTER that rename, used by /new-repo to bootstrap downstream repos; in the mutation scope, out of the .base fanout because init.sh reseeds its subtree
+urg_node_humble	app/urg_node_humble	parked	no	yes	call-docker-build / docker-build	fanout parked pending the rename to urg_node_ros2; main already carries .base
+urg_node_noetic	app/urg_node_noetic	parked	no	yes	call-docker-build / docker-build	fanout parked pending the rename to urg_node_ros1; main already carries .base

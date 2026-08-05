@@ -40,35 +40,25 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/log.sh disable=SC1091
 source "${SCRIPT_DIR}/lib/log.sh"
+# shellcheck source=lib/roster.sh disable=SC1091
+source "${SCRIPT_DIR}/lib/roster.sh"
 
 SERVICE="sync-org-repo-settings"
 OWNER="ycpss91255-docker"
 DRY_RUN=0
 SCOPE_REPO=""
 
-# Base-aligned repos only -- consume `.base/` subtree, share the base CI / setup
-# conventions, or are adjacent tooling (multi_run, docker_harness, template,
-# .github). Add a repo here only after confirming it follows the base workflow.
-# Out-of-scope intentionally: github_runner (self-hosted runner provisioning,
-# ADR-0012), demo-repository (deleted upstream).
-ALL_REPOS=(
-  jetson_sdk_manager isaac docker_harness base omniverse_web_viewer ros1_bridge
-  template ros2_distro ros_distro sam_manager seggpt urg_node_noetic
-  urg_node_humble sick_noetic sick_humble realsense_ros1 realsense_ros2
-  gemini_cli codex_cli claude_code ai_agent .github multi_run
-)
+# Scope + per-repo required check both come from lib/roster.tsv (refs #272).
+# This file used to hardcode a third copy of the org list -- alongside the
+# fanout upgrader's and the fanout verifier's, two of which had already
+# diverged. Membership (`settings` column) and the required-check context
+# (`check` column) are per-repo facts, so they live with the repo's row.
+# Out of scope, and recorded as such in the roster: github_repo runner
+# provisioning (github_runner, ADR-0012); demo-repository was deleted upstream.
+mapfile -t ALL_REPOS < <(roster_settings_repos)
 
 required_check_for() {
-  case "$1" in
-    base)                    echo "ci-rollup" ;;
-    docker_harness)          echo "bats + shellcheck + hadolint" ;;
-    multi_run|template)      echo "test" ;;
-    ros_distro|ros2_distro)  echo "ci-passed" ;;
-    ros1_bridge)             echo "ci-summary" ;;
-    sam_manager)             echo "build" ;;
-    .github)                 echo "" ;;
-    *)                       echo "call-docker-build / docker-build" ;;
-  esac
+  roster_required_check "$1"
 }
 
 usage() {
