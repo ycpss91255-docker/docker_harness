@@ -69,6 +69,30 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   left the mismatch counter untouched, so `--expect` reported a clean fanout
   having checked nothing. It now exits 2 and names the roster.
 
+### Added
+- **`release-bump.sh`: a canonical primitive for the release bump, not just
+  the tag (refs #272).** `release.md` step 2 was prose telling a human to make
+  three mechanical edits -- set `.version`, promote `## [Unreleased]` to
+  `## [vX.Y.Z] - <today>`, re-insert a fresh `[Unreleased]` -- and it had been
+  produced by hand 106 times. The evidence that a hand-run step decays was in
+  the file it edits: base's Keep-a-Changelog compare-link block stopped dead at
+  `[v0.6.8]`, **16 link definitions for 106 version headings**, so ~90 headings
+  rendered as dangling references, and the 16 that survived still pointed at
+  `github.com/ycpss91255-docker/template`, the pre-rename URL. Nobody notices a
+  missing link definition, so once the step lapsed it never came back. The new
+  script owns all four edits and **derives the entire link block** from the
+  heading list plus the repo's own `origin` remote on every run -- never
+  appends -- so one command is simultaneously the 90-heading backfill, the
+  rename repair, and the guarantee that the block cannot lag again.
+  `--links-only` repairs without bumping, `--check` is a read-only drift gate,
+  `--dry-run` prints the diff. `release-tag.sh`'s `.version`-mismatch error now
+  names it, and `/release` step 2 calls it instead of describing it.
+
+  Which repo's changelog: **base's** (`base/doc/changelog/CHANGELOG.md`).
+  `release.md` is a docker_harness command, but the 106-heading changelog it
+  describes lives in the repo being released. docker_harness's own changelog
+  has one heading and no link block, and `--check` reports it clean.
+
 ### Fixed
 - **three `ci-and-stamp.sh` error paths printed a logger complaint instead of
   their diagnostic (refs #272).** `marker_write_failed`,

@@ -168,8 +168,10 @@ main() {
     recorded="$(tr -d '[:space:]' < "${repo_root}/.version" 2>/dev/null)"
     if [[ -n "${recorded}" && "${recorded}" != "${tag}" ]]; then
       err "tag-version mismatch: attempting ${tag} but .version says ${recorded}."
-      err "  Run /release (chore PR that bumps .version + promotes CHANGELOG)"
-      err "  before tagging."
+      err "  Run the bump primitive first, then land it as the chore PR:"
+      err "    .claude/scripts/release-bump.sh ${tag}"
+      err "  (it sets .version, promotes CHANGELOG's [Unreleased], and"
+      err "   regenerates the compare-link block -- refs #272). See /release."
       return 2
     fi
   fi

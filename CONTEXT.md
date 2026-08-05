@@ -139,6 +139,7 @@ docker/
     │   ├── setup-memory-link.sh             # 新 clone / 換機器:建 symlink ~/.claude/projects/<encoded>/memory -> <workspace>/.claude/memory,讓 per-project memory portable + git-tracked。idempotent
     │   ├── verify.sh                         # /verify 的實作:依序跑 shellcheck/hadolint/bats/tree-audit/TEST.md drift/doc-scan/diff-stats,hard-fail 阻擋,輸出 markdown summary
     │   ├── instinct-query.sh                 # 查詢 .claude/instincts.yaml — `instinct-query.sh <kind> [path]` 印出符合 trigger 的 instincts (5 kinds: file_edit / git_commit / gh_pr_create / gh_issue_create / bash_command)，hooks/skills 用來取代 grep CLAUDE.md prose;refs #95
+    │   ├── release-bump.sh                   # canonical primitive for release BUMP(release-tag.sh 的姊妹):寫 .version、把 `## [Unreleased]` 升成 `## [vX.Y.Z] - <date>` 並補回空的 Unreleased、並從 heading 清單 + origin remote **重新產生整段** compare-link block(不是 append,所以 repo 改名會自動修正、也不可能再漏);`--links-only` 只補 link(90 條 dangling reference 的 backfill 就是這一條指令)、`--check` 唯讀 drift gate、`--dry-run` 印 diff,refs #272
     │   ├── release-tag.sh                    # canonical primitive for cutting version tags;decision tree (RC / Z / Y / X bump) + .version integrity + RC CI 查詢 + RELEASE_X_BUMP_ACK 檢查;搭配 enforce_semver_tag_via_script.sh 強制 routing,refs #106
     │   ├── new-adr.sh                         # /adr 的實作:auto-number 8 位數補零,從 doc/adr/[0-9]*.md 掃 max+1,渲染 5-section 模板 (Date/Status/Context/Decision/Alternatives/Consequences),refs #97
     │   ├── check-log-helper-usage.sh           # CI lint：scan .claude/scripts/*.sh 偵測 bare printf|echo（usage() 內 + log-allow:script/start..end allowlist marker 外）為違反 lib/log.sh adoption,refs #148 M5
@@ -460,6 +461,14 @@ skill 內含 status check filter 對應表（template / docker_harness /
 
 舊規則（X = 破壞性）已淘汰；現在 breaking 跟 non-breaking feature 一起
 落 Y，X 純粹由 user 在 chat 明確說「OK cut」才動。
+
+**Bump 走 `.claude/scripts/release-bump.sh`,tag 走 `release-tag.sh`** — 兩支
+是同一個 release 的兩半。bump 那半以前只是 `release.md` 裡的散文(手工做過
+106 次),結果 Keep-a-Changelog 的 compare-link block 停在 `[v0.6.8]`:106 個
+version heading 只有 16 條 link 定義,約 90 個 heading 變 dangling reference,
+而僅存的 16 條還指著改名前的 `.../template/...`。release-bump.sh 每次都從
+heading 清單 + `origin` remote **重新產生整段 link block**,所以 backfill 與
+防再腐化是同一個動作;`--check` 是唯讀 gate(refs #272)。
 
 **強制走 `.claude/scripts/release-tag.sh`** — `enforce_semver_tag_via_script.sh`
 PreToolUse hook BLOCKs raw `git tag v*` / `git push.*v[0-9]`，迫使 caller
