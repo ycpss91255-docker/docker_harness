@@ -36,32 +36,11 @@ readonly SCRIPT_DIR
 source "${SCRIPT_DIR}/lib/log.sh"
 readonly ORG="ycpss91255-docker"
 
-readonly DEFAULT_REPOS=(
-  # NOTE: 10 downstream repos parked pending follow-up.
-  #   - 4 agent repos: archive pending (no concrete container plan)
-  #   - 3 app repos (ros1_bridge, sick_humble, sick_noetic): archive pending
-  #     (functionally covered by env/ros_distro + env/ros2_distro)
-  #   - 3 sensor repos still parked (urg_node_humble/noetic,
-  #     realsense_ros1): pending template->base subtree migration; the
-  #     realsense rename is done (realsense_noetic -> realsense_ros1),
-  #     urg_node still pending rename to urg_node_ros{,2}.
-  #     realsense_ros2 migrated + renamed (active below).
-  # Uncomment a repo's line once its prerequisite work merges.
-  # agent/ai_agent
-  # agent/claude_code
-  # agent/codex_cli
-  # agent/gemini_cli
-  # app/realsense_ros1
-  # app/ros1_bridge
-  # app/sick_humble
-  # app/sick_noetic
-  # app/urg_node_humble
-  # app/urg_node_noetic
-  app/realsense_ros2
-  env/ros2_distro
-  env/ros_distro
-  template
-)
+# Default scope = the roster's `mutation` column (refs #272), the same call
+# batch-mutation-pr.sh makes. This file used to carry its own copy of the
+# list -- one of the four that had already diverged.
+# shellcheck source=lib/roster.sh disable=SC1091
+source "${SCRIPT_DIR}/lib/roster.sh"
 
 usage() {
   sed -n '/^# Usage:/,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
@@ -120,7 +99,7 @@ main() {
   if [[ -n "${only_csv}" ]]; then
     IFS=',' read -ra repos <<< "${only_csv}"
   else
-    repos=("${DEFAULT_REPOS[@]}")
+    mapfile -t repos < <(roster_mutation_paths)
   fi
 
   if [[ -n "${skip_csv}" ]]; then

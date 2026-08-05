@@ -43,24 +43,24 @@ Follow this workflow:
    - Only for pure monitoring (no merge — e.g. the base repo needs a follow-up tag + downstream fanout, or you are waiting on some other action that depends on merged state) use the `wait-pr-ci` skill to wait for `ALL_DONE`.
    - dependabot PR stuck at BEHIND: leave a `@dependabot rebase` comment. `.github` doc-only PR: auto-merge stalls, so merge manually with `gh pr merge`.
 
-7. **If this PR was on the `base` repo**: after merge + tag, the
-   13 downstream repos need the new `.base/` subtree version pulled.
-   **Scope: workspace cwd only** — the fanout below assumes
-   `${CLAUDE_PROJECT_DIR}` is the workspace dir that contains all 13
+7. **If this PR was on the `base` repo**: after merge + tag, every
+   active downstream repo needs the new `.base/` subtree version
+   pulled. **Scope: workspace cwd only** — the fanout assumes
+   `${CLAUDE_PROJECT_DIR}` is the workspace dir containing the
    sub-repos. If the current session was started inside a single repo
    (per-repo cwd), skip step 7 entirely and instead run
-   `/batch-base-upgrade <vX.Y.Z>` from a workspace session, which
-   handles the same fan-out via a permanent script and avoids `cd`
-   parser warnings:
+   `/batch-base-upgrade <vX.Y.Z>` from a workspace session:
    ```
    .claude/scripts/batch-base-upgrade.sh vX.Y.Z --why "..." --issue <num>
    ```
-   Manual fan-out (kept for reference; prefer the batch script):
+   **Do not hand-write the repo list.** It lives in exactly one place,
+   `.claude/scripts/lib/roster.tsv` (`fanout` column), and both the
+   upgrader and the verifier read it — this step used to carry its own
+   inline copy, which is how the fanout came to open PRs for one more
+   repo than the verification step ever looked at (refs #272). To see
+   the effective list:
    ```
-   for repo in env/ros_distro env/ros2_distro agent/ai_agent agent/claude_code agent/codex_cli agent/gemini_cli app/realsense_ros2 app/realsense_ros1 app/sick_humble app/sick_noetic app/urg_node_noetic app/ros1_bridge app/urg_node_humble; do
-     git -C "${CLAUDE_PROJECT_DIR}/$repo" pull
-     (cd "${CLAUDE_PROJECT_DIR}/$repo" && ./.base/upgrade.sh && git push)
-   done
+   .claude/scripts/batch-base-upgrade.sh --list-repos
    ```
    For non-base PRs (fix / feat / refactor on a single repo), step 7
    is **N/A** — your work ends at step 6.

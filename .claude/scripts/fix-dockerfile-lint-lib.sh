@@ -36,8 +36,9 @@
 #   --branch <name>      Required. Chore branch to patch in each repo
 #                        (e.g. chore/base-v0.28.2).
 #   --org <owner>        GitHub owner for clones (default: ycpss91255-docker).
-#   --repos <r1,r2,...>  Comma-separated short repo names (default: 13 active
-#                        downstream repos).
+#   --repos <r1,r2,...>  Comma-separated short repo names (default: every
+#                        .base consumer in lib/roster.tsv, active or parked --
+#                        the patch is idempotent and pre-dates the pauses).
 #   --dry-run            Print plan and exit without cloning / pushing.
 #   -h, --help           Show this help.
 #
@@ -50,21 +51,14 @@ _FDLL_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pw
 source "${_FDLL_SCRIPT_DIR}/lib/log.sh"
 
 readonly DEFAULT_ORG='ycpss91255-docker'
-readonly DEFAULT_REPOS=(
-  ai_agent
-  claude_code
-  codex_cli
-  gemini_cli
-  realsense_humble
-  realsense_noetic
-  ros1_bridge
-  sick_humble
-  sick_noetic
-  urg_node_humble
-  urg_node_noetic
-  ros2_distro
-  ros_distro
-)
+# Default scope comes from lib/roster.tsv (refs #272). The hardcoded list this
+# replaced still named `realsense_humble` / `realsense_noetic`, renamed away
+# long before -- which is the whole reason a hand-kept copy is the bug: a
+# generic, re-runnable fanout helper silently defaulted to two repos that no
+# longer exist. `all` here, not `active`: a Dockerfile patch is idempotent and
+# is worth applying to a parked consumer the moment its fanout resumes.
+# shellcheck source=lib/roster.sh disable=SC1091
+source "${_FDLL_SCRIPT_DIR}/lib/roster.sh"
 
 usage() {
   sed -n '/^# Usage:/,/^# Run/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
@@ -97,7 +91,7 @@ main() {
   if [[ -n "${repos_csv}" ]]; then
     IFS=',' read -r -a repos <<< "${repos_csv}"
   else
-    repos=("${DEFAULT_REPOS[@]}")
+    mapfile -t repos < <(roster_fanout_repos all)
   fi
 
   TMPDIR_FIX="$(mktemp -d)"

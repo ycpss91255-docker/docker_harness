@@ -37,6 +37,9 @@ _BLA_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd
 source "${_BLA_SCRIPT_DIR}/lib/log.sh"
 
 # repo|category|issue
+# roster-exempt: one-shot org-wide Apache-2.0 LICENSE add, already executed.
+# Each row carries its own per-repo issue number, so this is a run record
+# rather than a scope list.
 readonly REPOS=(
   "ai_agent|agent|41"
   "claude_code|agent|40"

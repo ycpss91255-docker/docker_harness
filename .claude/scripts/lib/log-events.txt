@@ -66,3 +66,9 @@ ci_start
 ci_failed
 marker_written
 no_ci_mechanism
+marker_write_failed
+stale_marker_removed
+stale_marker_removal_failed
+
+# --- ci-and-stamp attestation completeness (refs #272) ---
+required_jobs_unclassified

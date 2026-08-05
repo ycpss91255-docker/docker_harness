@@ -64,6 +64,8 @@ readonly BASE_REMOTE="https://github.com/${BASE_REPO}.git"
 readonly TARGET_VERSION="v0.27.0"
 readonly BRANCH="chore/sensor-app-${TARGET_VERSION}"
 
+# roster-exempt: one-shot v0.27.0 sensor-app fanout, already executed. The
+# list records which five repos that wave touched, under their then-names.
 readonly DEFAULT_REPOS=(
   app/realsense_humble
   app/realsense_noetic

@@ -60,14 +60,13 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 readonly SCRIPT_DIR
 # shellcheck source=lib/log.sh disable=SC1091
 source "${SCRIPT_DIR}/lib/log.sh"
+# Default scope = the roster's `mutation` column (refs #272). Wider than the
+# `.base` fanout on purpose: it includes `template`, whose subtree init.sh
+# reseeds rather than the upgrade fanout. Reading the roster is what stops this
+# engine drifting away from the fanout the way four copies of the list did.
+# shellcheck source=lib/roster.sh disable=SC1091
+source "${SCRIPT_DIR}/lib/roster.sh"
 readonly ORG="ycpss91255-docker"
-
-readonly DEFAULT_REPOS=(
-  app/realsense_ros2
-  env/ros2_distro
-  env/ros_distro
-  template
-)
 
 # Mutation exit-code protocol.
 readonly MUT_CHANGED=0
@@ -151,7 +150,7 @@ main() {
   if [[ -n "${only_csv}" ]]; then
     IFS=',' read -ra repos <<< "${only_csv}"
   else
-    repos=("${DEFAULT_REPOS[@]}")
+    mapfile -t repos < <(roster_mutation_paths)
   fi
   if [[ -n "${skip_csv}" ]]; then
     local skip_set=" ${skip_csv//,/ } "

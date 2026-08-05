@@ -33,9 +33,9 @@
 #   --branch <name>      Required. Chore branch to patch in each repo
 #                        (e.g. chore/base-v0.31.0).
 #   --org <owner>        GitHub owner for clones (default: ycpss91255-docker).
-#   --repos <r1,r2,...>  Comma-separated short repo names (default:
-#                        ros_distro,ros2_distro -- the 2 active downstream
-#                        per /batch-base-upgrade DEFAULT_REPOS).
+#   --repos <r1,r2,...>  Comma-separated short repo names (default: the
+#                        active downstream set from lib/roster.tsv, the same
+#                        list /batch-base-upgrade fans out over).
 #   --dry-run            Print plan and exit without cloning / pushing.
 #   -h, --help           Show this help.
 #
@@ -48,10 +48,14 @@ _FDCS_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pw
 source "${_FDCS_SCRIPT_DIR}/lib/log.sh"
 
 readonly DEFAULT_ORG='ycpss91255-docker'
-readonly DEFAULT_REPOS=(
-  ros_distro
-  ros2_distro
-)
+# Default scope comes from lib/roster.tsv (refs #272). `active`, matching this
+# helper's stated scope ("the active downstream repos a fanout must patch") --
+# the hardcoded pair it replaced was written when that meant two repos and was
+# never updated when realsense_ros2 joined, which is exactly the divergence the
+# roster exists to make impossible. Its sibling fix-dockerfile-lint-lib.sh asks
+# for `all` instead, because its patch predates the parked repos' pause.
+# shellcheck source=lib/roster.sh disable=SC1091
+source "${_FDCS_SCRIPT_DIR}/lib/roster.sh"
 
 usage() {
   sed -n '/^# Usage:/,/^# Run/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
@@ -84,7 +88,7 @@ main() {
   if [[ -n "${repos_csv}" ]]; then
     IFS=',' read -r -a repos <<< "${repos_csv}"
   else
-    repos=("${DEFAULT_REPOS[@]}")
+    mapfile -t repos < <(roster_fanout_repos active)
   fi
 
   TMPDIR_FIX="$(mktemp -d)"

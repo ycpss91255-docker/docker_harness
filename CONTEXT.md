@@ -43,9 +43,15 @@ state (which repos are active vs archive-pending vs rename-pending
 vs `.base` migration-pending) lives in two stable sources of truth,
 not duplicated here:
 
-- `.claude/scripts/batch-base-upgrade.sh` `DEFAULT_REPOS` -- the
-  current active batch-upgrade scope (active entries uncommented;
-  pending entries comment-out with rationale).
+- `.claude/scripts/lib/roster.tsv` -- THE roster (refs #272). One row
+  per org repo; the `fanout` column (`active` / `parked` / `n-a`)
+  carries the batch-upgrade scope and each parked row's rationale,
+  `mutation` the generic fanout engine's scope, `settings` the
+  org-settings sync scope, `check` the required status check. The
+  upgrader (`batch-base-upgrade.sh`) and the verifier
+  (`check-template-versions.sh`) read the SAME call, so they cannot
+  again cover different sets. It replaced four hand-kept copies, two of
+  which had already diverged over `app/realsense_ros2`.
 - GitHub issues opened via
   `.claude/scripts/batch-open-archive-rename-issues.sh` -- per-repo
   archive / rename / migration follow-up.
@@ -107,7 +113,7 @@ docker/
     │   ├── batch-gitignore-add-line.sh      # 通用 .gitignore 追加任意行的 17 repo fanout（PR #23）
     │   ├── batch-mutation-pr.sh             # 通用跨 repo fanout 引擎：--mutation <script> 套到每個 repo,worktree->mutate->commit->push->PR;取代 one-shot batch-*.sh sprawl(refs #169,配 [[batch-mutation-pr]] skill)
     │   ├── batch-line-edit.sh               # batch-mutation-pr 的第一個 preset:--file/--line 跨 repo append-line-if-missing,delegate 給引擎(refs #169)
-    │   ├── ci-and-stamp.sh                  # 開 PR 前跑該 repo 的完整 CI mirror(auto-detect: .claude/test/ci.sh→ci.sh check / justfile+.base/→just build test / justfile→just test+just test lint),exit 0 ⟺ 全綠且 .claude/state/local-ci-pass/<sha>.ok marker 存在(單一 verdict 只 branch 一次;紅燈會刪同 sha 的 stale marker,寫不出 marker 就回非 0,refs #261);集中 marker-write 讓 enforce_local_full_ci_before_pr 對所有 repo 可滿足(refs #208/#176)
+    │   ├── ci-and-stamp.sh                  # 開 PR 前跑該 repo 的 local CI mirror(auto-detect: .claude/test/ci.sh→ci.sh check / justfile+.base/→just build test / justfile→actionlint + just test + just test lint),exit 0 ⟺ 全綠且 .claude/state/local-ci-pass/<sha>.ok marker 存在(單一 verdict 只 branch 一次;紅燈會刪同 sha 的 stale marker,寫不出 marker 就回非 0,refs #261);集中 marker-write 讓 enforce_local_full_ci_before_pr 對所有 repo 可滿足(refs #208/#176)。required set 由 lib/ci-required-jobs.sh 從 repo 自己的 workflow 推導(base=ci-rollup needs、docker_harness=workflow 的 ci.sh steps),每個 required job 必須被歸成 attested 或 excluded(附理由),兩份清單寫進 marker 並在 stamp 時印出;歸不了類就 exit 3 不跑不 stamp — marker 因此是「本機跑過這些」而非「GH CI 會過」,refs #272
     │   ├── batch-pr-merge.sh                # 批次 squash-merge 多個 <repo>:<pr>（接 short / full repo 名都可）
     │   ├── batch-pr-close.sh                # 批次 close 多個 <repo>:<pr>，--reason 必填（superseded-by 場景，例如 hotfix 後重 fanout 取代既有批次 PR）
     │   ├── check-template-versions.sh       # HTTPS curl 13 repo `.base/.version` 對齊檢查（release 後驗證）
@@ -133,6 +139,7 @@ docker/
     │   ├── setup-memory-link.sh             # 新 clone / 換機器:建 symlink ~/.claude/projects/<encoded>/memory -> <workspace>/.claude/memory,讓 per-project memory portable + git-tracked。idempotent
     │   ├── verify.sh                         # /verify 的實作:依序跑 shellcheck/hadolint/bats/tree-audit/TEST.md drift/doc-scan/diff-stats,hard-fail 阻擋,輸出 markdown summary
     │   ├── instinct-query.sh                 # 查詢 .claude/instincts.yaml — `instinct-query.sh <kind> [path]` 印出符合 trigger 的 instincts (5 kinds: file_edit / git_commit / gh_pr_create / gh_issue_create / bash_command)，hooks/skills 用來取代 grep CLAUDE.md prose;refs #95
+    │   ├── release-bump.sh                   # canonical primitive for release BUMP(release-tag.sh 的姊妹):寫 .version、把 `## [Unreleased]` 升成 `## [vX.Y.Z] - <date>` 並補回空的 Unreleased、並從 heading 清單 + origin remote **重新產生整段** compare-link block(不是 append,所以 repo 改名會自動修正、也不可能再漏);`--links-only` 只補 link(90 條 dangling reference 的 backfill 就是這一條指令)、`--check` 唯讀 drift gate、`--dry-run` 印 diff,refs #272
     │   ├── release-tag.sh                    # canonical primitive for cutting version tags;decision tree (RC / Z / Y / X bump) + .version integrity + RC CI 查詢 + RELEASE_X_BUMP_ACK 檢查;搭配 enforce_semver_tag_via_script.sh 強制 routing,refs #106
     │   ├── new-adr.sh                         # /adr 的實作:auto-number 8 位數補零,從 doc/adr/[0-9]*.md 掃 max+1,渲染 5-section 模板 (Date/Status/Context/Decision/Alternatives/Consequences),refs #97
     │   ├── check-log-helper-usage.sh           # CI lint：scan .claude/scripts/*.sh 偵測 bare printf|echo（usage() 內 + log-allow:script/start..end allowlist marker 外）為違反 lib/log.sh adoption,refs #148 M5
@@ -143,7 +150,10 @@ docker/
     │       ├── checkpoint.sh                  # /tmp checkpoint protocol helper — write_checkpoint + is_acked,Tier 2 E2 hook 共享 deny/ack 契約,refs ADR-00000002 / #117
     │       ├── log.sh                          # OTel-aligned 5-level JSON logger; mirror of ycpss91255-docker/base@v0.37.0 (script/docker/lib/log.sh),refs base#423 / base#438 / #148
     │       ├── log-events.txt                 # registered body enum for _log_*; unregistered body 觸發 fatal exit
-    │       └── log.lnav-format.json           # lnav format file for the JSON logger output
+    │       ├── log.lnav-format.json           # lnav format file for the JSON logger output
+    │       ├── roster.tsv                      # THE 一份 org repo 名冊(取代先前散在 4 支 script + pr.md 的複本):欄位 repo/path/fanout(active|parked|n-a)/mutation/settings/check/note;fanout 欄同時餵 batch-base-upgrade(開 PR)與 check-template-versions(驗證),所以兩邊不可能再看不同集合,refs #272
+    │       ├── roster.sh                       # roster.tsv 的唯一 reader:roster_fanout_paths/_repos <active|parked|all>、roster_mutation_paths/_repos、roster_settings_repos、roster_required_check <repo>、roster_file;純讀不改,refs #272
+    │       └── ci-required-jobs.sh             # 從 repo 自己的 workflow 推導「CI 到底要求什麼」的純讀函式庫:ci_required_jobs(ci-rollup needs,flow/block 兩種 YAML seq)、ci_ci_sh_targets / ci_check_targets(docker_harness 兩邊 target 集合)、ci_actionlint_image / ci_actionlint_ignores(pin + 抑制規則);ci-and-stamp.sh 用它把 marker 的宣稱釘在 workflow 上而非手抄表,refs #272
     ├── memory/               # Claude Code per-project memory（auto-loaded via symlink）
     │   ├── MEMORY.md         # 入口索引(被 Claude Code 自動讀進 system prompt 開頭)
     │   ├── feedback_*.md     # 個別 feedback / workflow rule（每檔有 name + description + type frontmatter）
@@ -451,6 +461,14 @@ skill 內含 status check filter 對應表（template / docker_harness /
 
 舊規則（X = 破壞性）已淘汰；現在 breaking 跟 non-breaking feature 一起
 落 Y，X 純粹由 user 在 chat 明確說「OK cut」才動。
+
+**Bump 走 `.claude/scripts/release-bump.sh`,tag 走 `release-tag.sh`** — 兩支
+是同一個 release 的兩半。bump 那半以前只是 `release.md` 裡的散文(手工做過
+106 次),結果 Keep-a-Changelog 的 compare-link block 停在 `[v0.6.8]`:106 個
+version heading 只有 16 條 link 定義,約 90 個 heading 變 dangling reference,
+而僅存的 16 條還指著改名前的 `.../template/...`。release-bump.sh 每次都從
+heading 清單 + `origin` remote **重新產生整段 link block**,所以 backfill 與
+防再腐化是同一個動作;`--check` 是唯讀 gate(refs #272)。
 
 **強制走 `.claude/scripts/release-tag.sh`** — `enforce_semver_tag_via_script.sh`
 PreToolUse hook BLOCKs raw `git tag v*` / `git push.*v[0-9]`，迫使 caller

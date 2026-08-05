@@ -15,12 +15,11 @@ Parse the argument for both VERSION and TARGET:
   - `MAJOR.MINOR.0-rcN` — explicit Release Candidate.
   - User can override via context — if the argument explicitly includes `-rcN`, honour it.
 
-- **Target repo(s)**:
-  - `env` — ros_distro, ros2_distro
-  - `agent` — ai_agent, claude_code, gemini_cli, codex_cli
-  - `app` — ros1_bridge, urg_node_humble, urg_node_noetic, realsense_ros2, realsense_noetic, sick_humble, sick_noetic
-  - `base` — base repo (its own `.version` line, separate from the rest)
-  - Or specify individual repos
+- **Target repo(s)**: named by their workspace path in
+  `.claude/scripts/lib/roster.tsv`, the one roster (`env/*`, `agent/*`,
+  `app/*` groups; `.claude/scripts/batch-base-upgrade.sh --list-repos`
+  prints the active set). `base` is its own target — it carries a
+  `.version` line the rest do not. Or specify individual repos.
 
 ## 2. Branch + bump
 
@@ -31,21 +30,34 @@ git checkout main && git pull --ff-only origin main
 git checkout -b release/vX.Y.Z
 ```
 
-**For the `base` repo**, bump two files:
+**Do not make the bump edits by hand.** They are mechanical, and the hand-run
+version decayed: the Keep-a-Changelog compare-link block stopped being updated
+around `v0.6.8` and ~90 releases rendered their heading as a dangling
+reference (refs #272). The canonical primitive owns all of them:
 
-- `.version` — single line, the new tag.
-- `doc/changelog/CHANGELOG.md` — promote the `[Unreleased]` section to
-  `[vX.Y.Z] - YYYY-MM-DD` (today's absolute date), insert a fresh empty
-  `[Unreleased]` heading above it.
+```bash
+.claude/scripts/release-bump.sh vX.Y.Z            # from the repo being released
+.claude/scripts/release-bump.sh vX.Y.Z --dry-run  # preview the diff first
+```
 
-  The promoted section keeps the `### Added / Changed / Fixed / ...` content
-  written during PR work — this is why CHANGELOG entries should be added at
-  PR-time, not deferred to release.
+It sets `.version` to the tag literal, promotes `## [Unreleased]` to
+`## [vX.Y.Z] - <today>`, re-inserts an empty `[Unreleased]` above it, and
+regenerates the **whole** compare-link block from the heading list plus the
+repo's own `origin` remote. Regenerating (rather than appending) is what makes
+a rename self-correct and the block impossible to leave behind again.
+`--links-only` repairs the block without a bump; `--check` is the read-only
+drift gate.
 
-**For container repos** (env / agent / app), there is no top-level `.version`;
-the version is propagated through `.base/.version` via the subtree upgrade.
-A release commit on those repos is typically just a CHANGELOG bump (if the
-repo has its own CHANGELOG) and possibly a `main.yaml` `@tag` adjustment.
+The promoted section keeps the `### Added / Changed / Fixed / ...` content
+written during PR work — this is why CHANGELOG entries should be added at
+PR-time, not deferred to release.
+
+**For container repos** (env / agent / app) the same command applies. They
+have no top-level `.version` — it is propagated through `.base/.version` by
+the subtree upgrade — so the script reports that half as skipped and does the
+changelog half. A release commit there is typically just the CHANGELOG bump
+(if the repo has its own CHANGELOG) and possibly a `main.yaml` `@tag`
+adjustment.
 
 ## 3. Open the chore PR
 
@@ -146,12 +158,18 @@ If RC CI (step 4) or tag workflows (step 7) fail:
 
 After tagging `base@vX.Y.Z`:
 
-- Each downstream repo (the 17 in env / agent / app) needs its `.base/`
-  subtree pulled to the new tag.
-- Use `/batch-base-upgrade vX.Y.Z` to mass-upgrade all 17 in one batch
+- Every **active** downstream repo needs its `.base/` subtree pulled to
+  the new tag. Which repos those are is not stated here and must not be
+  retyped anywhere: `.claude/scripts/lib/roster.tsv` is the one roster,
+  and `batch-base-upgrade.sh --list-repos` prints the effective set.
+- Use `/batch-base-upgrade vX.Y.Z` to mass-upgrade them in one batch
   (one PR per downstream repo, parallel CI). The command name keeps
   the `template` prefix for backward compatibility with existing scripts
   / muscle memory; it has always upgraded the `.base/` subtree.
+- Verify with `.claude/scripts/check-template-versions.sh --expect vX.Y.Z`.
+  It reads the SAME roster call, so it covers exactly what the upgrader
+  touched and fails (rather than exiting 0 over an empty list) when the
+  selection is empty (refs #272).
 - This is its own multi-PR workflow — run `/batch-base-upgrade` after
   the base tag's CI is fully green; do not interleave with the release
   itself.

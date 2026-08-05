@@ -6,6 +6,103 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **the local-CI marker states what it ran, and derives what it owes, from
+  `ci-rollup` itself (refs #272).** `enforce_local_full_ci_before_pr.sh`
+  denies `gh pr create` until `.claude/state/local-ci-pass/<sha>.ok` exists,
+  and `ci-and-stamp.sh` claimed that marker attested *"GH CI will pass"*. For
+  a `base` checkout it ran `just test && just test lint`; `ci-rollup`'s
+  `needs:` lists thirteen jobs, and nothing compared the two -- which is how
+  one PR went red three times on checks the marker had already blessed, and
+  why the `COVERAGE_MIN` 50 -> 80 bump landed on a gate the marker did not
+  model at all. The required set is now **derived from the repo's own
+  workflow on every run** (new `lib/ci-required-jobs.sh`: `ci-rollup`'s
+  `needs:` for base, the workflow's enumerated `ci.sh` steps for
+  docker_harness), every derived job is classified `attested` or `excluded`
+  **with a reason**, both lists are written into the marker and printed at
+  stamp time, and a required job in neither list exits 3 without running or
+  stamping anything -- the `lint-static` completeness-guard shape, so a new
+  required job fails here instead of on someone's PR. `actionlint` moved from
+  excluded to attested (it is one container, run at the pin and with the
+  `-ignore` suppressions read out of the workflow, so a CI bump cannot leave
+  the mirror behind); `classify`, `coverage`, `coverage-gate`, `acceptance`,
+  `system` and `worker-selftest` are excluded on the record. The hook's deny
+  message says the same thing, so "stamped" stops reading as "CI will pass".
+- **one downstream roster, in one file (refs #272).** The list of org repos
+  lived in four places -- `batch-base-upgrade.sh`'s `DEFAULT_REPOS`,
+  `check-template-versions.sh`'s, `sync-org-repo-settings.sh`'s `ALL_REPOS`,
+  and an inline `for repo in ...` in `.claude/commands/pr.md` -- and two of
+  them had already diverged: the upgrader listed `app/realsense_ros2` as
+  active while the verifier had it commented out with a **contradicting**
+  note. So the documented fanout step "verify each downstream main is at the
+  target tag" iterated 2 repos while the upgrader had opened PRs for 3, and
+  `--expect` exited 0 because it only ever loops over its own list -- a
+  verification step that structurally could not fail for the repo most likely
+  to need it. New `lib/roster.tsv` holds one row per org repo with the
+  lifecycle state each consumer needs (`fanout` / `mutation` / `settings` /
+  `check`), and `lib/roster.sh` is its only reader; the upgrader and the
+  verifier now make the *same call*, and `--list-repos` on either prints it.
+  Seven live consumers were converted (adding `batch-mutation-pr.sh`,
+  `batch-gitignore-add-line.sh`, `fix-dockerfile-lint-lib.sh` and
+  `fix-dockerfile-copy-script.sh`, whose own copies had rotted further still:
+  the first defaulted to `realsense_humble` / `realsense_noetic`, renamed away
+  long ago). Executed one-shot fanouts keep their list, which is a record of
+  what they ran against rather than current scope, behind an explicit
+  `# roster-exempt: <why>` marker -- and a spec fails any script that carries
+  a repo list without one.
+
+  The `realsense_ros2` contradiction was resolved on evidence, not by picking
+  a side: its main really does carry `.base/.version`, and the active entry
+  landed deliberately in #199 with #238 updating it again, while
+  `check-template-versions.sh` received neither edit. Active is current. The
+  same probe shows every parked downstream also already carries `.base`, so
+  "pending the template -> .base migration" was stale wherever it appeared;
+  the parked rows now record the reason that is still true (archive pending,
+  rename pending, or -- for `realsense_ros1` -- that the *local* checkout is
+  still `app/realsense_noetic`, which would make an active row skip on
+  missing-local-dir). `sync-org-repo-settings.sh` listing both `base` and
+  `template` turned out to be correct rather than pre-rename residue:
+  `template` is a separate, live GitHub Template repo created after the
+  rename, and the roster says so on its row.
+- **`check-template-versions.sh` fails on an empty selection (refs #272).**
+  Selecting no repos (`--skip` everything, or a roster with nothing active)
+  left the mismatch counter untouched, so `--expect` reported a clean fanout
+  having checked nothing. It now exits 2 and names the roster.
+
+### Added
+- **`release-bump.sh`: a canonical primitive for the release bump, not just
+  the tag (refs #272).** `release.md` step 2 was prose telling a human to make
+  three mechanical edits -- set `.version`, promote `## [Unreleased]` to
+  `## [vX.Y.Z] - <today>`, re-insert a fresh `[Unreleased]` -- and it had been
+  produced by hand 106 times. The evidence that a hand-run step decays was in
+  the file it edits: base's Keep-a-Changelog compare-link block stopped dead at
+  `[v0.6.8]`, **16 link definitions for 106 version headings**, so ~90 headings
+  rendered as dangling references, and the 16 that survived still pointed at
+  `github.com/ycpss91255-docker/template`, the pre-rename URL. Nobody notices a
+  missing link definition, so once the step lapsed it never came back. The new
+  script owns all four edits and **derives the entire link block** from the
+  heading list plus the repo's own `origin` remote on every run -- never
+  appends -- so one command is simultaneously the 90-heading backfill, the
+  rename repair, and the guarantee that the block cannot lag again.
+  `--links-only` repairs without bumping, `--check` is a read-only drift gate,
+  `--dry-run` prints the diff. `release-tag.sh`'s `.version`-mismatch error now
+  names it, and `/release` step 2 calls it instead of describing it.
+
+  Which repo's changelog: **base's** (`base/doc/changelog/CHANGELOG.md`).
+  `release.md` is a docker_harness command, but the 106-heading changelog it
+  describes lives in the repo being released. docker_harness's own changelog
+  has one heading and no link block, and `--check` reports it clean.
+
+### Fixed
+- **three `ci-and-stamp.sh` error paths printed a logger complaint instead of
+  their diagnostic (refs #272).** `marker_write_failed`,
+  `stale_marker_removed` and `stale_marker_removal_failed` were never added to
+  `lib/log-events.txt`, and an unregistered body makes `_log_dispatch` print
+  `FATAL: unregistered log body` and return 1 instead of emitting the record --
+  so the "green but could not write the marker" and "stale marker removed"
+  cases reported nothing usable at exactly the moment somebody needed to know
+  why the stamp disagreed with the run. Registered.
+
 ### Added
 - **`doc/test/*.md` is generated, not hand-maintained (closes #265).** New
   `.claude/scripts/sync-doc-test-counts.sh` derives every figure in the test

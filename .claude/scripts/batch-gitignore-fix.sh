@@ -37,6 +37,10 @@ readonly ORG="ycpss91255-docker"
 readonly BRANCH="chore/gitignore-claude-symlink"
 readonly TITLE="chore: gitignore .claude (also covers symlinks)"
 
+# roster-exempt: one-shot, executed once as PR #21. This list is the
+# historical record of THAT run's scope (it still names osrf_ros2_humble /
+# ros2_humble / ros_kinetic, archived since), not current fanout scope --
+# rewriting it from lib/roster.tsv would rewrite history, not fix drift.
 readonly DEFAULT_REPOS=(
   agent/ai_agent
   agent/claude_code
