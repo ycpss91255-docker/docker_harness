@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1115 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1127 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -1946,3 +1946,20 @@ escaping, and the read-only `--check` gate.
 | one roster: /pr's fan-out step points at the script, not a fourth copy | - |
 | verifier and upgrader iterate the same list | - |
 | --expect over an empty selection fails instead of passing vacuously | - |
+
+### .claude/test/bats/unit/release_bump_spec.bats (12)
+
+| Test | Scenario |
+|------|----------|
+| --help prints usage and exits 0 | - |
+| invalid tag shape exits 2 | - |
+| bumps .version to the tag literal | - |
+| promotes Unreleased and re-inserts an empty one above it | - |
+| every version heading gets a compare link, oldest anchored at the tag | - |
+| regenerating rewrites links that point at the pre-rename repo | - |
+| --links-only backfills without touching .version or the headings | - |
+| --check reports drift, writes nothing, and passes once complete | - |
+| regeneration is idempotent | - |
+| refuses to bump a version the changelog already records | - |
+| refuses when there is no Unreleased section to promote | - |
+| derives the slug from the remote, so a renamed repo self-corrects | - |
