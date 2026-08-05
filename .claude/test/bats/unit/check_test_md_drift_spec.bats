@@ -210,3 +210,49 @@ write_pytest_defs() {
   run "$(hook check_test_md_drift.sh)" <<< '{"tool_input":{"file_path":"/tmp/repo/src/widget.py"}}'
   assert_silent
 }
+
+# ---- .claude/ prefixed headings (this repo's own layout, refs #265) ----
+# docker_harness moved its specs to `.claude/test/bats/<level>/` with the
+# ISTQB split (#237). Before #265 the heading pattern only accepted
+# `test/...` and `.base/test/...`, so this hook matched NOTHING in its own
+# repo and reported clean while the catalogs rotted.
+
+# mktemp_claude_layout_repo <count> — repo whose spec lives under
+# .claude/test/bats/unit/ with <count> @test stanzas.
+mktemp_claude_layout_repo() {
+  local count="$1" repo
+  repo="$(mktemp -d)"
+  mkdir -p "${repo}/test" "${repo}/.claude/test/bats/unit" "${repo}/doc/test"
+  write_bats_stanzas "${repo}/.claude/test/bats/unit/log_spec.bats" "${count}"
+  echo "${repo}"
+}
+
+@test "fires when a .claude/test/bats/ heading count drifts" {
+  local repo
+  repo="$(mktemp_claude_layout_repo 3)"
+  printf '# TEST.md index\n' > "${repo}/doc/test/TEST.md"
+  printf '### .claude/test/bats/unit/log_spec.bats (5)\n' > "${repo}/doc/test/unit.md"
+  run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/.claude/test/bats/unit/log_spec.bats\"}}"
+  assert_message_contains ".claude/test/bats/unit/log_spec.bats: doc/test catalog says 5, actual 3"
+  rm -rf "${repo}"
+}
+
+@test "silent when a .claude/test/bats/ heading count matches" {
+  local repo
+  repo="$(mktemp_claude_layout_repo 4)"
+  printf '# TEST.md index\n' > "${repo}/doc/test/TEST.md"
+  printf '### .claude/test/bats/unit/log_spec.bats (4)\n' > "${repo}/doc/test/unit.md"
+  run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/.claude/test/bats/unit/log_spec.bats\"}}"
+  assert_silent
+  rm -rf "${repo}"
+}
+
+@test "fires when a .claude/ heading lists a spec file that is gone" {
+  local repo
+  repo="$(mktemp_claude_layout_repo 2)"
+  printf '# TEST.md index\n' > "${repo}/doc/test/TEST.md"
+  printf '### .claude/test/bats/unit/gone_spec.bats (2)\n' > "${repo}/doc/test/unit.md"
+  run "$(hook check_test_md_drift.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/.claude/test/bats/unit/log_spec.bats\"}}"
+  assert_message_contains ".claude/test/bats/unit/gone_spec.bats: listed in doc/test catalog but file missing"
+  rm -rf "${repo}"
+}

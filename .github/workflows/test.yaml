@@ -35,3 +35,10 @@ jobs:
 
       - name: Audit CLAUDE.md `.claude/` tree drift
         run: ./ci.sh tree-check
+
+      # The workflow enumerates ci.sh targets rather than calling `ci.sh
+      # check`, so a target added to the local gate alone would gate nothing
+      # on a PR (refs #265, base#864 / base#866). Every new check therefore
+      # needs a step here as well.
+      - name: Audit doc/test catalog drift
+        run: ./ci.sh doc-count-check

@@ -20,7 +20,9 @@
 #   tree-check        audit CONTEXT.md .claude/ tree vs filesystem (host)
 #   ceiling-check     audit CLAUDE.md line / section ceilings (host)
 #   log-helper-check  enforce lib/log.sh adoption in .claude/scripts (host)
-#   check             lint + hadolint + test + tree-check + ceiling-check + log-helper-check
+#   doc-count-check   assert doc/test/*.md matches the spec tree (host)
+#   check             lint + hadolint + test + tree-check + ceiling-check +
+#                     log-helper-check + doc-count-check
 #   clean             remove the test image
 #   help              list targets
 
@@ -96,6 +98,14 @@ t_log_helper_check() {
   "${REPO_ROOT}/.claude/scripts/check-log-helper-usage.sh" --scripts-dir "${REPO_ROOT}/.claude/scripts"
 }
 
+# Read-only twin of .claude/scripts/sync-doc-test-counts.sh: regenerates the
+# doc/test catalogs into a scratch copy and diffs. It shares the generator's
+# code path on purpose -- a separately-implemented checker is how the two
+# older drift checkers ended up matching nothing at all (refs #265).
+t_doc_count_check() {
+  "${REPO_ROOT}/.claude/scripts/sync-doc-test-counts.sh" --check "${REPO_ROOT}"
+}
+
 t_check() {
   t_lint
   t_hadolint
@@ -103,6 +113,7 @@ t_check() {
   t_tree_check
   t_ceiling_check
   t_log_helper_check
+  t_doc_count_check
 }
 
 t_clean() {
@@ -123,6 +134,7 @@ main() {
     tree-check)       t_tree_check ;;
     ceiling-check)    t_ceiling_check ;;
     log-helper-check) t_log_helper_check ;;
+    doc-count-check)  t_doc_count_check ;;
     check)            t_check ;;
     clean)            t_clean ;;
     help|-h|--help)   t_help ;;

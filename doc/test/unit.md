@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1076 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1100 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -21,11 +21,11 @@ stdin and asserts one of three behaviours:
 ### .claude/test/bats/unit/auto_allow_rm_in_workspace_spec.bats (18)
 | Test | Scenario |
 |------|----------|
-| allows rm <relative file> (workspace cwd assumed) | relative path → ALLOW |
+| allows rm \<relative file> (workspace cwd assumed) | relative path → ALLOW |
 | allows rm subdir/file.txt | nested relative → ALLOW |
 | allows rm /tmp/foo.sh | absolute under /tmp → ALLOW |
 | allows rm -rf /tmp/dir | flag + /tmp path → ALLOW |
-| allows rm /home/yunchien/workspace/docker/foo.txt (under workspace) | absolute under workspace → ALLOW |
+| allows rm \<absolute path under workspace> | absolute under workspace → ALLOW |
 | allows rm -- --weird-name (after -- separator) | `--` separator handling |
 | silent on rm /etc/passwd (outside workspace) | absolute outside → SILENT (falls through to ask) |
 | silent on rm /usr/bin/foo (outside workspace) | absolute outside → SILENT |
@@ -87,7 +87,7 @@ stdin and asserts one of three behaviours:
 | git commit with upgrade.sh (template-internal session, no prefix) fires | path without `.base/` prefix still matches → FIRE |
 | git commit with core script + README is silent | both staged → SILENT |
 | git commit with core script + translated README is silent | `README.zh-TW.md` counts → SILENT |
-| git -C <path> commit resolves work dir from -C | parses `-C <repo>` to find correct repo → FIRE |
+| git -C \<path> commit resolves work dir from -C | parses `-C <repo>` to find correct repo → FIRE |
 
 ### .claude/test/bats/unit/check_no_ai_attribution_spec.bats (4)
 | Test | Scenario |
@@ -130,7 +130,7 @@ silently truncating the fixture.
 | write_bats_stanzas writes count real @test stanzas + shebang | core: 3 stanzas + shebang, grep-able |
 | write_bats_stanzas count=0 yields shebang only, zero @test | edge: empty fixture |
 
-### .claude/test/bats/unit/check_test_md_drift_spec.bats (15)
+### .claude/test/bats/unit/check_test_md_drift_spec.bats (20)
 
 The regex parsing repo-local + `.base/test/` headings is shared:
 `^### ((\.base/)?test/<path>.(bats|py)) (<N>)`. The optional `.base/`
@@ -145,7 +145,7 @@ parity; the count tracks def-functions not collected cases, so
 | Test | Scenario |
 |------|----------|
 | fires when TEST.md count > actual @test count | TEST.md claims more → FIRE |
-| fires when TEST.md count < actual @test count | TEST.md claims fewer → FIRE |
+| fires when TEST.md count \< actual @test count | TEST.md claims fewer → FIRE |
 | silent when counts match | counts equal → SILENT |
 | fires when TEST.md lists missing bats file | bats file missing → FIRE |
 | silent when edited file is not .bats or TEST.md | not a tracked file type → SILENT |
@@ -153,12 +153,17 @@ parity; the count tracks def-functions not collected cases, so
 | silent when .base/test/smoke/*.bats count matches | subtree counts match → SILENT |
 | fires when .base/test/smoke/*.bats heading lists missing file | subtree path in TEST.md but file absent → FIRE |
 | repo-local and .base/ entries both checked in same TEST.md | mixed headings, one drifts → FIRE on the drifted one |
+| fires when drift is in a sibling catalog (doc/test/unit.md, not TEST.md) | post-split catalogs beside TEST.md are scanned too |
+| silent when sibling-catalog count matches (doc/test/unit.md) | negative control for the sibling-catalog scan |
 | fires when a pytest file's def test_ count drifts from TEST.md | pytest def-count drift → FIRE (issue #198) |
 | silent when pytest def test_ count matches TEST.md | pytest counts match → SILENT |
 | counts class-method pytest tests (indented def test_) | class-based pytest counted |
 | fires when TEST.md lists a missing pytest file | pytest file missing → FIRE |
 | test_ prefix pytest file (not just _test suffix) triggers the check | both discovery patterns fire |
 | silent when edited file is a non-test .py (src module) | non-test .py → SILENT |
+| fires when a .claude/test/bats/ heading count drifts | this repo's own layout → FIRE (refs #265) |
+| silent when a .claude/test/bats/ heading count matches | negative control for the `.claude/` prefix |
+| fires when a .claude/ heading lists a spec file that is gone | `.claude/` path in a catalog but file absent → FIRE |
 
 ### .claude/test/bats/unit/check_readme_framework_spec.bats (20)
 | Test | Scenario |
@@ -174,7 +179,7 @@ parity; the count tracks def-functions not collected cases, so
 | [drift] fires when a translation file is missing entirely | doc/README.ja.md missing → FIRE |
 | checks a translation file directly with [zh-TW] label | edit doc/README.zh-TW.md, drift → message prefixed `[zh-TW]` |
 | silent when editing .base/README.md (the framework reference itself) | path under `.base/` → SILENT (skipped) |
-| silent when editing archive/<repo>/README.md (read-only archive) | path under `archive/` → SILENT (skipped) |
+| silent when editing archive/\<repo>/README.md (read-only archive) | path under `archive/` → SILENT (skipped) |
 | silent when editing a non-README file | unrelated path → SILENT |
 | silent on multi_run/README.md when fully aligned | multi_run path with all 4 languages aligned → SILENT |
 | [7] silent when every tree path exists on disk (positive control) | Directory Structure tree where every leaf file/dir is materialized → SILENT (refs #65) |
@@ -192,7 +197,9 @@ parity; the count tracks def-functions not collected cases, so
 | fires on standalone hadolint | bare `hadolint ...` → FIRE |
 | silent inside docker run wrapper | `docker run ... shellcheck ...` → SILENT |
 | silent inside ./build.sh test wrapper | `./build.sh test` → SILENT |
-| silent inside make -f Makefile.ci wrapper | `make -f Makefile.ci lint` → SILENT |
+| silent inside make -f Makefile.ci wrapper (legacy, transition-tolerated) | `make -f Makefile.ci lint` → SILENT |
+| silent inside just -f justfile.ci wrapper (base#573 make->just, #202) | `just -f justfile.ci lint` → SILENT |
+| silent inside just test wrapper (downstream container-ops) | `just test` → SILENT |
 | silent on unrelated command containing the word bats in path | `ls /usr/lib/bats-core` → SILENT |
 | silent inside just -f .claude/test/justfile wrapper (default list) | `just -f .claude/test/justfile test` → SILENT |
 | lint_wrappers.txt overrides default list | sibling file lists custom wrapper → matches custom, SILENT |
@@ -264,11 +271,11 @@ call-log asserts ordering, default-owner prefix, and skip-and-continue.
 | --help prints usage and exits 0 | help path |
 | arg validation: missing repo arg -> exit 2 | required-arg validation |
 | arg validation: repo but no PR args -> exit 2 | required-arg validation |
-| arg validation: non-numeric PR -> exit 2 before any delegation | up-front validation, empty call-log |
 | --dry-run prints planned order and makes no delegate/gh call | dry-run no-op (empty call-log) |
 | default-owner expansion: short repo foo -> ycpss91255-docker/foo | default owner prefix |
 | ordering: PRs are delegated in the given argument order | serial order preserved |
 | skip-and-continue: first PR fails, second still lands, exit 1 names failed PR | continue-on-error + summary |
+| arg validation: non-numeric PR -> exit 2 before any delegation | up-front validation, empty call-log |
 | all-success: every delegate exits 0 -> exit 0 with merged summary | happy path |
 
 ### .claude/test/bats/unit/remind_monitor_on_ci_trigger_spec.bats (13)
@@ -314,11 +321,11 @@ re-invoke `/wait-pr-ci` on the same PR. Silent on initial `-u` pushes
 | silent on git push origin main (doc-only direct) | main target → SILENT |
 | fires on plain git push (re-push to existing upstream) | bare re-push → FIRE |
 | fires on git push origin feat/x without -u (re-push) | branch re-push → FIRE |
-| fires on git -C <dir> push --force-with-lease | -C global flag form → FIRE |
+| fires on git -C \<dir> push --force-with-lease | -C global flag form → FIRE |
 | silent on version-tag push (git push origin vX.Y.Z) | tag push, semver hook owns → SILENT |
 | silent on non-push git command (git status) | non-push git → SILENT |
 | silent on non-git command (ls) | non-git → SILENT |
-| silent on bulk tag push variant | --tags bulk → SILENT |
+| silent on git push --tags (bulk tag push, not a PR branch) | --tags bulk → SILENT |
 
 ### .claude/test/bats/unit/remind_tdd_categories_spec.bats (13)
 | Test | Scenario |
@@ -331,25 +338,25 @@ re-invoke `/wait-pr-ci` on the same PR. Silent on initial `-u` pushes
 | silent on .md edit | docs → SILENT |
 | silent on .bats edit | test file → SILENT |
 | silent on .claude/ internals | hook self-edits → SILENT |
-| [#75] .sh in downstream repo with only test/smoke/ drops Unit + Integration | repo-detect: ros1_bridge layout → only Smoke + Lint clauses |
-| [#75] .sh in repo with full test infra keeps all 4 categories | repo-detect: template layout → all 4 clauses |
-| [#75] Dockerfile in repo with only test/smoke/ keeps Smoke + Lint | repo-detect on Dockerfile path |
-| [#75] repo without any test/ subdir falls back to all 4 categories | fallback preserves pre-#75 behaviour |
-| [#220] .sh in repo detected via root justfile only (no Dockerfile) scopes categories | repo-detect: base/downstream root-justfile marker |
+| [#75/#237] .sh in repo with only test/bats/system/ drops Unit + Integration | repo-detect: ros1_bridge layout → only Smoke + Lint clauses |
+| [#220/#237] .sh in repo detected via root justfile only (no Dockerfile) scopes levels | repo-detect: base/downstream root-justfile marker |
+| [#75/#237] .sh in repo with full level infra keeps unit + integration + system | repo-detect: template layout → all 4 clauses |
+| [#75/#237] Dockerfile in repo with only test/bats/system/ keeps System (Smoke type) + static | repo-detect on Dockerfile path |
+| [#75/#237] repo without any test/bats level dir falls back to all levels | fallback preserves pre-#75 behaviour |
 
 ### .claude/test/bats/unit/remind_no_heredoc_redirect_spec.bats (10)
 | Test | Scenario |
 |------|----------|
-| fires on cat <<'EOF' > /path | quoted heredoc to file → FIRE |
-| fires on cat << EOF > /path (no quotes) | unquoted heredoc → FIRE |
-| fires on cat <<-EOF > /path (dash form) | tab-stripping heredoc → FIRE |
-| fires on cat <<EOF >> /path (append redirect) | append `>>` form → FIRE |
+| fires on cat \<\<'EOF' > /path | quoted heredoc to file → FIRE |
+| fires on cat \<\< EOF > /path (no quotes) | unquoted heredoc → FIRE |
+| fires on cat \<\<-EOF > /path (dash form) | tab-stripping heredoc → FIRE |
+| fires on cat \<\<EOF >> /path (append redirect) | append `>>` form → FIRE |
 | silent on plain echo > file (no heredoc) | simple redirect → SILENT |
 | silent on cat /file > /other (no heredoc) | file-to-file copy → SILENT |
 | silent on heredoc piped to command (no file redirect) | `cat <<EOF \| sh` → SILENT |
 | silent on git commit message describing the pattern (false-positive guard) | `git commit -m "...cat <<EOF > path..."` → SILENT |
-| silent on bash -c "cat <<EOF > path" (allowed wrapper) | `bash -c` wraps the heredoc → SILENT |
-| fires on chained command: git status && cat <<EOF > /path | command-position heredoc after `&&` → FIRE |
+| silent on bash -c "cat \<\<EOF > path" (allowed wrapper) | `bash -c` wraps the heredoc → SILENT |
+| fires on chained command: git status && cat \<\<EOF > /path | command-position heredoc after `&&` → FIRE |
 
 ### .claude/test/bats/unit/remind_no_chinese_in_git_artifacts_spec.bats (11)
 
@@ -398,7 +405,7 @@ threshold for short inline bodies.
 | rule 8: gh issue close --comment "$(cat path)" denied | cat substitution → DENY |
 | rule 8: gh pr create --body "$(cat path)" denied | cat substitution → DENY |
 | rule 8: gh pr edit --body $(cat path) without quotes denied | unquoted substitution → DENY |
-| rule 8: gh pr create --body-file - <<EOF heredoc denied | `--body-file -` heredoc → DENY |
+| rule 8: gh pr create --body-file - \<\<EOF heredoc denied | `--body-file -` heredoc → DENY |
 | rule 8: gh issue create --body-file - alone (stdin variant) denied | `--body-file -` alone → DENY |
 | rule 1: gh issue create without --body-file denied | inline body present, no `--body-file` → DENY |
 | rule 1: gh issue create with --body-file + --label allowed (silent) | canonical (Rule 1 + Rule 9) → SILENT |
@@ -415,30 +422,30 @@ threshold for short inline bodies.
 | rule 4: gh pr create --body-file path with dash-like name allowed | path with `-` but not literal `-` → SILENT |
 | rule 3: gh issue close N --comment "..." denied | `--comment` on close → DENY (two-step required) |
 | rule 3: gh issue close N -c "..." (short form) denied | short form of `--comment` → DENY |
-| rule 3: python3 -c mentioning gh issue close in a literal is NOT blocked | `-c` of another program, scoped out → SILENT (#219) |
-| rule 3: git log -S for the gh issue close string is NOT blocked | string-only match, no flag → SILENT (#219) |
-| rule 3: gh issue close N (no comment) chained before another -c command is allowed | `-c` after `&&` cut from close-segment → SILENT (#219) |
+| rule 3: python3 -c mentioning gh issue close in a literal is NOT blocked (refs #219) | `-c` of another program, scoped out → SILENT (#219) |
+| rule 3: git log -S for the gh issue close string is NOT blocked (refs #219) | string-only match, no flag → SILENT (#219) |
+| rule 3: gh issue close N (no comment) chained before another -c command is allowed (refs #219) | `-c` after `&&` cut from close-segment → SILENT (#219) |
 | rule 3: gh issue close N --reason completed (no comment) allowed | reason-only close → SILENT |
 | rule 3: gh issue close N --reason "not planned" allowed | reason-only close with quoted reason → SILENT |
 | rule 3: gh issue close N (no args beyond N) allowed | bare close → SILENT |
 | rule 6: gh pr edit N --body "inline" denied | edit inline body → DENY |
 | rule 6: gh pr edit N --body-file /tmp/x.md allowed | edit via file → SILENT |
 | rule 6: gh pr edit N --add-label "x" (no body) allowed | edit without body → SILENT |
-| rule 2: gh issue comment N --body "<=80 single-line" allowed | short inline → SILENT |
-| rule 2: gh issue comment N --body "<long string>" denied | long inline → DENY |
-| rule 5: gh pr comment N --body "<=80" allowed | short inline → SILENT |
-| rule 5: gh pr comment N --body "<long>" denied | long inline → DENY |
+| rule 2: gh issue comment N --body "\<=80 single-line" allowed | short inline → SILENT |
+| rule 2: gh issue comment N --body "\<long string>" denied | long inline → DENY |
+| rule 5: gh pr comment N --body "\<=80" allowed | short inline → SILENT |
+| rule 5: gh pr comment N --body "\<long>" denied | long inline → DENY |
 | rule 7: gh pr review --body "LGTM" allowed | short review → SILENT |
-| rule 7: gh pr review --body "<long>" denied | long review → DENY |
+| rule 7: gh pr review --body "\<long>" denied | long review → DENY |
 | silent on non-gh command using $(cat path) | non-gh → SILENT |
 | silent on gh pr view (no body involvement) | read-only subcmd → SILENT |
 | silent on gh pr merge --auto (no body) | merge subcmd → SILENT |
-| silent on gh run view <id> --json jobs | run-scoped read → SILENT |
+| silent on gh run view \<id> --json jobs | run-scoped read → SILENT |
 | silent on gh api /repos/.../issues/N | raw api read → SILENT |
 | silent on empty tool_input | defensive |
 | silent on non-Bash tool_input shape (e.g. Edit) | wrong tool → SILENT |
-| rule 2: gh issue comment --body "<exactly 80 chars>" allowed | boundary lower side → SILENT |
-| rule 2: gh issue comment --body "<81 chars>" denied | boundary upper side → DENY |
+| rule 2: gh issue comment --body "\<exactly 80 chars>" allowed | boundary lower side → SILENT |
+| rule 2: gh issue comment --body "\<81 chars>" denied | boundary upper side → DENY |
 | #196 A: pr create closing #N without decision record denied | closing PR needs ## Resolution/Decision (issue #196) |
 | #196 A: pr create closing #N WITH ## Resolution allowed | marker present → SILENT |
 | #196 A: pr create closing #N WITH ## Decision allowed | Decision marker equivalent |
@@ -467,7 +474,7 @@ parser warnings). `gh` is stubbed via PATH so the loop sees canned
 | missing --prs exits 2 | required arg validation |
 | unknown arg exits 2 | unknown flag |
 | all-pass + MERGEABLE single PR exits 0 with ALL_DONE | happy path |
-| any FAILURE check exits 1 with FAIL <pr> | fail-fast on FAILURE |
+| any FAILURE check exits 1 with FAIL \<pr> | fail-fast on FAILURE |
 | all-pass + CONFLICTING mergeable exits 1 with update-stale-pr hint | mergeable=CONFLICTING surfaces as FAIL with update-stale-pr.sh hint (issue #87 / #221) |
 | mixed SUCCESS+SKIPPED rollup hits ALL_DONE | SKIPPED counts as success-equivalent (issue #86) |
 | multiple PRs all-pass + MERGEABLE exits 0 | CSV PR batching |
@@ -486,9 +493,9 @@ parser warnings). `gh` is stubbed via PATH so the loop sees canned
 | headRefOid change between polls emits [head-moved] and forces pending | headRefOid guard (issue #60) |
 | stable headRefOid across polls preserves ALL_DONE path | negative control for headRefOid guard |
 | JSON without headRefOid preserves backwards-compatible behaviour | mocks without headRefOid keep working |
-| state=MERGED with mergeable=UNKNOWN exits 0 with ALL_DONE | auto-merge race short-circuit (issue #113) |
-| state=CLOSED without merge exits 1 with FAIL <pr> | terminal failure (issue #113) |
-| state-transition mid-poll OPEN/pending -> MERGED reaches ALL_DONE | mid-poll race (issue #113) |
+| state=MERGED with mergeable=UNKNOWN exits 0 with ALL_DONE (auto-merge race) | auto-merge race short-circuit (issue #113) |
+| state=CLOSED without merge exits 1 with FAIL \<pr> | terminal failure (issue #113) |
+| state-transition mid-poll: OPEN/pending -> MERGED reaches ALL_DONE | mid-poll race (issue #113) |
 | absent .state field preserves backwards-compatible behaviour | legacy stubs without .state keep working |
 | ALL_DONE appends one JSON event line with full schema | event-log emit (issue #175 Phase 1) |
 | FAIL appends event line with exit_reason=FAIL | event-log emit (issue #175 Phase 1) |
@@ -512,25 +519,25 @@ and aggregates all PRs into one stream.
 | all-pass single short-form pair exits 0 with ALL_DONE | happy path + default owner prefix |
 | full owner/repo form is accepted (no prefix added) | full form override |
 | --owner overrides default for short form | owner flag |
-| any FAILURE check exits 1 with FAIL <repo>#<pr> | failure surfacing |
+| any FAILURE check exits 1 with FAIL \<repo>#\<pr> | failure surfacing |
 | mixed SUCCESS+SKIPPED rollup hits ALL_DONE | SKIPPED counts as success-equivalent (issue #86) |
 | multiple pairs all-pass + MERGEABLE exits 0 | batch happy path |
 | custom --check-filter narrows to a non-default check name | container-repo filter usage |
 | max-iterations exits 124 when stuck pending | iteration cap |
 | no matching checks counts as no-checks (not all-pass) and loops | empty filter result ≠ green |
 | all-pass but UNKNOWN mergeable does not exit ALL_DONE | mergeable gate |
-| per-repo --check-filter <repo>=<expr> applies only to that repo | per-repo filter map (issue #46) |
+| per-repo --check-filter \<repo>=\<expr> applies only to that repo | per-repo filter map (issue #46) |
 | per-repo filter overrides default for one repo, others fall back | mixed per-repo + global default |
 | per-repo filter accepts full owner/repo key form | full owner/repo as filter key |
 | global --check-filter (no repo prefix) still works as before | backwards-compat global filter |
 | per-repo filter with no matching check counts as no-checks | per-repo filter narrowing semantics |
 | duplicate --check-filter for same repo: last one wins | last-write-wins map semantic |
-| --min-checks 2 with only 1 matching SUCCESS stays pending | subset-rollup race per-pair (issue #66) |
+| --min-checks 2 with only 1 matching SUCCESS stays pending (subset rollup race) | subset-rollup race per-pair (issue #66) |
 | status IN_PROGRESS blocks all-pass (status guard) | status-guard demotion per-pair |
-| per-repo --min-checks <repo>=<N> applies only to that repo | per-repo min-checks map |
+| per-repo --min-checks \<repo>=\<N> applies only to that repo | per-repo min-checks map |
 | --min-checks default 1 preserves backwards-compatible behaviour | positive control |
 | --min-checks non-integer exits 2 | arg validation |
-| --min-checks <repo>=<non-int> exits 2 | per-repo arg validation |
+| --min-checks \<repo>=\<non-int> exits 2 | per-repo arg validation |
 | all-pass with completedAt predating watch start → pending (batch) | stale-rollup completedAt guard per-pair (issue #60) |
 | headRefOid change between polls emits [head-moved] (batch) | headRefOid guard per-pair (issue #60) |
 | stable headRefOid across polls preserves ALL_DONE path (batch) | negative control for headRefOid guard |
@@ -576,9 +583,9 @@ via PATH; bodies land under a temp `TMPDIR` so test runs are sealed.
 | --only filters to single archive repo | filter happy path |
 | --only filters to multiple slugs across archive + rename groups | cross-group filter |
 | --only with non-matching slug creates none | filter no-match |
-| archive title format: 'chore: archive <repo> (out of docker_harness active list)' | title contract (archive) |
-| rename title format: 'chore: rename <old> -> <new> (+ .base migration)' | title contract (rename) |
-| non-dry-run calls 'gh issue create -R <owner/repo> --title ... --body-file ...' | argv shape uses --body-file (rule 1 of enforce_gh_body_file.sh) |
+| archive title format: 'chore: archive \<repo> (out of docker_harness active list)' | title contract (archive) |
+| rename title format: 'chore: rename \<old> -> \<new> (+ .base migration)' | title contract (rename) |
+| non-dry-run calls 'gh issue create -R \<owner/repo> --title ... --body-file ...' | argv shape uses --body-file (rule 1 of enforce_gh_body_file.sh) |
 | --owner overrides default org for create | owner flag |
 | skips create when an issue with the same title already exists | idempotent re-run |
 | gh create failure counts toward 'failed' and exits 1 | failure surfacing |
@@ -596,7 +603,7 @@ repos with a shared `--reason` comment posted first. Sibling of
 | no pairs exits 2 | required-arg validation |
 | bad pair (no colon) exits 2 | format validation |
 | non-numeric PR exits 2 | PR validation up-front |
-| short repo name is normalized to ycpss91255-docker/<repo> | default owner prefix |
+| short repo name is normalized to ycpss91255-docker/\<repo> | default owner prefix |
 | full owner/repo form is accepted (no prefix added) | full-form override |
 | --owner overrides default for short form | owner flag |
 | --dry-run prints planned closes and skips gh invocation | dry-run no-op |
@@ -608,7 +615,7 @@ repos with a shared `--reason` comment posted first. Sibling of
 | empty repo in pair exits 2 | empty-repo guard |
 | empty PR in pair exits 2 | empty-pr guard |
 
-### .claude/test/bats/unit/batch_pr_merge_spec.bats (14)
+### .claude/test/bats/unit/batch_pr_merge_spec.bats (18)
 
 Covers `.claude/scripts/batch-pr-merge.sh` — squash-merge the N PRs
 opened by `batch-template-upgrade.sh` once their CI is green. Mirrors
@@ -622,13 +629,17 @@ printed by `batch-template-upgrade.sh` works for both scripts.
 | no pairs exits 2 | required-arg validation |
 | bad pair (no colon) exits 2 | format validation |
 | non-numeric PR exits 2 | PR validation up-front (before any gh call) |
-| short repo name is normalized to ycpss91255-docker/<repo> | default owner prefix |
+| short repo name is normalized to ycpss91255-docker/\<repo> | default owner prefix |
 | full owner/repo form is accepted (no prefix added) | full form override |
 | --owner overrides default for short form | owner flag |
 | --dry-run prints planned merges and skips gh invocation | dry-run no-op |
 | successful merge invokes gh pr merge with --squash --delete-branch | argv shape |
 | gh failure produces summary and exits 1 | failure surfacing |
 | mixed success and failure continues and reports both | continue-on-error semantics |
+| --reset-local is accepted and dry-run still skips gh + reset (#146) | dry-run covers the reset step too |
+| --reset-local: missing local checkout is logged + skipped, merge still ok (#146) | absent local checkout is not fatal |
+| --reset-local does NOT run when merge fails (#146) | reset gated on a successful merge |
+| --reset-local appears in --help output (#146) | flag documented in usage |
 | unknown flag exits 2 | flag validation |
 | empty repo in pair exits 2 | empty-repo guard |
 | empty PR in pair exits 2 | empty-pr guard |
@@ -649,28 +660,28 @@ guard that BLOCKs raw `git tag v*` / `git push.*v[0-9]` /
 | denies git push origin refs/tags/vX.Y.Z | full refspec deny |
 | denies git push --tags | bulk push deny |
 | denies git push origin --tags | bulk push with remote deny |
-| denies even when ACK env appears in command | ACK env on raw git still rejected |
+| denies even when ACK env appears in command (Claude must use script, not raw git) | ACK env on raw git still rejected |
 | silent for git tag listing (-l) | list form passes |
 | silent for git tag --list | list form passes |
 | silent for git tag with no args (list form) | bare list form passes |
-| silent for git tag -d \<tag\> (delete annotated) | delete passes |
-| silent for git tag --delete \<tag\> | delete passes |
+| silent for git tag -d \<tag> (delete annotated) | delete passes |
+| silent for git tag --delete \<tag> | delete passes |
 | silent for git push origin :v1.3.0 (refspec delete) | refspec delete passes |
 | silent for regular branch push (no v-tag refspec) | branch push passes |
 | silent for non-version tag (e.g. release-2026) | non-v tag passes |
 | silent for non-git command | non-git passes |
 | silent for invocation of .claude/scripts/release-tag.sh itself | canonical script invocation passes |
-| denies git -C \<dir\> tag vX.Y.Z (global -C flag) | -C global flag detected |
+| denies git -C \<dir> tag vX.Y.Z (global -C flag) | -C global flag detected |
 | denies git tag -f vX.Y.Z (force re-tag) | -f flag detected |
 | silent on empty command (defensive) | empty input handled |
 | denies gh release create vX.Y.Z | gh CLI bypass closed (issue #181) |
 | denies gh release create vX.Y.Z-rcN | gh CLI bypass for RC tags |
 | denies gh release create with --repo flag | flags interleaved before / after tag |
 | silent for gh release list | non-create subcommand passes |
-| silent for gh release view \<tag\> | view passes |
-| silent for gh release delete \<tag\> | delete passes |
+| silent for gh release view \<tag> | view passes |
+| silent for gh release delete \<tag> | delete passes |
 | silent for gh release create non-version tag (release-2026) | non-v tag passes via gh too |
-| silent for gh release edit \<tag\> (metadata edit, tag already exists) | edit on existing tag passes |
+| silent for gh release edit \<tag> (metadata edit, tag already exists) | edit on existing tag passes |
 
 ### .claude/test/bats/unit/release_tag_spec.bats (25)
 
@@ -681,7 +692,7 @@ PATH; `git` operations run against a real temp repo seeded per test.
 | Test | Scenario |
 |------|----------|
 | --help exits 0 and prints usage | help path |
-| missing \<tag\> exits 2 | arg validation |
+| missing \<tag> exits 2 | arg validation |
 | malformed tag (no v prefix) exits 2 | shape validation |
 | malformed tag (extra suffix) exits 2 | shape validation |
 | unknown flag exits 2 | flag validation |
@@ -727,7 +738,7 @@ Refs issue #97.
 | first ADR gets number 00000001 | bootstrap numbering |
 | second ADR gets number 00000002 | increment |
 | auto-numbering picks max+1 across non-contiguous existing ADRs | max-scan |
-| rejects collision when same slug already exists | filename-collision guard |
+| same slug across different numbers is allowed (auto-numbering) | slug reuse permitted; the ADR number disambiguates |
 | template body contains all 4 sections | template rendering (Context / Decision / Alternatives / Consequences) |
 | title-cases the slug in the H1 | slug -> title-case transform |
 | --dry-run does not create the file | preview mode |
@@ -768,8 +779,8 @@ branch-name match is exercised end-to-end.
 | Test | Scenario |
 |------|----------|
 | --help exits 0 and prints usage | help path |
-| missing \<pr\> exits 3 | arg validation |
-| non-numeric \<pr\> exits 3 | shape validation |
+| missing \<pr> exits 3 | arg validation |
+| non-numeric \<pr> exits 3 | shape validation |
 | unknown flag exits 3 | flag validation |
 | duplicate positional exits 3 | arg duplicate guard |
 | gh failure (PR not found) exits 3 | upstream lookup failure |
@@ -832,7 +843,7 @@ via PATH.
 | unknown arg exits 2 | unknown flag |
 | all runs completed + success exits 0 with ALL_DONE | happy path |
 | mixed success+skipped runs hit ALL_DONE | skipped counts as success-equivalent (issue #86) |
-| any completed run with conclusion != success exits 1 with FAIL <name> | fail on completed-non-success |
+| any completed run with conclusion != success exits 1 with FAIL \<name> | fail on completed-non-success |
 | any in_progress run keeps polling and hits max-iterations 124 | partial completion stays pending |
 | empty run list (tag just pushed) keeps polling and hits max-iterations 124 | total==0 ≠ green |
 | custom --check-filter narrows to a specific run name | filter ignores out-of-scope in-progress runs |
@@ -1018,33 +1029,13 @@ parser never sees is composed correctly.
 | default suite=all targets unit + integration dirs | path-resolution default |
 | --suite unit narrows to /source/test/unit/ | suite kind handling |
 | --suite integration narrows to /source/test/integration/ | suite kind handling |
-| --suite <path> uses literal /source/<path> | escape hatch for arbitrary path |
+| --suite \<path> uses literal /source/\<path> | escape hatch for arbitrary path |
 | default --grep produces inner cmd with grep filter pipe | grep wiring |
 | --grep '' disables filter (full output) | empty pattern disables grep |
 | --service overrides default service name | flag override |
 | --compose-file overrides default compose.yaml | flag override |
 | HOST_UID / HOST_GID env values come from id stub | env propagation |
 | --head N caps output to first N lines | head/tail mutual exclusion |
-
-### .claude/test/bats/unit/batch_template_upgrade_spec.bats (7)
-
-Covers `.claude/scripts/batch-template-upgrade.sh` — the implementation
-behind `/batch-template-upgrade`. After PR #34 the script self-prints a
-copy-pasteable `wait-pr-ci-batch.sh` + `batch-pr-merge.sh` block at the
-end of a real run, so sessions that bypass the slash command still see
-the next-step path (was the root cause of the v0.15.0 ad-hoc
-`/tmp/wait-batch-vX.Y.Z.sh` regression). Specs cover arg validation
-plus unit tests of `print_next_step_hint` via source-with-guard.
-
-| Test | Scenario |
-|------|----------|
-| --help prints usage and exits 0 | help path |
-| missing version exits 2 | required-arg validation |
-| missing why exits 2 | required-arg validation |
-| unknown arg exits 2 | flag validation |
-| print_next_step_hint emits both wait + merge commands when pairs given | hint formatting (2+ pairs) |
-| print_next_step_hint silent when no pairs | dry-run / all-skipped guard |
-| print_next_step_hint preserves single pair | hint formatting (1 pair) |
 
 ### .claude/test/bats/unit/check_claude_md_tree_spec.bats (8)
 
@@ -1125,8 +1116,8 @@ template v0.18.0 / v0.18.1 to ship with `.version` still on v0.17.0
 |------|----------|
 | blocks git tag -a when .version mismatches | annotated tag path, FAIL → deny |
 | blocks lightweight git tag when .version mismatches | bare `git tag <tag>` |
-| blocks git push origin <tag> when .version mismatches | push form |
-| blocks git push origin refs/tags/<tag> when .version mismatches | refspec form |
+| blocks git push origin \<tag> when .version mismatches | push form |
+| blocks git push origin refs/tags/\<tag> when .version mismatches | refspec form |
 | silent when .version matches tag exactly | happy path |
 | silent for rc tag matching .version | rc semver in `.version` |
 | blocks rc tag when .version still on previous version | rc mismatch |
@@ -1199,7 +1190,7 @@ hook writes a checkpoint markdown + quotes the matching `touch
 | denies bare template/upgrade.sh (legacy, no leading ./) | surface 2 path-prefix variant |
 | denies git subtree pull --prefix=.base ... | surface 3 trigger |
 | denies git subtree pull --prefix=template ... (legacy prefix) | surface 3 legacy prefix |
-| denies git -C <repo> subtree pull --prefix=.base ... (via -C arg) | -C arg resolution |
+| denies git -C \<repo> subtree pull --prefix=.base ... (via -C arg) | -C arg resolution |
 | silent on git subtree pull with unrelated --prefix=foo | scope discriminator |
 | silent on git subtree push --prefix=.base (push, not pull) | subcommand discriminator |
 | silent on make -f Makefile.ci upgrade (already going through wrapper) | wrapper path |
@@ -1210,6 +1201,10 @@ hook writes a checkpoint markdown + quotes the matching `touch
 | silent on empty command | empty-input guard |
 | allows same command after ack file exists | ack-bypass |
 | ack for different command does NOT bypass deny | hash isolation |
+| downstream justfile -> deny with just upgrade canonical | downstream layout → `just upgrade` hint |
+| base-self justfile.ci -> deny with just -f justfile.ci canonical | base-self layout → `just -f justfile.ci upgrade` hint |
+| precedence: justfile wins over Makefile.ci when both present | just-first during the make->just transition |
+| silent when justfile present but has no upgrade recipe | no upgrade recipe → rule N/A |
 
 ### .claude/test/bats/unit/enforce_batch_via_script_spec.bats (19)
 
@@ -1279,6 +1274,9 @@ bypass (env var or inline command prefix). `gh` is PATH-stubbed so
 | silent on unrelated command (git status) | non-merge command |
 | silent on gh pr view (read-only) | read-only gh |
 | silent on empty command | empty-input guard |
+| N1: non-merge command that merely mentions gh pr merge --auto is silent | quoted mention, not a real arm → SILENT |
+| N3: fail-open when gh pr list errors (silent) | gh outage never blocks a legitimate single arm |
+| N4: mixed armed set excludes only the PR being armed | self-exclusion in the armed-PR query |
 
 ### .claude/test/bats/unit/enforce_local_full_ci_before_pr_spec.bats (11)
 
@@ -1304,7 +1302,7 @@ nothing can stamp it (refs #176 / #208).
 | gh pr ready also gated (no marker -> deny) | ready trigger → DENY |
 | silent (fail safe) when cwd is not a git repo | non-repo → SILENT |
 | allows when only doc/ + TEST.md changed since the green marker | multi-doc-only → ALLOW |
-| fail-open: repo with no detectable CI mechanism is silent | no ci.sh/justfile.ci/justfile → SILENT (issue #208) |
+| fail-open: repo with no detectable CI mechanism is silent (refs #208) | no ci.sh/justfile.ci/justfile → SILENT (issue #208) |
 
 ### .claude/test/bats/unit/ci_and_stamp_spec.bats (10)
 
@@ -1352,11 +1350,11 @@ now. Lift via the same `/tmp` checkpoint protocol (ADR-00000002 /
 | Test | Scenario |
 |------|----------|
 | denies git checkout -b feat/x in main checkout | positive trigger + checkpoint side-effect |
-| denies git checkout -B feat/x (capital B) | -B variant |
-| denies git -C <main-path> checkout -b feat/x | -C arg resolution |
+| denies git checkout -B feat/x (capital B) in main checkout | -B variant |
+| denies git -C \<main-path> checkout -b feat/x (via -C arg) | -C arg resolution |
 | deny reason mentions git worktree add | reason content |
 | silent on git checkout -b inside a worktree | worktree pass-through (cwd) |
-| silent on git -C <worktree-path> checkout -b | worktree pass-through (-C) |
+| silent on git -C \<worktree-path> checkout -b | worktree pass-through (-C) |
 | silent on git checkout main (switch existing branch, no -b) | non-create form |
 | silent on git checkout -- file.txt (path restore) | path-restore form |
 | silent on git checkout some-existing-branch | existing branch switch |
@@ -1464,7 +1462,7 @@ sessions without a compact fall back to whole-session counting
 | silent on empty transcript | edge case |
 | fires on gh pr merge invocation (even with low tool count) | PR-merge signal |
 | fires on tool count >= default threshold (100) | count signal |
-| silent on tool count below default threshold (99 < 100) | threshold boundary |
+| silent on tool count below default threshold (99 \< 100) | threshold boundary |
 | fires on both PR merge AND high tool count (both reasons listed) | combined signal |
 | respects STRATEGIC_COMPACT_TOOL_THRESHOLD override (lower) | env override down |
 | respects STRATEGIC_COMPACT_TOOL_THRESHOLD override (higher) | env override up |
@@ -1539,7 +1537,7 @@ network access.
 | denies with cd && form | `cd <dir> && git ...` resolution |
 | silent when cwd is not a git repo (allow) | rule N/A → silent |
 
-### .claude/test/bats/unit/verify_spec.bats (15)
+### .claude/test/bats/unit/verify_spec.bats (16)
 
 Covers `.claude/scripts/verify.sh` — the unified change-complete
 verification loop fronted by `/verify`. Stubs the hard phases
@@ -1561,6 +1559,7 @@ paths against a temp git repo seeded by `setup()`.
 | single hard phase prints summary table | phase routing + summary table |
 | all phases run end-to-end on a clean tree | full pipeline happy path |
 | TEST.md drift reported when count mismatches | per-section drift detection |
+| TEST.md drift reported for a .claude/test/bats/ heading (refs #265) | `.claude/`-prefixed heading is scanned |
 | TEST.md drift reported when listed file missing | drift when bats file absent |
 | hard-phase failure stops later phases by default | short-circuit on hard fail |
 | --continue-on-fail runs later phases despite hard failure | override short-circuit |
@@ -1585,11 +1584,11 @@ both glob + not_glob).
 | --list prints every instinct name with its kind | list mode |
 | git_commit kind returns the commit-title instinct | kind match |
 | kind with no matching instinct exits 1 | empty-result exit code |
-| file_edit on .sh path returns shell-style + no-emoji | glob match + kind-only |
-| file_edit on .py path returns only no-emoji | glob excludes |
+| file_edit on .sh path returns shell-style + no-emoji (kind match without glob) | glob match + kind-only |
+| file_edit on .py path returns only no-emoji (glob filters shell-style out) | glob excludes |
 | file_edit on Dockerfile matches glob with curly? | glob without extension |
 | not_glob excludes the matching glob entry | negative glob |
-| guidance bullets are printed indented | output shape |
+| guidance bullets are printed indented under the entry header | output shape |
 | refs line printed when present, omitted when absent | optional field |
 | missing INSTINCTS_FILE exits 2 | resolution failure |
 
@@ -1708,7 +1707,7 @@ and `PARALLEL_REMIND_THRESHOLD=<N>` (default 4). Pairs with
 | case-insensitive: 'ALL REPOS' fires | case folding |
 | ordinal numbers do NOT trigger (the 4th issue) | false-positive guard |
 | version-shaped numbers do NOT trigger (v0.32.0) | false-positive guard |
-| CJK quantifier 所有 repo fires | CJK quantifier pattern |
+| CJK quantifier '所有 repo' fires | CJK quantifier pattern |
 
 ### .claude/test/bats/unit/wait_issue_close_spec.bats (12)
 
@@ -1764,7 +1763,7 @@ directory or a broken symlink. New in #210; see ADR-00000011.
 
 | Test | Scenario |
 |------|----------|
-| every repo-owned .claude/skills/<name> is a symlink to ../../.agents/skills/<name> | symlink shape + target |
+| every repo-owned .claude/skills/\<name> is a symlink to ../../.agents/skills/\<name> | symlink shape + target |
 | every repo-owned skill resolves its SKILL.md through the symlink | functional reachability |
 | every repo-owned skill canonical dir is a real directory under .agents/skills | canonical store is a real dir, not nested symlink |
 
@@ -1817,3 +1816,108 @@ remove" preview is never followed by a `fatal: ... is not a working tree`.
 | skips a worktree whose PR is not MERGED | unmerged branch untouched |
 | skips a dirty worktree | dirty-tree guard |
 | skips a path that does not exist | missing path is a skip, not a failure |
+
+### .claude/test/bats/unit/batch_base_upgrade_spec.bats (8)
+
+Covers `.claude/scripts/batch-base-upgrade.sh` — the `/batch-base-upgrade`
+fanout implementation (renamed from `batch-template-upgrade.sh` in #146).
+Argument validation plus the next-step hint it prints once the PRs are open.
+
+| Test | Scenario |
+|------|----------|
+| --help prints usage and exits 0 | help path |
+| missing version exits 2 | required-arg validation |
+| missing why exits 2 | required-arg validation |
+| unknown arg exits 2 | flag validation |
+| print_next_step_hint emits both wait + merge commands when pairs given | next-step hint shape |
+| print_next_step_hint silent when no pairs | no PRs → no hint |
+| print_next_step_hint preserves single pair | single-pair hint |
+| print_next_step_hint mentions --reset-local rationale (#146) | hint documents the local-checkout reset |
+
+### .claude/test/bats/unit/remind_topics_yaml_on_new_repo_spec.bats (6)
+
+Covers `.claude/hooks/remind_topics_yaml_on_new_repo.sh` — PreToolUse Bash
+hook that nudges for a `topics.yaml` entry when a repo is created under the
+`ycpss91255-docker` org, and stays silent for every other `gh repo` form.
+
+| Test | Scenario |
+|------|----------|
+| fires on gh repo create ycpss91255-docker/\<name> | org repo create → FIRE (topics.yaml nudge) |
+| fires regardless of gh repo create flag order | flag-order independence |
+| silent on gh repo create against another org | scoped to the org → SILENT |
+| silent on gh repo view (not create) | wrong subcommand → SILENT |
+| silent on unrelated command | non-matching command → SILENT |
+| silent when tool_input.command missing | defensive |
+
+### .claude/test/bats/unit/sync_org_repo_settings_spec.bats (12)
+
+Covers `.claude/scripts/sync-org-repo-settings.sh` — idempotent org-wide
+repo-settings sync. The specs pin the per-repo required-check map and the
+`ALL_REPOS` roster, the two tables a drifted org would otherwise change
+silently.
+
+| Test | Scenario |
+|------|----------|
+| --help prints usage and exits 0 | help path |
+| unknown arg exits 2 with unrecognised_arg body | flag validation + log body |
+| required_check_for: base -> ci-rollup | per-repo required-check map |
+| required_check_for: docker_harness -> bats + shellcheck + hadolint | per-repo required-check map |
+| required_check_for: ros_distro / ros2_distro -> ci-passed | per-repo required-check map |
+| required_check_for: ros1_bridge -> ci-summary | per-repo required-check map |
+| required_check_for: multi_run / template -> test | per-repo required-check map |
+| required_check_for: sam_manager -> build | per-repo required-check map |
+| required_check_for: .github -> empty (doc-only PRs bypass lint) | doc-only repo has no required check |
+| required_check_for: default (single-target container) -> call-docker-build / docker-build | fallback branch of the map |
+| ALL_REPOS lists 23 base-aligned repos | repo roster contract |
+| ALL_REPOS excludes out-of-scope repos (demo-repository, github_runner) | roster exclusions |
+
+### .claude/test/bats/unit/warn_structured_data_text_tools_spec.bats (10)
+
+Covers `.claude/hooks/warn_structured_data_text_tools.sh` — PreToolUse Bash
+hook (non-blocking) that nudges toward `jq` when `awk` / `sed` is pointed at
+a `.json` / `.jsonl` file, while staying silent on prose that merely mentions
+the rule.
+
+| Test | Scenario |
+|------|----------|
+| fires on awk parsing a .jsonl file | text tool on JSONL → FIRE |
+| fires on sed parsing a .json file | text tool on JSON → FIRE |
+| fires on cat .jsonl piped to awk | pipe form detected |
+| fires on chained command: ls && awk on .json | chained command detected |
+| silent when jq is present (jq extracts, awk formats columns) | jq in the pipeline → SILENT |
+| silent on grep against .jsonl (out of scope — grep on json is common) | grep scoped out → SILENT |
+| silent on awk against a non-json file (.csv) | non-JSON target → SILENT |
+| silent on commit message describing the rule with jq (false-positive guard) | prose mention → SILENT |
+| silent on commit message mentioning awk+json without command-position awk | quoted mention, no command-position awk → SILENT |
+| silent on empty command | defensive |
+
+### .claude/test/bats/unit/sync_doc_test_counts_spec.bats (20)
+
+Covers `.claude/scripts/sync-doc-test-counts.sh` — the generator these very
+catalogs are produced by. Fixtures use the fallback `test/<level>/` layout,
+so each case is a self-contained temp repo. The specs pin the semantics the
+script's header documents: preservation, deletion, rename, ordering,
+escaping, and the read-only `--check` gate.
+
+| Test | Scenario |
+|------|----------|
+| --help prints usage and exits 0 | help path |
+| unknown flag exits 2 | flag validation |
+| repo root without doc/test exits 2 | root validation |
+| heading count is regenerated from the spec file | derived `### <path> (N)` |
+| section whose spec file no longer exists is dropped whole | deletion semantics (section level) |
+| spec file with no section gets one appended, with its rows | missing-section sweep |
+| a hand-written description survives regeneration | preservation keyed on the test name |
+| row naming a deleted test is dropped | deletion semantics (row level) |
+| a renamed test is delete-plus-add: prose does not follow the rename | rename semantics |
+| rows follow spec file order, not the doc's previous order | ordering contract |
+| a pipe in a test name is escaped and round-trips | `\|` escaping both ways |
+| an angle bracket in a test name is escaped so markdown keeps it | `\<` escaping so inline HTML cannot swallow it |
+| a section with no Test table keeps its prose untouched | opt-in tables: summary sections left alone |
+| the per-level **N tests** total is regenerated | per-level total derived |
+| TEST.md grand total and index row are regenerated | index figures derived |
+| --check exits 1 on drift, names the fix, and writes nothing | gate mode is read-only |
+| --check exits 0 once the docs are in sync | gate mode positive control |
+| regeneration is idempotent | second run is a no-op |
+| a Description column header is accepted as well as Scenario | both catalog column headers supported |
+| a one-line @test stanza is catalogued like a multi-line one | row set matches the `grep -c '^@test'` count for both stanza shapes |

@@ -154,6 +154,18 @@ EOF
   assert_output --partial "| test-md | fail |"
 }
 
+@test "TEST.md drift reported for a .claude/test/bats/ heading (refs #265)" {
+  mkdir -p "${REPO_DIR}/.claude/test/bats/unit"
+  printf '@test "a" { true; }\n' \
+    > "${REPO_DIR}/.claude/test/bats/unit/x_spec.bats"
+  printf '# Tests\n\n### .claude/test/bats/unit/x_spec.bats (4)\n' \
+    > "${REPO_DIR}/doc/test/TEST.md"
+  run "$(script verify.sh)" --repo-root "${REPO_DIR}" --phase test-md
+  assert_failure 1
+  assert_output --partial '"claimed":"4"'
+  assert_output --partial '"actual":"1"'
+}
+
 @test "TEST.md drift reported when listed file missing" {
   cat > "${REPO_DIR}/doc/test/TEST.md" <<'EOF'
 # Tests

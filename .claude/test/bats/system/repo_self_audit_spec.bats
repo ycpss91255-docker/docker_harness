@@ -6,7 +6,9 @@
 # so real drift (a script added without a CONTEXT.md tree entry, a
 # CLAUDE.md that outgrew its ceiling, a helper that bypasses lib/log.sh)
 # fails here as a system regression. Mirrors the ci.sh tree-check /
-# ceiling-check / log-helper-check targets, run as part of the bats suite.
+# ceiling-check / log-helper-check / doc-count-check targets, run as part of
+# the bats suite -- which is the layer that actually gates on a PR for the
+# targets the workflow does not invoke by name (refs #265).
 
 load '../lib/test_helper'
 
@@ -24,4 +26,10 @@ load '../lib/test_helper'
 @test "system: .claude/scripts adopt the lib/log.sh helper" {
   run "$(script check-log-helper-usage.sh)" --scripts-dir "${PROJECT_ROOT}/.claude/scripts"
   assert_success
+}
+
+@test "system: doc/test catalogs match the real spec tree" {
+  run "$(script sync-doc-test-counts.sh)" --check "${PROJECT_ROOT}"
+  assert_success
+  assert_output --partial "in sync"
 }
