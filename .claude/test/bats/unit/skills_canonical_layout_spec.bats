@@ -17,9 +17,11 @@ repo_root() {
 # The repo-owned skills that must live canonically under .agents/skills/.
 # Third-party skills are deliberately absent (machine-local).
 REPO_OWNED_SKILLS=(
+  auto-merge-on-green
   batch-mutation-pr
   gh-artifact-format
   parallel-agents
+  plan-and-build
   proactive-optimization
   semver-bump
   skillification-candidates

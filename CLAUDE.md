@@ -119,6 +119,8 @@ from prose.
   `[[skillification-candidates]]` (Stop hook reminds)
 - Parallel-Agent dispatch for bulk work (N>=4 independent items, cap
   3): `[[parallel-agents]]` (UserPromptSubmit hook reminds)
+- Plan with the user, then hand implementation to a Workflow agent in
+  a worktree under `/tdd`: `[[plan-and-build]]` (ADR-00000014)
 - Stress-test plan / design before commit: `[[grill-me]]` (Q&A) or
   `[[grill-with-docs]]` (Q&A that also updates CONTEXT.md / ADR
   inline as decisions crystallise)

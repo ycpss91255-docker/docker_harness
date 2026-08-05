@@ -51,6 +51,7 @@ skills-lock.json
 !.agents/skills/batch-mutation-pr/
 !.agents/skills/gh-artifact-format/
 !.agents/skills/parallel-agents/
+!.agents/skills/plan-and-build/
 !.agents/skills/proactive-optimization/
 !.agents/skills/update-stale-pr/
 !.agents/skills/semver-bump/
@@ -64,6 +65,7 @@ skills-lock.json
 !.claude/skills/batch-mutation-pr
 !.claude/skills/gh-artifact-format
 !.claude/skills/parallel-agents
+!.claude/skills/plan-and-build
 !.claude/skills/proactive-optimization
 !.claude/skills/update-stale-pr
 !.claude/skills/semver-bump

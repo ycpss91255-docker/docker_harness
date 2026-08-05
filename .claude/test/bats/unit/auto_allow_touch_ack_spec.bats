@@ -86,3 +86,32 @@ setup() {
   run "$(hook auto_allow_touch_ack.sh)" <<< '{"tool_input":{"command":""}}'
   assert_silent
 }
+
+# ---- subagent calls never get the one-click lift (refs #267) ----
+#
+# The ack exists to capture a HUMAN's intent to lift a Tier 2 E2 gate. An
+# autonomous implementer that can write its own ack lifts those gates by
+# itself, which defeats them. Hooks do fire for subagent tool calls, and a
+# subagent payload carries `agent_id` / `agent_type` that a main-session
+# payload does not -- so an agent-originated ack falls through to the normal
+# ask flow, where the human answers.
+
+@test "silent on a matching ack when the caller is a subagent (agent_id present)" {
+  run "$(hook auto_allow_touch_ack.sh)" <<< '{"agent_id":"ac98fe516","agent_type":"general-purpose","tool_input":{"command":"touch /tmp/claude-checkpoint-foo.ack"}}'
+  assert_silent
+}
+
+@test "silent on a matching ack when the caller is a subagent (agent_type only)" {
+  run "$(hook auto_allow_touch_ack.sh)" <<< '{"agent_type":"Explore","tool_input":{"command":"touch /tmp/claude-checkpoint-foo.ack"}}'
+  assert_silent
+}
+
+@test "still allows a matching ack when the agent fields are absent (main session)" {
+  run "$(hook auto_allow_touch_ack.sh)" <<< '{"session_id":"a2bc46c6","tool_input":{"command":"touch /tmp/claude-checkpoint-foo.ack"}}'
+  assert_permission_decision "allow"
+}
+
+@test "still allows a matching ack when the agent fields are present but empty" {
+  run "$(hook auto_allow_touch_ack.sh)" <<< '{"agent_id":"","agent_type":"","tool_input":{"command":"touch /tmp/claude-checkpoint-foo.ack"}}'
+  assert_permission_decision "allow"
+}
