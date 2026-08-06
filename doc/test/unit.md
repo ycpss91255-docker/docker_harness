@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1127 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1131 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -40,7 +40,7 @@ stdin and asserts one of three behaviours:
 | silent on rmdir (different command) | exact `rm` match, not prefix |
 | silent on empty CLAUDE_PROJECT_DIR (defensive) | refuses to act without anchor |
 
-### .claude/test/bats/unit/auto_allow_touch_ack_spec.bats (18)
+### .claude/test/bats/unit/auto_allow_touch_ack_spec.bats (22)
 | Test | Scenario |
 |------|----------|
 | allows touch /tmp/claude-checkpoint-foo.ack | minimal ack path → ALLOW |
@@ -61,6 +61,10 @@ stdin and asserts one of three behaviours:
 | denies a matching ack when the caller is a subagent (agent_type only) | - |
 | still allows a matching ack when the agent fields are absent (main session) | interactive session keeps the lift |
 | still allows a matching ack when the agent fields are present but empty | empty marker is not a subagent |
+| silent on an unrelated agent command (ls, not touch) | - |
+| silent on an agent running the repo gate | - |
+| silent on an agent git commit | - |
+| silent on an agent touching a non-ack path | - |
 
 ### .claude/test/bats/unit/check_changelog_drift_spec.bats (6)
 | Test | Scenario |

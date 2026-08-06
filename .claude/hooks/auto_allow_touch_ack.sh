@@ -32,33 +32,6 @@ main() {
   local input cmd agent_marker
   input="$(cat)"
 
-  # An ack records a HUMAN's intent to lift a Tier 2 E2 gate, so an agent
-  # writing one is never legitimate -- it lifts the gate instead of passing
-  # it. Hooks do fire for subagent tool calls, and a subagent payload carries
-  # `agent_id` / `agent_type` that a main-session payload does not, so those
-  # are DENIED outright.
-  #
-  # Denying rather than staying silent is the #267 defect this corrects
-  # (refs #274). Silence does not hand the decision back to a human: with no
-  # hook decision the permission layer judges a bare `touch` of a /tmp path
-  # benign and approves it unasked, so the ack still got written -- confirmed
-  # at runtime, where a Workflow agent created the file uninterrupted. Note
-  # `session_id` cannot serve as the discriminator here: it is identical for
-  # parent and child, as is CLAUDE_CODE_CHILD_SESSION.
-  local agent_marker
-  agent_marker="$(printf '%s' "${input}" \
-    | jq -r '(.agent_id // "") + (.agent_type // "")' 2>/dev/null)"
-  if [[ -n "${agent_marker}" ]]; then
-    jq -nc '{
-      hookSpecificOutput: {
-        hookEventName: "PreToolUse",
-        permissionDecision: "deny",
-        permissionDecisionReason: ("a checkpoint ack records a human decision to lift a Tier 2 E2 gate, so it cannot come from an agent. Report what you need lifted and why, and let the interactive session ack it (ADR-00000002, ADR-00000014)")
-      }
-    }'
-    return 0
-  fi
-
   cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
 
   [[ -z "${cmd}" ]] && return 0
@@ -108,6 +81,35 @@ main() {
 
   # Final shape check against the ack glob.
   if [[ ! "${path}" =~ ${ACK_PREFIX_RE} ]]; then
+    return 0
+  fi
+
+  # Only now that this is known to be a matching ack does the caller matter.
+  # An ack records a HUMAN's intent to lift a Tier 2 E2 gate, so an agent
+  # writing one lifts the gate instead of passing it. Hooks fire for subagent
+  # tool calls, and a subagent payload carries `agent_id` / `agent_type` that
+  # a main-session payload does not, so an agent's ack is DENIED.
+  #
+  # Deciding this here rather than on entry is the #276 fix: this is a
+  # PreToolUse Bash hook, so an entry-point deny rejected every command a
+  # subagent issued, down to `ls`. Scope the deny to the ack, exactly as the
+  # allow is scoped.
+  #
+  # Denying rather than staying silent is in turn the #274 fix: with no hook
+  # decision the permission layer judges a bare `touch` of a /tmp path benign
+  # and approves it unasked, so silence let the ack through. `session_id`
+  # cannot discriminate -- it is identical for parent and child, as is
+  # CLAUDE_CODE_CHILD_SESSION.
+  agent_marker="$(printf '%s' "${input}" \
+    | jq -r '(.agent_id // "") + (.agent_type // "")' 2>/dev/null)"
+  if [[ -n "${agent_marker}" ]]; then
+    jq -n --arg p "${path}" '{
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: ("checkpoint ack " + $p + " records a human decision to lift a Tier 2 E2 gate, so it cannot come from an agent. Report what you need lifted and why, and let the interactive session ack it (ADR-00000002, ADR-00000014)")
+      }
+    }'
     return 0
   fi
 

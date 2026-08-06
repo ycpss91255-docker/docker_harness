@@ -119,3 +119,30 @@ setup() {
   run "$(hook auto_allow_touch_ack.sh)" <<< '{"agent_id":"","agent_type":"","tool_input":{"command":"touch /tmp/claude-checkpoint-foo.ack"}}'
   assert_permission_decision "allow"
 }
+
+# ---- the deny stays scoped to acks (refs #276) ----
+#
+# The hook is a PreToolUse Bash hook, so it sees every command a subagent
+# runs. Denying on the agent marker alone blocked all of them -- an
+# implementer could not even `ls`. The agent branch must fire only once the
+# command has been confirmed to be a matching checkpoint-ack touch.
+
+@test "silent on an unrelated agent command (ls, not touch)" {
+  run "$(hook auto_allow_touch_ack.sh)" <<< '{"agent_id":"probe","tool_input":{"command":"ls -la /tmp"}}'
+  assert_silent
+}
+
+@test "silent on an agent running the repo gate" {
+  run "$(hook auto_allow_touch_ack.sh)" <<< '{"agent_id":"probe","tool_input":{"command":"just -f .claude/test/justfile check"}}'
+  assert_silent
+}
+
+@test "silent on an agent git commit" {
+  run "$(hook auto_allow_touch_ack.sh)" <<< '{"agent_type":"general-purpose","tool_input":{"command":"git commit -m subject"}}'
+  assert_silent
+}
+
+@test "silent on an agent touching a non-ack path" {
+  run "$(hook auto_allow_touch_ack.sh)" <<< '{"agent_id":"probe","tool_input":{"command":"touch /tmp/scratch.txt"}}'
+  assert_silent
+}

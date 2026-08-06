@@ -94,6 +94,18 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   has one heading and no link block, and `--check` reports it clean.
 
 ### Fixed
+- **The agent ack deny is scoped to acks (fixes #276).** #274 placed the
+  agent branch at the top of `main()`, before the command was read, so this
+  PreToolUse **Bash** hook denied every command a subagent issued -- `ls`,
+  the gate, a commit -- with the checkpoint-ack message. That disabled the
+  `plan-and-build` implementer role #267 exists to enable, and every other
+  subagent use with it. The branch now sits where the `allow` it mirrors
+  sits, after the command has been confirmed to be a matching ack touch, so
+  the decision is: matching ack + agent -> deny; matching ack + interactive
+  -> allow; anything else -> silent. Found by the runtime re-verification of
+  #274, which reported the agent's read-only follow-up `ls` coming back with
+  the byte-identical deny reason. 4 specs pin the scope (unrelated command,
+  the gate, a commit, a non-ack touch), which nothing had asserted before.
 - **Agent-originated checkpoint acks are denied, not merely un-allowed
   (fixes #274).** #267 had `auto_allow_touch_ack.sh` stay silent when the
   caller carried `agent_id` / `agent_type`, on the reasoning that the ack
