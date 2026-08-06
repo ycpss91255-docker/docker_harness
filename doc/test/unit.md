@@ -57,8 +57,8 @@ stdin and asserts one of three behaviours:
 | silent on touch /tmp/claude-checkpoint-a.ack /tmp/other.txt (multi-arg with non-ack) | multi-arg guard |
 | silent on touch /tmp/CLAUDE-CHECKPOINT-foo.ack (case-sensitive prefix) | regex is case-sensitive |
 | silent on empty command | empty input guard |
-| silent on a matching ack when the caller is a subagent (agent_id present) | subagent payload → no one-click lift |
-| silent on a matching ack when the caller is a subagent (agent_type only) | either agent field is enough |
+| denies a matching ack when the caller is a subagent (agent_id present) | - |
+| denies a matching ack when the caller is a subagent (agent_type only) | - |
 | still allows a matching ack when the agent fields are absent (main session) | interactive session keeps the lift |
 | still allows a matching ack when the agent fields are present but empty | empty marker is not a subagent |
 
