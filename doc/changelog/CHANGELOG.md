@@ -94,6 +94,23 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   has one heading and no link block, and `--check` reports it clean.
 
 ### Fixed
+- **Agent-originated checkpoint acks are denied, not merely un-allowed
+  (fixes #274).** #267 had `auto_allow_touch_ack.sh` stay silent when the
+  caller carried `agent_id` / `agent_type`, on the reasoning that the ack
+  would fall through to the normal ask flow and a human would answer it. A
+  runtime check refuted it: a Workflow agent ran
+  `touch /tmp/claude-checkpoint-*.ack` and created the file uninterrupted.
+  With no hook decision the permission layer judges a bare `touch` of a
+  `/tmp` path benign and approves it unasked -- neither settings file
+  carries a `touch` rule, so the approval happens above the hook -- which
+  left the Tier 2 E2 gate-lift hole exactly as open as before. The hook now
+  emits an explicit `permissionDecision: "deny"` for agent callers, with a
+  reason directing the agent to report what it needs lifted rather than
+  acking it; the interactive session's one-click lift is unchanged. The two
+  specs asserted `assert_silent`, i.e. the mechanism rather than the
+  guarantee, so they passed while the property they existed to protect did
+  not hold; they now assert the deny decision. ADR-00000014 amended with the
+  general form: a hook that declines to decide has not withheld permission.
 - **three `ci-and-stamp.sh` error paths printed a logger complaint instead of
   their diagnostic (refs #272).** `marker_write_failed`,
   `stale_marker_removed` and `stale_marker_removal_failed` were never added to

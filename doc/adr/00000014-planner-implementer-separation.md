@@ -1,6 +1,6 @@
 # ADR-00000014: planner / implementer separation runs on Workflow, not the Agent tool
 
-- **Date:** 2026-08-04
+- **Date:** 2026-08-04 (amended 2026-08-06, refs #274)
 - **Status:** Accepted
 - **Relates to:** issue #267 (the `plan-and-build` skill),
   ADR-00000011 (split skill tracking -- why `tdd` is not in worktrees),
@@ -47,8 +47,16 @@ that lifts the Tier 2 E2 gates (`enforce_worktree_for_branch` /
 able to write its own ack lifts those gates rather than passing them. Hooks
 do fire for subagent tool calls, and a subagent payload carries `agent_id`
 / `agent_type` that a main-session payload does not, so the hook keys on
-those and stays silent for agent callers -- the ack falls through to the
-normal ask flow, where the human answers.
+those and **denies** agent callers outright.
+
+The first attempt (#267) had the hook stay *silent* for agent callers, on
+the reasoning that the ack would then fall through to the normal ask flow
+and a human would answer it. A runtime check refuted that: a Workflow agent
+created the ack file uninterrupted. With no hook decision the permission
+layer judges a bare `touch` of a `/tmp` path benign and approves it without
+asking, so silence is indistinguishable from consent. An explicit deny is
+what returns the decision to the human (#274). The lesson generalises --
+**a hook that declines to decide has not withheld permission.**
 
 The environment cannot serve this purpose: `CLAUDE_CODE_CHILD_SESSION` is
 `1` in the interactive session too, and `session_id` is identical for
