@@ -93,17 +93,21 @@ setup() {
 # autonomous implementer that can write its own ack lifts those gates by
 # itself, which defeats them. Hooks do fire for subagent tool calls, and a
 # subagent payload carries `agent_id` / `agent_type` that a main-session
-# payload does not -- so an agent-originated ack falls through to the normal
-# ask flow, where the human answers.
+# payload does not -- so the hook DENIES those outright.
+#
+# Staying silent is not enough and was the #267 defect (refs #274): with the
+# hook silent the permission layer judges a bare `touch` of a /tmp path benign
+# and approves it without ever asking a human, so the ack still gets written.
+# Verified at runtime -- a Workflow agent created the file uninterrupted.
 
-@test "silent on a matching ack when the caller is a subagent (agent_id present)" {
+@test "denies a matching ack when the caller is a subagent (agent_id present)" {
   run "$(hook auto_allow_touch_ack.sh)" <<< '{"agent_id":"ac98fe516","agent_type":"general-purpose","tool_input":{"command":"touch /tmp/claude-checkpoint-foo.ack"}}'
-  assert_silent
+  assert_permission_decision "deny"
 }
 
-@test "silent on a matching ack when the caller is a subagent (agent_type only)" {
+@test "denies a matching ack when the caller is a subagent (agent_type only)" {
   run "$(hook auto_allow_touch_ack.sh)" <<< '{"agent_type":"Explore","tool_input":{"command":"touch /tmp/claude-checkpoint-foo.ack"}}'
-  assert_silent
+  assert_permission_decision "deny"
 }
 
 @test "still allows a matching ack when the agent fields are absent (main session)" {
