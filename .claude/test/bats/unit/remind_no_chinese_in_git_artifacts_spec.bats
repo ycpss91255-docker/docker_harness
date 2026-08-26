@@ -91,6 +91,22 @@ teardown() {
   assert_silent
 }
 
+# #283 defect 2, third surface: scoping to one command must not lose the
+# rest of THAT command -- a backslash-continued newline is a continuation,
+# so the message on the next line is still the commit message.
+
+@test "denies a backslash-continued git commit whose CJK message is on a later line" {
+  run "$(hook remind_no_chinese_in_git_artifacts.sh)" \
+    <<< '{"tool_input":{"command":"git commit \\\n  -m \"修正錯誤\""}}'
+  assert_permission_decision "deny"
+}
+
+@test "silent on a backslash-continued echo mentioning git commit with CJK" {
+  run "$(hook remind_no_chinese_in_git_artifacts.sh)" \
+    <<< '{"tool_input":{"command":"echo one \\\n  \"reminder about git commit -m 中文\""}}'
+  assert_silent
+}
+
 # #283 defect 2, second surface: heredoc body content is data the command
 # writes, so CJK there is not a commit message either -- while a genuine
 # git commit on its own line after the heredoc still is one.
