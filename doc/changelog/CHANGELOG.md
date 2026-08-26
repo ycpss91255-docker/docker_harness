@@ -114,6 +114,24 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   has one heading and no link block, and `--check` reports it clean.
 
 ### Fixed
+- **local `lint` stopped being permanently red, and an untracked one-off now
+  fails a gate someone runs (fixes #282).** `enforce_batch_via_script.sh`
+  requires cross-repo batch work to go through `.claude/scripts/<name>.sh`,
+  but nothing ever covered disposal, so every fanout was obliged to leave a
+  script behind: fifteen had accumulated untracked over three months. The
+  local gate lints the live working tree on purpose (refs #214) while CI
+  checks out a clean one, so `lint` failed on a clean `main` for weeks over
+  files CI never sees -- a gate whose standing noise made a real regression
+  indistinguishable. Three changes: the fifteen are deleted; `ci.sh lint`
+  now lints the **git-tracked** shell scripts (the list is computed on the
+  host, where git is, and handed to the container), so local and CI answer
+  the same question; and a new PreToolUse hook,
+  `enforce_scripts_tracked_before_pr.sh`, denies `gh pr create` / `gh pr
+  ready` while `.claude/scripts/` (`lib/` included) holds an untracked
+  `*.sh`, naming the offenders. The gate sits at PR-open rather than inside
+  `ci.sh check` deliberately: a half-written script is a legitimate
+  in-progress state, whereas at PR-open the work is finished, so the script
+  is either part of it (committed) or it was scratch (deleted).
 - **Two hooks stopped reading command data as command syntax (fixes #283).**
   `enforce_gh_body_file.sh` split the command on newlines unconditionally, so
   a backslash-continued `gh issue create` was cut at line one and a
