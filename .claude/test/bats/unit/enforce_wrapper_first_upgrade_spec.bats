@@ -4,9 +4,10 @@ load '../lib/test_helper'
 
 # enforce_wrapper_first_upgrade.sh -- PreToolUse Bash hook that DENIES direct
 # `./.base/upgrade.sh` invocations when the repo has a CI-runner upgrade
-# wrapper. Detection is wrapper-adaptive (refs #202): justfile
-# (`just upgrade`) > justfile.ci (`just -f justfile.ci upgrade`). A root
-# `Makefile.ci` is not a wrapper -- make was retired org-wide (refs #280).
+# wrapper: a root justfile carrying an `upgrade` recipe (`just upgrade`).
+# The transitional runners of the make->just migration -- `justfile.ci`
+# and `Makefile.ci` -- are retired and are not wrappers (refs #280; was
+# #202 / base#573).
 # The block can be lifted via the `/tmp` checkpoint protocol
 # (ADR-00000002 / #117) -- a `touch <ack-file>` ack on the same command
 # (sha256(cmd) hashed).
@@ -237,11 +238,10 @@ ack_path_for() {
   assert_permission_decision "deny"
 }
 
-# ---- wrapper-adaptive detection (refs #202; base#573 make->just) ----
-# Precedence: justfile (downstream `just upgrade`) > justfile.ci
-# (base-self `just -f justfile.ci upgrade`). A root Makefile.ci is not a
-# wrapper at all since make was retired (refs #280). The justfile fixture
-# in setup() exercises the downstream branch.
+# ---- wrapper detection (refs #280; was #202 / base#573 make->just) ----
+# The only wrapper is a root justfile with an `upgrade` recipe. The
+# transitional runners justfile.ci / Makefile.ci are retired and must be
+# ignored. The justfile fixture in setup() exercises the live branch.
 
 # mk_just_repo <runner-filename> — temp repo with .base/upgrade.sh and a
 # just runner file carrying an `upgrade *args:` recipe; NO Makefile.ci.

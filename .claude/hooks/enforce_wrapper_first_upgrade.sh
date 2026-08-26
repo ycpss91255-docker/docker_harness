@@ -74,24 +74,18 @@ main() {
   repo_root="$(git -C "${work_dir}" rev-parse --show-toplevel 2>/dev/null)"
   [[ -z "${repo_root}" ]] && repo_root="${work_dir}"
 
-  # Wrapper-adaptive detection (refs #202; base#573 retired Makefile.ci
-  # for justfile.ci). Precedence, first match wins:
-  #   1. justfile + `upgrade` recipe   -> `just upgrade` (downstream
-  #      consumer; the main path -- the trigger surfaces only happen in
-  #      `.base` consumers, whose root carries the container-ops justfile)
-  #   2. justfile.ci + `upgrade` recipe -> `just -f justfile.ci upgrade`
-  #      (base-self CI runner)
-  # A root `Makefile.ci` is NOT a wrapper: make was retired org-wide and no
-  # repo root ships one any more (refs #280).
+  # Wrapper detection: a root `justfile` carrying an `upgrade` recipe ->
+  # `just upgrade`. Every repo in the org has one (the trigger surfaces
+  # only happen in `.base` consumers, whose root carries the container-ops
+  # justfile). The make->just migration's transitional runners --
+  # `justfile.ci` and `Makefile.ci` -- are retired and are NOT wrappers:
+  # no repo root ships either any more (refs #280; was #202 / base#573).
   # No wrapper present -> silent (raw call OK, nothing to enforce).
   # just recipes are `upgrade *args:` / `upgrade:`.
   local canonical_base=""
   if [[ -f "${repo_root}/justfile" ]] \
      && grep -qE '^upgrade([[:space:]]|:)' "${repo_root}/justfile" 2>/dev/null; then
     canonical_base="just upgrade"
-  elif [[ -f "${repo_root}/justfile.ci" ]] \
-       && grep -qE '^upgrade([[:space:]]|:)' "${repo_root}/justfile.ci" 2>/dev/null; then
-    canonical_base="just -f justfile.ci upgrade"
   else
     return 0
   fi
