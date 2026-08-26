@@ -28,16 +28,17 @@
 set -uo pipefail
 
 # Walk up from a directory looking for a repo-root marker (Dockerfile,
-# justfile.ci / Makefile.ci, .base/, template/, init.sh). Returns the
-# first matching ancestor or empty. Scopes TDD-capability detection to
-# the relevant downstream repo even when the file lives inside a
-# docker_harness subtree (refs #75; justfile.ci added #202 / base#573;
-# root justfile added #220 — base/downstream now use a root justfile).
+# justfile, .base/, template/, init.sh). Returns the first matching
+# ancestor or empty. Scopes TDD-capability detection to the relevant
+# downstream repo even when the file lives inside a docker_harness
+# subtree (refs #75; root justfile added #220 — base/downstream use a
+# root justfile. The transitional justfile.ci / Makefile.ci runners were
+# dropped as markers in #280: no repo root ships either any more, so a
+# stray one only risks shadowing the real root).
 detect_repo_root() {
   local dir="$1"
   while [[ "${dir}" != "/" && "${dir}" != "." && -n "${dir}" ]]; do
     if [[ -e "${dir}/Dockerfile" || -e "${dir}/justfile" \
-          || -e "${dir}/justfile.ci" || -e "${dir}/Makefile.ci" \
           || -d "${dir}/.base" || -d "${dir}/template" \
           || -e "${dir}/init.sh" ]]; then
       printf '%s' "${dir}"
