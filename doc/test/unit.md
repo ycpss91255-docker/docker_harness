@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1133 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1134 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -193,10 +193,11 @@ parity; the count tracks def-functions not collected cases, so
 | [7] zh-TW heading '## 目錄結構' is recognized | translated heading also enters the tree-walker → FIRE on stale path |
 | [7] silent when README has no Directory Structure section | no tree section at all → SILENT (walker no-op) |
 
-### .claude/test/bats/unit/remind_docker_for_lint_spec.bats (14)
+### .claude/test/bats/unit/remind_docker_for_lint_spec.bats (15)
 | Test | Scenario |
 |------|----------|
 | fires on standalone shellcheck | bare `shellcheck ...` → FIRE |
+| [#280] the reminder only names entry points that still exist | - |
 | fires on standalone bats | bare `bats ...` → FIRE |
 | fires on standalone hadolint | bare `hadolint ...` → FIRE |
 | silent inside docker run wrapper | `docker run ... shellcheck ...` → SILENT |

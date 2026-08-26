@@ -7,6 +7,15 @@ load '../lib/test_helper'
   assert_message_contains "驗證一律走 Docker"
 }
 
+@test "[#280] the reminder only names entry points that still exist" {
+  # make and justfile.ci are retired org-wide; suggesting them sends the
+  # reader to a command that cannot run.
+  run "$(hook remind_docker_for_lint.sh)" <<< '{"tool_input":{"command":"shellcheck script/foo.sh"}}'
+  assert_message_contains "驗證一律走 Docker"
+  refute_output --partial "Makefile.ci"
+  refute_output --partial "justfile.ci"
+}
+
 @test "fires on standalone bats" {
   run "$(hook remind_docker_for_lint.sh)" <<< '{"tool_input":{"command":"bats test/unit/foo_spec.bats"}}'
   assert_message_contains "驗證一律走 Docker"
