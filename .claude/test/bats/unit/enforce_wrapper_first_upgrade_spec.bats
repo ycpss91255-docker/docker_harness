@@ -5,14 +5,15 @@ load '../lib/test_helper'
 # enforce_wrapper_first_upgrade.sh -- PreToolUse Bash hook that DENIES direct
 # `./.base/upgrade.sh` invocations when the repo has a CI-runner upgrade
 # wrapper. Detection is wrapper-adaptive (refs #202): justfile
-# (`just upgrade`) > justfile.ci (`just -f justfile.ci upgrade`) >
-# Makefile.ci (`make -f Makefile.ci upgrade`, legacy). The block can be
-# lifted via the `/tmp` checkpoint protocol (ADR-00000002 / #117) -- a
-# `touch <ack-file>` ack on the same command (sha256(cmd) hashed).
+# (`just upgrade`) > justfile.ci (`just -f justfile.ci upgrade`). A root
+# `Makefile.ci` is not a wrapper -- make was retired org-wide (refs #280).
+# The block can be lifted via the `/tmp` checkpoint protocol
+# (ADR-00000002 / #117) -- a `touch <ack-file>` ack on the same command
+# (sha256(cmd) hashed).
 #
 # Three layers exercised:
 #   - positive: invocation writes a checkpoint and denies
-#   - negative: routes through make wrapper or rule N/A are silent
+#   - negative: routes through the just wrapper or rule N/A are silent
 #   - ack-bypass: a pre-existing .ack file allows the same command
 
 setup() {
@@ -25,11 +26,9 @@ setup() {
   git config user.email t@t
   git config user.name t
   mkdir -p .base template
-  cat > Makefile.ci <<'EOF'
-.PHONY: upgrade
-
-upgrade:
-	./.base/upgrade.sh $(VERSION)
+  cat > justfile <<'EOF'
+upgrade *args:
+    ./.base/upgrade.sh {{args}}
 EOF
   cat > .base/upgrade.sh <<'EOF'
 #!/usr/bin/env bash
@@ -88,14 +87,14 @@ ack_path_for() {
   assert_permission_decision "deny"
 }
 
-@test "deny reason mentions canonical make wrapper" {
+@test "deny reason mentions canonical just wrapper with the version arg" {
   run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"./.base/upgrade.sh v0.18.2\"},\"cwd\":\"${REPO}\"}"
   assert_success
   local reason
   reason="$(echo "${output}" | jq -r '.hookSpecificOutput.permissionDecisionReason // empty')"
-  [[ "${reason}" == *"make -f Makefile.ci upgrade"* ]] || {
-    echo "expected reason to mention make wrapper, got: ${reason}" >&2
+  [[ "${reason}" == *"just upgrade v0.18.2"* ]] || {
+    echo "expected reason to mention 'just upgrade v0.18.2', got: ${reason}" >&2
     return 1
   }
 }
@@ -153,13 +152,13 @@ ack_path_for() {
 
 # ---- negative: silent when not applicable ----
 
-@test "silent on make -f Makefile.ci upgrade (already going through wrapper)" {
+@test "silent on just upgrade (already going through wrapper)" {
   run "$(hook enforce_wrapper_first_upgrade.sh)" \
-    <<< "{\"tool_input\":{\"command\":\"make -f Makefile.ci upgrade VERSION=v0.18.2\"},\"cwd\":\"${REPO}\"}"
+    <<< "{\"tool_input\":{\"command\":\"just upgrade v0.18.2\"},\"cwd\":\"${REPO}\"}"
   assert_silent
 }
 
-@test "silent when Makefile.ci absent (no make wrapper available)" {
+@test "silent when justfile absent (no just wrapper available)" {
   local repo
   repo="$(mktemp -d)"
   cd "${repo}"
@@ -178,13 +177,12 @@ ack_path_for() {
   rm -rf "${repo}"
 }
 
-@test "silent when Makefile.ci has no upgrade target" {
-  cat > "${REPO}/Makefile.ci" <<'EOF'
-.PHONY: test
-
-test:
-	echo test
-EOF
+@test "a Makefile.ci upgrade target does not stand in for a missing justfile recipe" {
+  # The justfile loses its `upgrade` recipe; the retired make wrapper is
+  # still on disk with a live `upgrade:` target. It must NOT be picked up
+  # as a fallback -- there is nothing left to enforce (refs #280).
+  printf 'build *args:\n    echo build\n' > "${REPO}/justfile"
+  printf '.PHONY: upgrade\n\nupgrade:\n\t./.base/upgrade.sh $(VERSION)\n' > "${REPO}/Makefile.ci"
   run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"./.base/upgrade.sh v0.18.2\"},\"cwd\":\"${REPO}\"}"
   assert_silent
@@ -241,9 +239,9 @@ EOF
 
 # ---- wrapper-adaptive detection (refs #202; base#573 make->just) ----
 # Precedence: justfile (downstream `just upgrade`) > justfile.ci
-# (base-self `just -f justfile.ci upgrade`) > Makefile.ci (legacy
-# `make -f Makefile.ci upgrade`). The Makefile.ci fixture in setup()
-# exercises the legacy branch (all the tests above stay green).
+# (base-self `just -f justfile.ci upgrade`). A root Makefile.ci is not a
+# wrapper at all since make was retired (refs #280). The justfile fixture
+# in setup() exercises the downstream branch.
 
 # mk_just_repo <runner-filename> — temp repo with .base/upgrade.sh and a
 # just runner file carrying an `upgrade *args:` recipe; NO Makefile.ci.
@@ -286,7 +284,7 @@ mk_just_repo() {
   rm -rf "${repo}"
 }
 
-@test "precedence: justfile wins over Makefile.ci when both present" {
+@test "a leftover Makefile.ci never leaks into the canonical hint" {
   local repo; repo="$(mk_just_repo justfile)"
   cat > "${repo}/Makefile.ci" <<'EOF'
 upgrade:
@@ -297,7 +295,8 @@ EOF
   assert_permission_decision "deny"
   local reason
   reason="$(echo "${output}" | jq -r '.hookSpecificOutput.permissionDecisionReason // empty')"
-  [[ "${reason}" == *"just upgrade"* ]] || { echo "want just (precedence), got: ${reason}"; rm -rf "${repo}"; return 1; }
+  [[ "${reason}" == *"just upgrade"* ]] || { echo "want just, got: ${reason}"; rm -rf "${repo}"; return 1; }
+  [[ "${reason}" != *"Makefile.ci"* ]] || { echo "should not mention Makefile.ci: ${reason}"; rm -rf "${repo}"; return 1; }
   rm -rf "${repo}"
 }
 

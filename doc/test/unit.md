@@ -1189,7 +1189,7 @@ hook writes a checkpoint markdown + quotes the matching `touch
 | denies ./.base/upgrade.sh and writes checkpoint markdown | positive trigger + checkpoint side-effect |
 | denies bare .base/upgrade.sh (no leading ./) | path-prefix variant |
 | denies absolute path .base/upgrade.sh | absolute-path variant |
-| deny reason mentions canonical make wrapper | reason content |
+| deny reason mentions canonical just wrapper with the version arg | - |
 | denies ./template/upgrade.sh (legacy folder name) | surface 2 trigger |
 | denies bare template/upgrade.sh (legacy, no leading ./) | surface 2 path-prefix variant |
 | denies git subtree pull --prefix=.base ... | surface 3 trigger |
@@ -1197,9 +1197,9 @@ hook writes a checkpoint markdown + quotes the matching `touch
 | denies git -C \<repo> subtree pull --prefix=.base ... (via -C arg) | -C arg resolution |
 | silent on git subtree pull with unrelated --prefix=foo | scope discriminator |
 | silent on git subtree push --prefix=.base (push, not pull) | subcommand discriminator |
-| silent on make -f Makefile.ci upgrade (already going through wrapper) | wrapper path |
-| silent when Makefile.ci absent (no make wrapper available) | rule N/A |
-| silent when Makefile.ci has no upgrade target | rule N/A |
+| silent on just upgrade (already going through wrapper) | - |
+| silent when justfile absent (no just wrapper available) | - |
+| a Makefile.ci upgrade target does not stand in for a missing justfile recipe | - |
 | silent on unrelated commands (git status) | non-trigger |
 | silent on script with similar name (foo/upgrade.sh) | path-prefix discriminator |
 | silent on empty command | empty-input guard |
@@ -1207,7 +1207,7 @@ hook writes a checkpoint markdown + quotes the matching `touch
 | ack for different command does NOT bypass deny | hash isolation |
 | downstream justfile -> deny with just upgrade canonical | downstream layout → `just upgrade` hint |
 | base-self justfile.ci -> deny with just -f justfile.ci canonical | base-self layout → `just -f justfile.ci upgrade` hint |
-| precedence: justfile wins over Makefile.ci when both present | just-first during the make->just transition |
+| a leftover Makefile.ci never leaks into the canonical hint | - |
 | silent when the only wrapper candidate is a root Makefile.ci (make retired, refs #280) | - |
 | silent when justfile present but has no upgrade recipe | no upgrade recipe → rule N/A |
 
