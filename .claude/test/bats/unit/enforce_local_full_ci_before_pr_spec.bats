@@ -133,6 +133,23 @@ fire() {
   assert_silent
 }
 
+@test "[#280] fail-open: a lone justfile.ci is not a detectable CI mechanism" {
+  # justfile.ci was the base-self CI runner during the make->just window.
+  # No repo ships one now, and ci-and-stamp.sh cannot run CI from it, so
+  # it must not make the gate claim there is a local CI to assert.
+  local repo
+  repo="$(mktemp -d)"
+  git -C "${repo}" init -q -b main
+  git -C "${repo}" config user.email t@t
+  git -C "${repo}" config user.name t
+  printf 'test:\n\t:\n' > "${repo}/justfile.ci"
+  git -C "${repo}" add -A
+  git -C "${repo}" commit -q -m init
+  fire "gh pr create --title T --body-file /tmp/x.md" "${repo}"
+  assert_silent
+  rm -rf "${repo}"
+}
+
 @test "fail-open: repo with no detectable CI mechanism is silent (refs #208)" {
   # No .claude/test/ci.sh, no justfile.ci, no root justfile -> the
   # gate has nothing to verify against, so it must not block.

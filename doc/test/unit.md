@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1134 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1135 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -1285,7 +1285,7 @@ bypass (env var or inline command prefix). `gh` is PATH-stubbed so
 | N3: fail-open when gh pr list errors (silent) | gh outage never blocks a legitimate single arm |
 | N4: mixed armed set excludes only the PR being armed | self-exclusion in the armed-PR query |
 
-### .claude/test/bats/unit/enforce_local_full_ci_before_pr_spec.bats (11)
+### .claude/test/bats/unit/enforce_local_full_ci_before_pr_spec.bats (12)
 
 Covers `.claude/hooks/enforce_local_full_ci_before_pr.sh` — BLOCKING
 PreToolUse hook that DENIES `gh pr create` / `gh pr ready` unless
@@ -1309,6 +1309,7 @@ nothing can stamp it (refs #176 / #208).
 | gh pr ready also gated (no marker -> deny) | ready trigger → DENY |
 | silent (fail safe) when cwd is not a git repo | non-repo → SILENT |
 | allows when only doc/ + TEST.md changed since the green marker | multi-doc-only → ALLOW |
+| [#280] fail-open: a lone justfile.ci is not a detectable CI mechanism | - |
 | fail-open: repo with no detectable CI mechanism is silent (refs #208) | no ci.sh/justfile.ci/justfile → SILENT (issue #208) |
 
 ### .claude/test/bats/unit/ci_and_stamp_spec.bats (10)
