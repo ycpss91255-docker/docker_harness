@@ -177,8 +177,20 @@ detect_subcmd() {
 # separator inside a quoted body truncates the segment) -- the goal is
 # cross-command isolation, not a full shell parser; the truncation only
 # affects the flag VALUE, never the presence of the gh subcommand + flag.
+#
+# A newline separates two commands, so it IS a boundary -- EXCEPT after a
+# trailing backslash, which is a line continuation inside ONE command.
+# fold_continuations() collapses those first, else a multi-line invocation
+# is cut at line 1 and every flag below it (a --body-file, a --label) is
+# invisible to every rule -- a false deny on a valid command (refs #283).
+fold_continuations() {
+  printf '%s' "${1//\\$'\n'/ }"
+}
+
 gh_segment() {
-  local cmd="$1" seg
+  local cmd
+  cmd="$(fold_continuations "$1")"
+  local seg
   cmd="${cmd//&&/$'\n'}"
   cmd="${cmd//||/$'\n'}"
   cmd="${cmd//|/$'\n'}"
