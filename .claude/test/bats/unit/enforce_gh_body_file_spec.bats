@@ -406,6 +406,21 @@ stub_gh_fail() {
   assert_silent
 }
 
+# #283: folding continuations must NOT make a plain newline stop being a
+# boundary -- two genuine gh commands on separate lines stay independent,
+# so a flag on the second never satisfies (or trips) a rule on the first.
+
+@test "#283: --body-file on a second gh command line does not satisfy the first" {
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh issue create --title T --label bug\ngh pr view 9 --body-file /tmp/x.md\"}}"
+  assert_permission_decision "deny"
+}
+
+@test "#283: a complete gh issue create followed by another gh command is silent" {
+  local bf="${TMP}/body.md"; printf 'body\n' > "${bf}"
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh issue create --title T --label bug --body-file ${bf}\ngh pr view 9\"}}"
+  assert_silent
+}
+
 @test "#283: a real gh issue create after a heredoc block is still denied" {
   run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"cat > ${TMP}/x.md <<EOF\nissue notes\nEOF\ngh issue create --title T --label bug\"}}"
   assert_permission_decision "deny"
