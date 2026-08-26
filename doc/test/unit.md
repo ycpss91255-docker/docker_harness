@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1141 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1143 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -364,7 +364,7 @@ re-invoke `/wait-pr-ci` on the same PR. Silent on initial `-u` pushes
 | silent on bash -c "cat \<\<EOF > path" (allowed wrapper) | `bash -c` wraps the heredoc → SILENT |
 | fires on chained command: git status && cat \<\<EOF > /path | command-position heredoc after `&&` → FIRE |
 
-### .claude/test/bats/unit/remind_no_chinese_in_git_artifacts_spec.bats (11)
+### .claude/test/bats/unit/remind_no_chinese_in_git_artifacts_spec.bats (13)
 
 Covers `.claude/hooks/remind_no_chinese_in_git_artifacts.sh` — blocking
 PreToolUse hook that DENIES `git commit` and `gh pr|issue` commands when
@@ -386,6 +386,8 @@ exempt from `--body-file` scanning.
 | silent on git commit -m with em-dash and smart quotes (English typography) | allowed non-ASCII typography → SILENT |
 | silent on non-git/gh command containing CJK | matcher narrows to git/gh subcommands → SILENT |
 | silent on gh pr list --json (no body/title editing) | non-editing gh subcommand → SILENT |
+| silent on echo whose quoted argument mentions git commit and holds CJK | - |
+| denies a real git commit with CJK chained after an unrelated echo | - |
 
 ### .claude/test/bats/unit/remind_test_tools_smoke_sync_spec.bats (7)
 | Test | Scenario |

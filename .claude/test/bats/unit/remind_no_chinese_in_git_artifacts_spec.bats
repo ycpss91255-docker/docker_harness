@@ -80,3 +80,19 @@ teardown() {
     <<< '{"tool_input":{"command":"gh pr list --repo a/b --json title"}}'
   assert_silent
 }
+
+# #283 defect 2: the rule applies to the git artifact being written, not to
+# any command that mentions one. A git/gh named inside another command's
+# quoted argument is a string, so CJK there is not a commit message.
+
+@test "silent on echo whose quoted argument mentions git commit and holds CJK" {
+  run "$(hook remind_no_chinese_in_git_artifacts.sh)" \
+    <<< '{"tool_input":{"command":"echo \"reminder: git commit -m must be English 中文\""}}'
+  assert_silent
+}
+
+@test "denies a real git commit with CJK chained after an unrelated echo" {
+  run "$(hook remind_no_chinese_in_git_artifacts.sh)" \
+    <<< '{"tool_input":{"command":"echo staging && git commit -m \"修正錯誤\""}}'
+  assert_permission_decision "deny"
+}
