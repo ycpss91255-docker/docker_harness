@@ -54,3 +54,63 @@ fire() {
   fire "$(pr_open_cmd)" "${repo}"
   assert_silent
 }
+
+@test "denies when the untracked .sh sits in .claude/scripts/lib/" {
+  # lib/ is inside the lint target set, so it is inside this gate too:
+  # "lints clean" and "survives the PR gate" must stay one question.
+  local repo
+  repo="$(mk_repo)"
+  mkdir -p "${repo}/.claude/scripts/lib"
+  echo "echo helper" > "${repo}/.claude/scripts/lib/scratch.sh"
+  fire "$(pr_open_cmd)" "${repo}"
+  assert_permission_decision "deny"
+  assert_message_contains ".claude/scripts/lib/scratch.sh"
+}
+
+@test "silent when the untracked file under .claude/scripts is not a .sh" {
+  # The convention, the lint target and the accumulation are all about
+  # shell scripts; notes and data files are out of scope.
+  local repo
+  repo="$(mk_repo)"
+  echo "scratch notes" > "${repo}/.claude/scripts/NOTES.md"
+  fire "$(pr_open_cmd)" "${repo}"
+  assert_silent
+}
+
+@test "silent when an untracked .sh is covered by an explicit gitignore rule" {
+  # A .gitignore entry is a deliberate decision that the file is local;
+  # the fifteen that piled up were covered by no rule at all.
+  local repo
+  repo="$(mk_repo)"
+  echo ".claude/scripts/local-*.sh" > "${repo}/.gitignore"
+  git -C "${repo}" add .gitignore
+  git -C "${repo}" commit -q -m ignore
+  echo "echo local" > "${repo}/.claude/scripts/local-thing.sh"
+  fire "$(pr_open_cmd)" "${repo}"
+  assert_silent
+}
+
+@test "denies PR ready too, not just PR create" {
+  local repo
+  repo="$(mk_repo)"
+  echo "echo scratch" > "${repo}/.claude/scripts/fix-oneoff.sh"
+  fire "$(pr_open_cmd ready)" "${repo}"
+  assert_permission_decision "deny"
+}
+
+@test "silent on a non-PR-open gh command with an untracked .sh present" {
+  local repo
+  repo="$(mk_repo)"
+  echo "echo scratch" > "${repo}/.claude/scripts/fix-oneoff.sh"
+  fire "gh pr view 5" "${repo}"
+  assert_silent
+}
+
+@test "silent when cwd is not a git repo" {
+  local dir
+  dir="$(mktemp -d)"
+  mkdir -p "${dir}/.claude/scripts"
+  echo "echo scratch" > "${dir}/.claude/scripts/fix-oneoff.sh"
+  fire "$(pr_open_cmd)" "${dir}"
+  assert_silent
+}

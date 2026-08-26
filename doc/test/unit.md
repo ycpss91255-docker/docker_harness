@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1149 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1155 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -1984,9 +1984,15 @@ escaping, and the read-only `--check` gate.
 | refuses when there is no Unreleased section to promote | - |
 | derives the slug from the remote, so a renamed repo self-corrects | - |
 
-### .claude/test/bats/unit/enforce_scripts_tracked_before_pr_spec.bats (2)
+### .claude/test/bats/unit/enforce_scripts_tracked_before_pr_spec.bats (8)
 
 | Test | Scenario |
 |------|----------|
 | denies PR open while .claude/scripts holds an untracked .sh | - |
 | silent on PR open when every .claude/scripts .sh is tracked | - |
+| denies when the untracked .sh sits in .claude/scripts/lib/ | - |
+| silent when the untracked file under .claude/scripts is not a .sh | - |
+| silent when an untracked .sh is covered by an explicit gitignore rule | - |
+| denies PR ready too, not just PR create | - |
+| silent on a non-PR-open gh command with an untracked .sh present | - |
+| silent when cwd is not a git repo | - |
