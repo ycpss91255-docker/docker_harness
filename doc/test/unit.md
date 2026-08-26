@@ -202,8 +202,8 @@ parity; the count tracks def-functions not collected cases, so
 | fires on standalone hadolint | bare `hadolint ...` → FIRE |
 | silent inside docker run wrapper | `docker run ... shellcheck ...` → SILENT |
 | silent inside ./build.sh test wrapper | `./build.sh test` → SILENT |
-| silent inside make -f Makefile.ci wrapper (legacy, transition-tolerated) | `make -f Makefile.ci lint` → SILENT |
-| silent inside just -f justfile.ci wrapper (base#573 make->just, #202) | `just -f justfile.ci lint` → SILENT |
+| [#280] a retired make runner does not vouch for a chained bare tool | - |
+| [#280] a retired justfile.ci runner does not vouch for a chained bare tool | - |
 | silent inside just test wrapper (downstream container-ops) | `just test` → SILENT |
 | silent on unrelated command containing the word bats in path | `ls /usr/lib/bats-core` → SILENT |
 | silent inside just -f .claude/test/justfile wrapper (default list) | `just -f .claude/test/justfile test` → SILENT |
