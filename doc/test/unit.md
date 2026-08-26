@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1132 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1133 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -331,7 +331,7 @@ re-invoke `/wait-pr-ci` on the same PR. Silent on initial `-u` pushes
 | silent on non-git command (ls) | non-git → SILENT |
 | silent on git push --tags (bulk tag push, not a PR branch) | --tags bulk → SILENT |
 
-### .claude/test/bats/unit/remind_tdd_categories_spec.bats (13)
+### .claude/test/bats/unit/remind_tdd_categories_spec.bats (14)
 | Test | Scenario |
 |------|----------|
 | fires on .sh file edit | shell logic → FIRE |
@@ -344,6 +344,7 @@ re-invoke `/wait-pr-ci` on the same PR. Silent on initial `-u` pushes
 | silent on .claude/ internals | hook self-edits → SILENT |
 | [#75/#237] .sh in repo with only test/bats/system/ drops Unit + Integration | repo-detect: ros1_bridge layout → only Smoke + Lint clauses |
 | [#220/#237] .sh in repo detected via root justfile only (no Dockerfile) scopes levels | repo-detect: base/downstream root-justfile marker |
+| [#280] retired CI runner files are not repo-root markers | - |
 | [#75/#237] .sh in repo with full level infra keeps unit + integration + system | repo-detect: template layout → all 4 clauses |
 | [#75/#237] Dockerfile in repo with only test/bats/system/ keeps System (Smoke type) + static | repo-detect on Dockerfile path |
 | [#75/#237] repo without any test/bats level dir falls back to all levels | fallback preserves pre-#75 behaviour |

@@ -89,6 +89,23 @@ teardown() {
   refute_output --partial "Add Integration"
 }
 
+@test "[#280] retired CI runner files are not repo-root markers" {
+  # justfile.ci / Makefile.ci were the make->just transition runners; no
+  # repo root ships either any more. A stray one in a subdirectory must
+  # not shadow the real repo root, or level scoping is lost.
+  local runner
+  for runner in justfile.ci Makefile.ci; do
+    local repo="${TMPDIR}/${runner}-repo"
+    mkdir -p "${repo}/test/bats/system" "${repo}/legacy"
+    echo "test:" > "${repo}/justfile"
+    echo "upgrade:" > "${repo}/legacy/${runner}"
+    echo "echo a" > "${repo}/legacy/foo.sh"
+    run "$(hook remind_tdd_categories.sh)" <<< "{\"tool_input\":{\"file_path\":\"${repo}/legacy/foo.sh\"}}"
+    assert_message_contains "System"
+    refute_output --partial "Unit required"
+  done
+}
+
 @test "[#75/#237] .sh in repo with full level infra keeps unit + integration + system" {
   mkdir -p "${TMPDIR}/repo/test/bats/unit" \
            "${TMPDIR}/repo/test/bats/integration" \
