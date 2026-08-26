@@ -112,6 +112,7 @@ _gh_probe() {
   local _repo="$1" _json
   _json="$(gh api "repos/${ORG}/${_repo}/git/trees/main?recursive=1" 2>/dev/null)" \
     || return 1
+  [[ -n "${_json}" ]] || return 1
   if [[ "$(jq -r '.truncated' <<< "${_json}")" == "true" ]]; then
     err "${_repo}: the tree read came back truncated -- refusing to report counts from a partial listing"
     return 1
@@ -242,10 +243,14 @@ main() {
   local _consumers=0 _unreadable=0 _incomplete=0
   local _tree="${_tmp}/tree"
   for _r in "${_repos[@]}"; do
+    # A probe's stderr is NOT swallowed. The default probe explains a
+    # truncated tree read there, and that explanation is the difference
+    # between "this repo is unreadable" and "this report's counts are
+    # wrong" -- the reader has to be told which.
     if [[ -n "${_probe}" ]]; then
-      "${_probe}" "${_r}" > "${_tree}" 2>/dev/null || { : > "${_tree}"; _probe_rc=1; }
+      "${_probe}" "${_r}" > "${_tree}" || { : > "${_tree}"; _probe_rc=1; }
     else
-      _gh_probe "${_r}" > "${_tree}" 2>/dev/null || { : > "${_tree}"; _probe_rc=1; }
+      _gh_probe "${_r}" > "${_tree}" || { : > "${_tree}"; _probe_rc=1; }
     fi
     if [[ -n "${_probe_rc:-}" ]]; then
       unset _probe_rc
