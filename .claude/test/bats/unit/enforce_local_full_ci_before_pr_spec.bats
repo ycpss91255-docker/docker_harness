@@ -19,8 +19,8 @@ mk_repo() {
   echo ".claude/state/" > "${dir}/.gitignore"
   echo "code" > "${dir}/script.sh"
   # A CI mechanism so the gate applies (post-#208 it fail-opens for
-  # repos with no detectable CI). justfile.ci marks a base-style repo.
-  printf 'test:\n\t:\n' > "${dir}/justfile.ci"
+  # repos with no detectable CI). A root justfile marks any org repo.
+  printf 'test:\n    :\n' > "${dir}/justfile"
   git -C "${dir}" add -A
   git -C "${dir}" commit -q -m init
   echo "${dir}"
@@ -151,7 +151,7 @@ fire() {
 }
 
 @test "fail-open: repo with no detectable CI mechanism is silent (refs #208)" {
-  # No .claude/test/ci.sh, no justfile.ci, no root justfile -> the
+  # No .claude/test/ci.sh, no root justfile -> the
   # gate has nothing to verify against, so it must not block.
   local repo
   repo="$(mktemp -d)"
