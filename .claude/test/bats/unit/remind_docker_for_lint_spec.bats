@@ -7,6 +7,15 @@ load '../lib/test_helper'
   assert_message_contains "驗證一律走 Docker"
 }
 
+@test "[#280] the reminder only names entry points that still exist" {
+  # make and justfile.ci are retired org-wide; suggesting them sends the
+  # reader to a command that cannot run.
+  run "$(hook remind_docker_for_lint.sh)" <<< '{"tool_input":{"command":"shellcheck script/foo.sh"}}'
+  assert_message_contains "驗證一律走 Docker"
+  refute_output --partial "Makefile.ci"
+  refute_output --partial "justfile.ci"
+}
+
 @test "fires on standalone bats" {
   run "$(hook remind_docker_for_lint.sh)" <<< '{"tool_input":{"command":"bats test/unit/foo_spec.bats"}}'
   assert_message_contains "驗證一律走 Docker"
@@ -27,14 +36,14 @@ load '../lib/test_helper'
   assert_silent
 }
 
-@test "silent inside make -f Makefile.ci wrapper (legacy, transition-tolerated)" {
-  run "$(hook remind_docker_for_lint.sh)" <<< '{"tool_input":{"command":"make -f Makefile.ci lint"}}'
-  assert_silent
+@test "[#280] a retired make runner does not vouch for a chained bare tool" {
+  run "$(hook remind_docker_for_lint.sh)" <<< '{"tool_input":{"command":"make -f Makefile.ci lint && shellcheck foo.sh"}}'
+  assert_message_contains "驗證一律走 Docker"
 }
 
-@test "silent inside just -f justfile.ci wrapper (base#573 make->just, #202)" {
-  run "$(hook remind_docker_for_lint.sh)" <<< '{"tool_input":{"command":"just -f justfile.ci lint"}}'
-  assert_silent
+@test "[#280] a retired justfile.ci runner does not vouch for a chained bare tool" {
+  run "$(hook remind_docker_for_lint.sh)" <<< '{"tool_input":{"command":"just -f justfile.ci lint && shellcheck foo.sh"}}'
+  assert_message_contains "驗證一律走 Docker"
 }
 
 @test "silent inside just test wrapper (downstream container-ops)" {

@@ -179,7 +179,7 @@ docker/
     │   ├── auto_allow_touch_ack.sh       # touch $TMPDIR/claude-checkpoint-*.ack 自動 allow（/tmp checkpoint 協定一鍵 ack,refs ADR-00000002 / #117）
     │   ├── check_tag_version_consistency.sh # git tag/push v* 前 BLOCK：repo root 有 .version 且不等於 tag 則 deny（refs #36；defensive 第二層,主要 gate 由 enforce_semver_tag_via_script.sh 接手）
     │   ├── enforce_semver_tag_via_script.sh # git tag/push v* 前 BLOCK：raw 命令一律拒絕,強制走 .claude/scripts/release-tag.sh canonical script(refs #106)
-    │   ├── enforce_wrapper_first_upgrade.sh # 三個 surface (./.base/upgrade.sh / ./template/upgrade.sh / git subtree pull --prefix=.base|template) 前 BLOCK,改走 hook 偵測的 CI-runner wrapper(justfile→just upgrade / justfile.ci→just -f justfile.ci upgrade / Makefile.ci→make -f Makefile.ci upgrade,checkpoint ack 可解,refs #36 / ADR-00000002 / base#573 / #202)
+    │   ├── enforce_wrapper_first_upgrade.sh # 三個 surface (./.base/upgrade.sh / ./template/upgrade.sh / git subtree pull --prefix=.base|template) 前 BLOCK,改走 hook 偵測的 wrapper(root justfile 有 upgrade recipe→just upgrade;過渡期的 justfile.ci / Makefile.ci 已退役不再視為 wrapper,checkpoint ack 可解,refs #36 / #280 / ADR-00000002 / base#573 / #202)
     │   ├── enforce_batch_via_script.sh   # 跨 repo for-loop + mutation (git push|reset|tag|branch -D / gh issue|pr close|merge|comment --body) 前 BLOCK,改走 .claude/scripts/<name>.sh(checkpoint ack 可解,refs #121 / ADR-00000002)
     │   ├── enforce_serial_merge_gate.sh  # `gh pr merge ... --auto` 第 2+ 個同 repo arm 前 BLOCK：查 `gh pr list --json number,autoMergeRequest` 已 armed >=1 就 deny + 印 ready-to-paste `.claude/scripts/serial-merge.sh <repo> <armed...> <this>`,避免 strict branch protection 下 O(N^2) CI re-run;0 armed 放行、SERIAL_MERGE=1 或 checkpoint ack 可 bypass(refs #236 / #235 / ADR-00000002)
     │   ├── enforce_worktree_for_branch.sh # 主 checkout 內 git checkout -b|-B 前 BLOCK,要求改走 git worktree add <path> -b <branch> main(內部 worktree 自動放行,checkpoint ack 可解,refs #122 / PR #89 / ADR-00000006)
@@ -297,7 +297,7 @@ with this file as the argument; pre-#127 it read `CLAUDE.md`.
 │   ├── smoke/                    # 共用 smoke tests
 │   ├── unit/                     # template 自身測試（見 doc/test/TEST.md）
 │   └── integration/              # init.sh 整合測試（見 doc/test/TEST.md）
-├── Makefile.ci                   # template CI 入口
+├── justfile                      # template CI 入口
 ├── compose.yaml                  # Docker CI 執行器
 └── .hadolint.yaml                # 共用 Hadolint 規則
 ```
@@ -383,8 +383,7 @@ git push origin vX.Y.Z
 cd <repo>
 just upgrade vX.Y.Z                          # 指定版本（推薦；下游 consumer）
 # 或 just upgrade                            # 升到最新 tag
-# base self: just -f justfile.ci upgrade vX.Y.Z
-# Legacy（過渡期，下游 .base 還是 Makefile.ci）: make -f Makefile.ci upgrade VERSION=vX.Y.Z
+# base 自身無 upgrade recipe：它是來源端,不從別處升級
 # Fallback（wrapper 不可用時，被 hook 擋需 ACK）: ./.base/upgrade.sh vX.Y.Z
 
 # 3. 走 PR merge（branch protection 禁止直接 push main）
@@ -652,7 +651,7 @@ level。base 住 `test/lint/<tool>/`；CI 強制。
 
 入口：
 - `./build.sh test` — Dockerfile `test` stage（ShellCheck → Hadolint → Bats smoke）
-- `just -f justfile.ci test` / `lint` — base 自身的 unit/integration 測試
+- `just test` / `just test lint` — base 自身的 unit/integration 測試
 
 ## 13. Known gotchas
 

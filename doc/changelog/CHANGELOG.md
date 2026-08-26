@@ -7,6 +7,26 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Changed
+- **the hooks stopped knowing about `make` and `justfile.ci` (closes #280).**
+  The make -> just migration finished a while ago: no repo root in the
+  workspace carries a `Makefile.ci` or a `justfile.ci`, and every repo has a
+  `justfile` with an `upgrade` recipe. Four hooks still branched on the
+  retired runners, and every one of those branches was either unreachable or
+  actively wrong. `enforce_wrapper_first_upgrade.sh` detected three wrapper
+  shapes in precedence order; the two dead ones are gone (with the
+  `VERSION=<tag>` make-style version formatting only they used), so a repo
+  without a `justfile` `upgrade` recipe is now silent instead of being denied
+  and told to run a wrapper that does not exist.
+  `remind_tdd_categories.sh` counted `justfile.ci` / `Makefile.ci` as
+  repo-root markers, where a stray one in a subdirectory could only shadow
+  the real root and lose ISTQB level scoping. `remind_docker_for_lint.sh`
+  both recognised the retired runners as lint wrappers -- letting a bare
+  `shellcheck` chained after one through unremarked -- and named
+  `make -f Makefile.ci` in the reminder it prints. And the PR gate,
+  `enforce_local_full_ci_before_pr.sh`, treated a lone `justfile.ci` as proof
+  the repo has local CI, so it would deny `gh pr create` over a marker that
+  `ci-and-stamp.sh` has no way to write; its header also credited the marker
+  to `make -C .claude/test test` rather than `ci-and-stamp.sh`.
 - **the local-CI marker states what it ran, and derives what it owes, from
   `ci-rollup` itself (refs #272).** `enforce_local_full_ci_before_pr.sh`
   denies `gh pr create` until `.claude/state/local-ci-pass/<sha>.ok` exists,

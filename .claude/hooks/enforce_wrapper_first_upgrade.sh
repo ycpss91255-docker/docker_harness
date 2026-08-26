@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# enforce_make_first_upgrade.sh -- Claude Code PreToolUse hook (matcher: Bash).
+# enforce_wrapper_first_upgrade.sh -- Claude Code PreToolUse hook (matcher: Bash).
 #
-# DENIES direct invocations that bypass the `make -f Makefile.ci upgrade`
-# wrapper when the repo root has a `Makefile.ci` with an `upgrade:` target.
+# DENIES direct invocations that bypass the `just upgrade` wrapper when the
+# repo root has a justfile with an `upgrade` recipe.
 # Three matching surfaces all skip the init.sh symlink resync + main.yaml
-# `@tag` sed that the make wrapper performs (refs issue #36 -- the
+# `@tag` sed that the just wrapper performs (refs issue #36 -- the
 # template v0.18.x incident where the missed sed left downstream
 # `make upgrade-check` permanently reporting "upgrade available"):
 #
@@ -17,15 +17,15 @@
 #
 # Lift mechanism: the `/tmp` checkpoint protocol (ADR-00000002 / #117).
 # On deny, write_checkpoint renders a five-section markdown to
-# $TMPDIR/claude-checkpoint-enforce-make-first-upgrade-<session>-<hash>.md
+# $TMPDIR/claude-checkpoint-enforce-wrapper-first-upgrade-<session>-<hash>.md
 # and quotes the matching `touch <ack>` command. A second attempt of the
 # same command hits is_acked and is allowed through.
 #
 # Silent (pass-through) when:
 #   - command does not match any of the three surfaces above
-#   - cwd has no Makefile.ci (no make wrapper available, raw call is OK)
-#   - Makefile.ci has no `upgrade:` target (rule N/A)
-#   - the agent is already going through `make -f Makefile.ci upgrade ...`
+#   - repo root has no justfile (no wrapper available, raw call is OK)
+#   - the justfile has no `upgrade` recipe (rule N/A)
+#   - the agent is already going through `just upgrade ...`
 #
 # Refs: issue #120 (original) + #120 follow-up (this expansion + #123
 #       close-comment promise), #117 (checkpoint helper), #36 (incident),
@@ -49,7 +49,7 @@ main() {
 
   [[ -z "${cmd}" ]] && return 0
 
-  # Trigger detection -- three surfaces, all routed to `make upgrade`.
+  # Trigger detection -- three surfaces, all routed to `just upgrade`.
   local matched=0
   # Surface 1+2: <prefix>/.base/upgrade.sh or <prefix>/template/upgrade.sh
   if [[ "${cmd}" =~ (^|[[:space:]\;\&\|])(\./)?(.*/)?(\.base|template)/upgrade\.sh([[:space:]]|$) ]]; then
@@ -74,28 +74,18 @@ main() {
   repo_root="$(git -C "${work_dir}" rev-parse --show-toplevel 2>/dev/null)"
   [[ -z "${repo_root}" ]] && repo_root="${work_dir}"
 
-  # Wrapper-adaptive detection (refs #202; base#573 retired Makefile.ci
-  # for justfile.ci). Precedence, first match wins:
-  #   1. justfile + `upgrade` recipe   -> `just upgrade` (downstream
-  #      consumer; the main path -- the trigger surfaces only happen in
-  #      `.base` consumers, whose root carries the container-ops justfile)
-  #   2. justfile.ci + `upgrade` recipe -> `just -f justfile.ci upgrade`
-  #      (base-self CI runner)
-  #   3. Makefile.ci + `upgrade:` target -> `make -f Makefile.ci upgrade`
-  #      (legacy / transition window: downstream `.base` still ships
-  #      Makefile.ci until the next base release + fanout)
+  # Wrapper detection: a root `justfile` carrying an `upgrade` recipe ->
+  # `just upgrade`. Every repo in the org has one (the trigger surfaces
+  # only happen in `.base` consumers, whose root carries the container-ops
+  # justfile). The make->just migration's transitional runners --
+  # `justfile.ci` and `Makefile.ci` -- are retired and are NOT wrappers:
+  # no repo root ships either any more (refs #280; was #202 / base#573).
   # No wrapper present -> silent (raw call OK, nothing to enforce).
-  # just recipes are `upgrade *args:` / `upgrade:`; make is `upgrade:`.
-  local canonical_base="" ver_style=""
+  # just recipes are `upgrade *args:` / `upgrade:`.
+  local canonical_base=""
   if [[ -f "${repo_root}/justfile" ]] \
      && grep -qE '^upgrade([[:space:]]|:)' "${repo_root}/justfile" 2>/dev/null; then
-    canonical_base="just upgrade"; ver_style="positional"
-  elif [[ -f "${repo_root}/justfile.ci" ]] \
-       && grep -qE '^upgrade([[:space:]]|:)' "${repo_root}/justfile.ci" 2>/dev/null; then
-    canonical_base="just -f justfile.ci upgrade"; ver_style="positional"
-  elif [[ -f "${repo_root}/Makefile.ci" ]] \
-       && grep -qE '^upgrade:' "${repo_root}/Makefile.ci" 2>/dev/null; then
-    canonical_base="make -f Makefile.ci upgrade"; ver_style="varflag"
+    canonical_base="just upgrade"
   else
     return 0
   fi
@@ -113,15 +103,10 @@ main() {
   fi
 
   # Extract optional version arg for the canonical hint (upgrade.sh form
-  # only). just recipes take a positional arg (`just upgrade v0.30.0`);
-  # the make wrapper takes `VERSION=v0.30.0`.
+  # only). just recipes take a positional arg (`just upgrade v0.30.0`).
   version_arg=""
   if [[ "${cmd}" =~ (\.base|template)/upgrade\.sh[[:space:]]+(v[0-9][0-9.]*(-[A-Za-z0-9.]+)?) ]]; then
-    if [[ "${ver_style}" == "varflag" ]]; then
-      version_arg=" VERSION=${BASH_REMATCH[2]}"
-    else
-      version_arg=" ${BASH_REMATCH[2]}"
-    fi
+    version_arg=" ${BASH_REMATCH[2]}"
   fi
   local canonical_with_version="${canonical_base}${version_arg}"
 

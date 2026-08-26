@@ -4,8 +4,9 @@
 #
 # Blocks `gh pr create` / `gh pr ready` unless local CI has passed on
 # the current HEAD -- a marker file `.claude/state/local-ci-pass/<sha>.ok`
-# written by the repo's CI target (`make -C .claude/test test` here) on
-# green. Two PRs in the base v0.40.0 release reached `gh pr create` with
+# written by `.claude/scripts/ci-and-stamp.sh` on green (it auto-detects
+# and runs the repo's CI mirror, then stamps the marker).
+# Two PRs in the base v0.40.0 release reached `gh pr create` with
 # code GH CI then rejected, each forcing a rebase + force-push + full
 # re-run cycle; this gate catches those locally first.
 #
@@ -76,7 +77,6 @@ main() {
   # CI for repos carrying one of these (mutually exclusive across the
   # org's repos). A repo with none has no local CI to assert -> allow.
   if [[ ! -x "${root}/.claude/test/ci.sh" \
-        && ! -f "${root}/justfile.ci" \
         && ! -f "${root}/justfile" ]]; then
     return 0
   fi

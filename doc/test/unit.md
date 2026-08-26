@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1131 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1135 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -193,16 +193,17 @@ parity; the count tracks def-functions not collected cases, so
 | [7] zh-TW heading '## 目錄結構' is recognized | translated heading also enters the tree-walker → FIRE on stale path |
 | [7] silent when README has no Directory Structure section | no tree section at all → SILENT (walker no-op) |
 
-### .claude/test/bats/unit/remind_docker_for_lint_spec.bats (14)
+### .claude/test/bats/unit/remind_docker_for_lint_spec.bats (15)
 | Test | Scenario |
 |------|----------|
 | fires on standalone shellcheck | bare `shellcheck ...` → FIRE |
+| [#280] the reminder only names entry points that still exist | - |
 | fires on standalone bats | bare `bats ...` → FIRE |
 | fires on standalone hadolint | bare `hadolint ...` → FIRE |
 | silent inside docker run wrapper | `docker run ... shellcheck ...` → SILENT |
 | silent inside ./build.sh test wrapper | `./build.sh test` → SILENT |
-| silent inside make -f Makefile.ci wrapper (legacy, transition-tolerated) | `make -f Makefile.ci lint` → SILENT |
-| silent inside just -f justfile.ci wrapper (base#573 make->just, #202) | `just -f justfile.ci lint` → SILENT |
+| [#280] a retired make runner does not vouch for a chained bare tool | - |
+| [#280] a retired justfile.ci runner does not vouch for a chained bare tool | - |
 | silent inside just test wrapper (downstream container-ops) | `just test` → SILENT |
 | silent on unrelated command containing the word bats in path | `ls /usr/lib/bats-core` → SILENT |
 | silent inside just -f .claude/test/justfile wrapper (default list) | `just -f .claude/test/justfile test` → SILENT |
@@ -331,7 +332,7 @@ re-invoke `/wait-pr-ci` on the same PR. Silent on initial `-u` pushes
 | silent on non-git command (ls) | non-git → SILENT |
 | silent on git push --tags (bulk tag push, not a PR branch) | --tags bulk → SILENT |
 
-### .claude/test/bats/unit/remind_tdd_categories_spec.bats (13)
+### .claude/test/bats/unit/remind_tdd_categories_spec.bats (14)
 | Test | Scenario |
 |------|----------|
 | fires on .sh file edit | shell logic → FIRE |
@@ -344,6 +345,7 @@ re-invoke `/wait-pr-ci` on the same PR. Silent on initial `-u` pushes
 | silent on .claude/ internals | hook self-edits → SILENT |
 | [#75/#237] .sh in repo with only test/bats/system/ drops Unit + Integration | repo-detect: ros1_bridge layout → only Smoke + Lint clauses |
 | [#220/#237] .sh in repo detected via root justfile only (no Dockerfile) scopes levels | repo-detect: base/downstream root-justfile marker |
+| [#280] retired CI runner files are not repo-root markers | - |
 | [#75/#237] .sh in repo with full level infra keeps unit + integration + system | repo-detect: template layout → all 4 clauses |
 | [#75/#237] Dockerfile in repo with only test/bats/system/ keeps System (Smoke type) + static | repo-detect on Dockerfile path |
 | [#75/#237] repo without any test/bats level dir falls back to all levels | fallback preserves pre-#75 behaviour |
@@ -1166,7 +1168,7 @@ make-internal calls / already-asked subs (rm/push/...) stay silent.
 | strips single env-prefix and matches docker build | env-prefix tolerance |
 | strips multiple env-prefixes and matches docker build | multi env-prefix |
 
-### .claude/test/bats/unit/enforce_wrapper_first_upgrade_spec.bats (23)
+### .claude/test/bats/unit/enforce_wrapper_first_upgrade_spec.bats (24)
 
 Covers `.claude/hooks/enforce_wrapper_first_upgrade.sh` — BLOCKING
 PreToolUse hook that DENIES three direct surfaces bypassing the
@@ -1189,7 +1191,7 @@ hook writes a checkpoint markdown + quotes the matching `touch
 | denies ./.base/upgrade.sh and writes checkpoint markdown | positive trigger + checkpoint side-effect |
 | denies bare .base/upgrade.sh (no leading ./) | path-prefix variant |
 | denies absolute path .base/upgrade.sh | absolute-path variant |
-| deny reason mentions canonical make wrapper | reason content |
+| deny reason mentions canonical just wrapper with the version arg | - |
 | denies ./template/upgrade.sh (legacy folder name) | surface 2 trigger |
 | denies bare template/upgrade.sh (legacy, no leading ./) | surface 2 path-prefix variant |
 | denies git subtree pull --prefix=.base ... | surface 3 trigger |
@@ -1197,17 +1199,18 @@ hook writes a checkpoint markdown + quotes the matching `touch
 | denies git -C \<repo> subtree pull --prefix=.base ... (via -C arg) | -C arg resolution |
 | silent on git subtree pull with unrelated --prefix=foo | scope discriminator |
 | silent on git subtree push --prefix=.base (push, not pull) | subcommand discriminator |
-| silent on make -f Makefile.ci upgrade (already going through wrapper) | wrapper path |
-| silent when Makefile.ci absent (no make wrapper available) | rule N/A |
-| silent when Makefile.ci has no upgrade target | rule N/A |
+| silent on just upgrade (already going through wrapper) | - |
+| silent when justfile absent (no just wrapper available) | - |
+| a Makefile.ci upgrade target does not stand in for a missing justfile recipe | - |
 | silent on unrelated commands (git status) | non-trigger |
 | silent on script with similar name (foo/upgrade.sh) | path-prefix discriminator |
 | silent on empty command | empty-input guard |
 | allows same command after ack file exists | ack-bypass |
 | ack for different command does NOT bypass deny | hash isolation |
 | downstream justfile -> deny with just upgrade canonical | downstream layout → `just upgrade` hint |
-| base-self justfile.ci -> deny with just -f justfile.ci canonical | base-self layout → `just -f justfile.ci upgrade` hint |
-| precedence: justfile wins over Makefile.ci when both present | just-first during the make->just transition |
+| silent when the only wrapper candidate is a root justfile.ci (retired, refs #280) | - |
+| a leftover Makefile.ci never leaks into the canonical hint | - |
+| silent when the only wrapper candidate is a root Makefile.ci (make retired, refs #280) | - |
 | silent when justfile present but has no upgrade recipe | no upgrade recipe → rule N/A |
 
 ### .claude/test/bats/unit/enforce_batch_via_script_spec.bats (19)
@@ -1282,7 +1285,7 @@ bypass (env var or inline command prefix). `gh` is PATH-stubbed so
 | N3: fail-open when gh pr list errors (silent) | gh outage never blocks a legitimate single arm |
 | N4: mixed armed set excludes only the PR being armed | self-exclusion in the armed-PR query |
 
-### .claude/test/bats/unit/enforce_local_full_ci_before_pr_spec.bats (11)
+### .claude/test/bats/unit/enforce_local_full_ci_before_pr_spec.bats (12)
 
 Covers `.claude/hooks/enforce_local_full_ci_before_pr.sh` — BLOCKING
 PreToolUse hook that DENIES `gh pr create` / `gh pr ready` unless
@@ -1306,6 +1309,7 @@ nothing can stamp it (refs #176 / #208).
 | gh pr ready also gated (no marker -> deny) | ready trigger → DENY |
 | silent (fail safe) when cwd is not a git repo | non-repo → SILENT |
 | allows when only doc/ + TEST.md changed since the green marker | multi-doc-only → ALLOW |
+| [#280] fail-open: a lone justfile.ci is not a detectable CI mechanism | - |
 | fail-open: repo with no detectable CI mechanism is silent (refs #208) | no ci.sh/justfile.ci/justfile → SILENT (issue #208) |
 
 ### .claude/test/bats/unit/ci_and_stamp_spec.bats (10)

@@ -14,18 +14,19 @@
 # Wrapper list: by default, recognises these substring patterns as
 # "already wrapped, no reminder":
 #   docker run / docker exec / docker compose
-#   just -f justfile.ci / just test / just build / just lint
-#   make -f Makefile.ci   (legacy; tolerated during the make->just
-#                          transition until downstream .base flips, #202)
+#   just test / just build / just lint
 #   ./build.sh
 #   just -f .claude/test/justfile
+#
+# The make->just transition runners (`make -f Makefile.ci`,
+# `just -f justfile.ci`) were dropped in #280 — no repo ships either, so
+# recognising them only let a genuinely bare tool through unremarked.
 #
 # Override per-repo: drop a `.claude/lint_wrappers.txt` next to
 # settings.json — one substring pattern per line, blank/`#`-prefixed
 # lines ignored. When the file is present it REPLACES the default
 # list (full override, not append). Useful for downstream forks that
-# wrap lint differently (e.g. coreSAM uses `make -C .claude` instead
-# of `make -f Makefile.ci`).
+# wrap lint differently (e.g. coreSAM uses `make -C .claude`).
 
 set -uo pipefail
 
@@ -53,11 +54,9 @@ main() {
       "docker run"
       "docker exec"
       "docker compose"
-      "just -f justfile.ci"
       "just test"
       "just build"
       "just lint"
-      "make -f Makefile.ci"
       "./build.sh"
       "just -f .claude/test/justfile"
     )
@@ -73,7 +72,7 @@ main() {
   [[ "${cmd}" =~ (^|[\;\&\|][[:space:]]*)(bats|shellcheck|hadolint|kcov)([[:space:]]|$) ]] || return 0
 
   local tool="${BASH_REMATCH[2]}"
-  msg="$(printf '"驗證一律走 Docker" (verify-via-Docker) reminder: detected a direct %s invocation; results may differ from CI (local bats-mock / shellcheck versions may vary). Use just test / just test lint (base), just build test (downstream), or just -f .claude/test/justfile test (docker_harness; legacy ./build.sh test / make -f Makefile.ci still accepted).' "${tool}")"
+  msg="$(printf '"驗證一律走 Docker" (verify-via-Docker) reminder: detected a direct %s invocation; results may differ from CI (local bats-mock / shellcheck versions may vary). Use just test / just test lint (base), just build test (downstream), or just -f .claude/test/justfile test (docker_harness; legacy ./build.sh test still accepted).' "${tool}")"
 
   jq -n --arg m "${msg}" '{
     systemMessage: $m,

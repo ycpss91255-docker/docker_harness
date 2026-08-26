@@ -1,7 +1,14 @@
 # ADR-00000005: `make -f Makefile.ci upgrade` is Canonical; `./.base/upgrade.sh` is Fallback
 
 - **Date:** 2026-05-20
-- **Status:** Accepted
+- **Status:** Superseded by ADR-00000011 / issue #280 (2026-08-26)
+
+> **Superseded.** `make` is retired fleet-wide: no repo carries a root
+> `Makefile.ci`, and `enforce_wrapper_first_upgrade.sh` no longer treats
+> one as a wrapper. The canonical route is now `just upgrade [vX.Y.Z]`
+> from the downstream repo's root justfile; `./.base/upgrade.sh` remains
+> the ack-gated fallback. The reasoning below is kept as the record of
+> why a wrapper-first rule exists at all -- that part still holds.
 
 ## Context
 
