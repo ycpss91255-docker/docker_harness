@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1155 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1160 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -1996,3 +1996,13 @@ escaping, and the read-only `--check` gate.
 | denies PR ready too, not just PR create | - |
 | silent on a non-PR-open gh command with an untracked .sh present | - |
 | silent when cwd is not a git repo | - |
+
+### .claude/test/bats/unit/ci_sh_lint_targets_spec.bats (5)
+
+| Test | Scenario |
+|------|----------|
+| lint targets are the tracked hook, script and lib shell scripts | - |
+| an untracked script is not a lint target | - |
+| a tracked non-shell file is not a lint target | - |
+| a tracked script deleted in the working tree is not a lint target | - |
+| t_lint lints the computed target list, not a shell glob | - |
