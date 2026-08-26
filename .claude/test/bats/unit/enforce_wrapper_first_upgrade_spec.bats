@@ -301,6 +301,21 @@ EOF
   rm -rf "${repo}"
 }
 
+@test "silent when the only wrapper candidate is a root Makefile.ci (make retired, refs #280)" {
+  local repo; repo="$(mktemp -d)"
+  ( cd "${repo}"
+    git init -q -b main; git config user.email t@t; git config user.name t
+    mkdir -p .base
+    printf '.PHONY: upgrade\n\nupgrade:\n\t./.base/upgrade.sh $(VERSION)\n' > Makefile.ci
+    echo '#!/usr/bin/env bash' > .base/upgrade.sh
+    chmod +x .base/upgrade.sh
+    git add -A >/dev/null; git commit -q -m init >/dev/null ) >/dev/null
+  run "$(hook enforce_wrapper_first_upgrade.sh)" \
+    <<< "{\"tool_input\":{\"command\":\"./.base/upgrade.sh v0.30.0\"},\"cwd\":\"${repo}\"}"
+  assert_silent
+  rm -rf "${repo}"
+}
+
 @test "silent when justfile present but has no upgrade recipe" {
   local repo; repo="$(mktemp -d)"
   ( cd "${repo}"

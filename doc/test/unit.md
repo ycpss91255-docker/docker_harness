@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1131 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1132 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -1166,7 +1166,7 @@ make-internal calls / already-asked subs (rm/push/...) stay silent.
 | strips single env-prefix and matches docker build | env-prefix tolerance |
 | strips multiple env-prefixes and matches docker build | multi env-prefix |
 
-### .claude/test/bats/unit/enforce_wrapper_first_upgrade_spec.bats (23)
+### .claude/test/bats/unit/enforce_wrapper_first_upgrade_spec.bats (24)
 
 Covers `.claude/hooks/enforce_wrapper_first_upgrade.sh` — BLOCKING
 PreToolUse hook that DENIES three direct surfaces bypassing the
@@ -1208,6 +1208,7 @@ hook writes a checkpoint markdown + quotes the matching `touch
 | downstream justfile -> deny with just upgrade canonical | downstream layout → `just upgrade` hint |
 | base-self justfile.ci -> deny with just -f justfile.ci canonical | base-self layout → `just -f justfile.ci upgrade` hint |
 | precedence: justfile wins over Makefile.ci when both present | just-first during the make->just transition |
+| silent when the only wrapper candidate is a root Makefile.ci (make retired, refs #280) | - |
 | silent when justfile present but has no upgrade recipe | no upgrade recipe → rule N/A |
 
 ### .claude/test/bats/unit/enforce_batch_via_script_spec.bats (19)
