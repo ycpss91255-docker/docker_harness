@@ -395,3 +395,18 @@ stub_gh_fail() {
   run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh issue create --title T \\\\\n  --label bug \\\\\n  --body 'inline body'\"}}"
   assert_permission_decision "deny"
 }
+
+# #283 defect 1, second surface: heredoc BODY content is data written to a
+# file, not a command being run. A body line that happens to start with gh
+# must not be mistaken for the invocation -- while a genuine gh command on
+# its own line after the heredoc still is one.
+
+@test "#283: heredoc body containing a gh-leading line does not drive the verdict" {
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"cat > ${TMP}/x.md <<EOF\ngh issue create --title T\nEOF\"}}"
+  assert_silent
+}
+
+@test "#283: a real gh issue create after a heredoc block is still denied" {
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"cat > ${TMP}/x.md <<EOF\nissue notes\nEOF\ngh issue create --title T --label bug\"}}"
+  assert_permission_decision "deny"
+}

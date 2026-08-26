@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1137 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1139 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -398,7 +398,7 @@ exempt from `--body-file` scanning.
 | silent when Dockerfile.test-tools has no final-stage apk add | no final apk → SILENT |
 | handles empty smoke step gracefully | YAML run block empty → no crash |
 
-### .claude/test/bats/unit/enforce_gh_body_file_spec.bats (59)
+### .claude/test/bats/unit/enforce_gh_body_file_spec.bats (61)
 
 Covers `.claude/hooks/enforce_gh_body_file.sh` -- the PreToolUse hook
 that BLOCKS gh routing violations from issue #64. Renamed + upgraded
@@ -467,6 +467,8 @@ threshold for short inline bodies.
 | #255: gh issue create missing --body-file still denied despite trailing echo mentioning one | foreign --body-file does not satisfy the rule |
 | #283: backslash-continued gh issue create with --body-file on a later line allowed | - |
 | #283: backslash-continued gh issue create with inline --body still denied | - |
+| #283: heredoc body containing a gh-leading line does not drive the verdict | - |
+| #283: a real gh issue create after a heredoc block is still denied | - |
 
 ### .claude/test/bats/unit/wait_pr_ci_spec.bats (32)
 
