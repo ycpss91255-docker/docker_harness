@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1147 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1149 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -1983,3 +1983,10 @@ escaping, and the read-only `--check` gate.
 | refuses to bump a version the changelog already records | - |
 | refuses when there is no Unreleased section to promote | - |
 | derives the slug from the remote, so a renamed repo self-corrects | - |
+
+### .claude/test/bats/unit/enforce_scripts_tracked_before_pr_spec.bats (2)
+
+| Test | Scenario |
+|------|----------|
+| denies PR open while .claude/scripts holds an untracked .sh | - |
+| silent on PR open when every .claude/scripts .sh is tracked | - |

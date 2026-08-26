@@ -185,6 +185,7 @@ docker/
     │   ├── enforce_worktree_for_branch.sh # 主 checkout 內 git checkout -b|-B 前 BLOCK,要求改走 git worktree add <path> -b <branch> main(內部 worktree 自動放行,checkpoint ack 可解,refs #122 / PR #89 / ADR-00000006)
     │   ├── enforce_merge_update_not_rebase.sh # git rebase(除 --abort/--continue/--skip)+ 有 open PR 的 branch force-push 前 BLOCK,改走 git merge origin/main + 一般 push;no-PR force-push / gh 錯誤 fail-open,checkpoint ack 可解,refs #221
     │   ├── enforce_local_full_ci_before_pr.sh # gh pr create/ready 前 BLOCK：HEAD 無 local-CI marker(.claude/state/local-ci-pass/<sha>.ok,由 .claude/test/ci.sh test 綠時寫)且非「綠後只動 doc」則 deny;LOCAL_CI_ACK=<sha> 可 override(refs #176)
+    │   ├── enforce_scripts_tracked_before_pr.sh # gh pr create/ready 前 BLOCK：.claude/scripts/ 下(含 lib/)還有 untracked *.sh 就 deny 並列出檔名 — enforce_batch_via_script 只管「產生」不管「善後」,15 個 fanout 一次性腳本累積成 local lint 長紅的根因;放 PR-open 而非 ci.sh check,因為腳本寫到一半未 commit 是合法中間狀態(refs #282)
     │   ├── check_prefer_dot_sh.sh       # docker build/run/exec/stop/compose 前：cwd 有對應 .sh wrapper 則 deny,沒有則 ask
     │   ├── remind_topics_yaml_on_new_repo.sh # gh repo create ycpss91255-docker/* 前提醒去 .github topics.yaml 加 repos.* 條目
     │   ├── auto_clean_worktree_leak.sh  # PreToolUse Bash：git pull / git checkout origin/* / git merge origin/* 前掃 main checkout 非 whitelist M(`.claude/instincts.yaml` + `.claude/memory/**`)→ 寫 cleaned event 到 ~/.claude/log/worktree-leak-events.jsonl + git checkout HEAD -- <files> 還原後放行；refs #167
