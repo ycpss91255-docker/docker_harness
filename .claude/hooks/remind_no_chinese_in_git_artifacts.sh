@@ -143,10 +143,20 @@ def strip_heredocs(text):
     return "\n".join(kept)
 
 
+def fold_continuations(text):
+    """text with backslash-continued newlines joined into one line.
+
+    A newline separates two commands, but a newline after a trailing
+    backslash is a continuation inside ONE command -- its flags, and its
+    message, still belong to the command that started above.
+    """
+    return text.replace("\\\n", " ")
+
+
 def split_commands(text):
     """Every simple command in text, as a token list."""
     out = []
-    for line in strip_heredocs(text).split("\n"):
+    for line in fold_continuations(strip_heredocs(text)).split("\n"):
         if not line.strip():
             continue
         try:
