@@ -1206,7 +1206,7 @@ hook writes a checkpoint markdown + quotes the matching `touch
 | allows same command after ack file exists | ack-bypass |
 | ack for different command does NOT bypass deny | hash isolation |
 | downstream justfile -> deny with just upgrade canonical | downstream layout → `just upgrade` hint |
-| base-self justfile.ci -> deny with just -f justfile.ci canonical | base-self layout → `just -f justfile.ci upgrade` hint |
+| silent when the only wrapper candidate is a root justfile.ci (retired, refs #280) | - |
 | a leftover Makefile.ci never leaks into the canonical hint | - |
 | silent when the only wrapper candidate is a root Makefile.ci (make retired, refs #280) | - |
 | silent when justfile present but has no upgrade recipe | no upgrade recipe → rule N/A |

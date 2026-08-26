@@ -273,14 +273,13 @@ mk_just_repo() {
   rm -rf "${repo}"
 }
 
-@test "base-self justfile.ci -> deny with just -f justfile.ci canonical" {
+@test "silent when the only wrapper candidate is a root justfile.ci (retired, refs #280)" {
+  # justfile.ci was the base-self CI runner during the make->just window;
+  # no repo root ships one any more, so it is not a wrapper.
   local repo; repo="$(mk_just_repo justfile.ci)"
   run "$(hook enforce_wrapper_first_upgrade.sh)" \
     <<< "{\"tool_input\":{\"command\":\"./.base/upgrade.sh v0.30.0\"},\"cwd\":\"${repo}\"}"
-  assert_permission_decision "deny"
-  local reason
-  reason="$(echo "${output}" | jq -r '.hookSpecificOutput.permissionDecisionReason // empty')"
-  [[ "${reason}" == *"just -f justfile.ci upgrade"* ]] || { echo "want 'just -f justfile.ci upgrade', got: ${reason}"; rm -rf "${repo}"; return 1; }
+  assert_silent
   rm -rf "${repo}"
 }
 
