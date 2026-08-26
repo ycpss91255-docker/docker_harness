@@ -49,7 +49,7 @@ main() {
 
   [[ -z "${cmd}" ]] && return 0
 
-  # Trigger detection -- three surfaces, all routed to `make upgrade`.
+  # Trigger detection -- three surfaces, all routed to `just upgrade`.
   local matched=0
   # Surface 1+2: <prefix>/.base/upgrade.sh or <prefix>/template/upgrade.sh
   if [[ "${cmd}" =~ (^|[[:space:]\;\&\|])(\./)?(.*/)?(\.base|template)/upgrade\.sh([[:space:]]|$) ]]; then
