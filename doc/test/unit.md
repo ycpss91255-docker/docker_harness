@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1135 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1152 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -1971,3 +1971,25 @@ escaping, and the read-only `--check` gate.
 | refuses to bump a version the changelog already records | - |
 | refuses when there is no Unreleased section to promote | - |
 | derives the slug from the remote, so a renamed repo self-corrects | - |
+
+### .claude/test/bats/unit/check_base_delivery_spec.bats (17)
+
+| Test | Scenario |
+|------|----------|
+| --help prints usage and exits 0 | - |
+| unknown arg exits 2 | - |
+| an empty selection is a failed audit, not a passed one | - |
+| the expected paths come from the manifest command, not a local copy | - |
+| a manifest command that prints nothing aborts rather than pass every repo | - |
+| a repo missing an installed file is reported and exits 1 | - |
+| a repo carrying every installed file exits 0 | - |
+| the headline counts how many consumers lack each file, worst first | - |
+| the verdict names the worst gap so a scan cannot miss it | - |
+| a repo with no .base subtree is not counted as a delivery failure | - |
+| the .base version each repo is pinned to is reported alongside the gaps | - |
+| a repo the probe cannot read is reported as UNREADABLE and fails the audit | - |
+| --scope narrows to one fanout state | - |
+| --only narrows to named repos, accepting a roster path or a bare name | - |
+| --skip drops named repos | - |
+| --list-repos prints the effective selection without probing anything | - |
+| --manifest reads the expected paths from a file instead of running init.sh | - |

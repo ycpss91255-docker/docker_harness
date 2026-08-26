@@ -117,6 +117,7 @@ docker/
     │   ├── batch-pr-merge.sh                # 批次 squash-merge 多個 <repo>:<pr>（接 short / full repo 名都可）
     │   ├── batch-pr-close.sh                # 批次 close 多個 <repo>:<pr>，--reason 必填（superseded-by 場景，例如 hotfix 後重 fanout 取代既有批次 PR）
     │   ├── check-template-versions.sh       # HTTPS curl 13 repo `.base/.version` 對齊檢查（release 後驗證）
+    │   ├── check-base-delivery.sh           # delivery audit:每個 roster repo 是否真的收到 init.sh 該裝的檔案(不只 `.base/.version` 對齊);expected 清單向 base 的 `init.sh --list-installed-paths` 要,不留本地副本;consumer 與否由 probe 實測(抓不到 `.base/.version` = 非 consumer)而非信 roster fanout 欄,所以 roster drift 會被報出來;輸出先給 per-file 缺漏排行再給 per-repo 明細 + 一句 VERDICT;BASE_INIT / DELIVERY_PROBE / DELIVERY_VERSION_PROBE 三個 seam 可注入所以離線可測(refs #927)
     │   ├── fix-compose-copy-line.sh         # 一次性 compose.yaml COPY 路徑修正
     │   ├── fix-dockerfile-lint-lib.sh        # 通用：對 --branch 指定的 chore 分支批次 patch downstream Dockerfile 加 `COPY .base/script/docker/lib /lint/lib`（#284 sub-libs split 後 fanout 必須跑，idempotent）
     │   ├── fix-dockerfile-copy-script.sh     # 通用：對 --branch 指定的 chore 分支批次 patch downstream Dockerfile 把 `COPY *.sh /lint/` 改成 `COPY script/*.sh /lint/`（base#330 / v0.31.0 wrapper consolidation 後 root 沒有 *.sh,active 2 個下游 fanout 必須跑,idempotent）

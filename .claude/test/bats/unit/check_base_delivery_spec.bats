@@ -21,6 +21,13 @@ setup() {
   export ROSTER_FILE="${STUB_DIR}/roster.tsv"
   export BASE_INIT="${STUB_DIR}/fake-init.sh"
   export DELIVERY_PROBE="${STUB_DIR}/fake-probe.sh"
+  # The version read is a third boundary, injected for the same reason:
+  # left to its default it is a real HTTPS fetch, which would make every
+  # spec below depend on the network to report a column none of them are
+  # about. The one spec that IS about it overrides this.
+  printf '#!/usr/bin/env bash\nprintf unknown\n' > "${STUB_DIR}/no-version.sh"
+  chmod +x "${STUB_DIR}/no-version.sh"
+  export DELIVERY_VERSION_PROBE="${STUB_DIR}/no-version.sh"
 }
 
 teardown() {
@@ -180,9 +187,13 @@ BARE=".base/.version justfile"
   write_roster app_one:active
   write_manifest justfile
   write_probe "app_one=${COMPLETE}"
-  run "$(script check-base-delivery.sh)"
+  printf '#!/usr/bin/env bash\nprintf v0.42.0\n' > "${STUB_DIR}/fake-version.sh"
+  chmod +x "${STUB_DIR}/fake-version.sh"
+  DELIVERY_VERSION_PROBE="${STUB_DIR}/fake-version.sh" \
+    run "$(script check-base-delivery.sh)"
   assert_success
   assert_output --partial "app_one"
+  assert_output --partial "v0.42.0"
 }
 
 @test "a repo the probe cannot read is reported as UNREADABLE and fails the audit" {
