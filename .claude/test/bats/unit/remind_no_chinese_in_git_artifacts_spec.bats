@@ -91,6 +91,22 @@ teardown() {
   assert_silent
 }
 
+# #283 defect 2, second surface: heredoc body content is data the command
+# writes, so CJK there is not a commit message either -- while a genuine
+# git commit on its own line after the heredoc still is one.
+
+@test "silent on a heredoc body holding CJK and a git commit line" {
+  run "$(hook remind_no_chinese_in_git_artifacts.sh)" \
+    <<< '{"tool_input":{"command":"cat > /tmp/fixture.txt <<EOF\ngit commit -m \"修正錯誤\"\nEOF"}}'
+  assert_silent
+}
+
+@test "denies a real git commit with CJK on a line after a heredoc block" {
+  run "$(hook remind_no_chinese_in_git_artifacts.sh)" \
+    <<< '{"tool_input":{"command":"cat > /tmp/fixture.txt <<EOF\nplain notes\nEOF\ngit commit -m \"修正錯誤\""}}'
+  assert_permission_decision "deny"
+}
+
 @test "denies a real git commit with CJK chained after an unrelated echo" {
   run "$(hook remind_no_chinese_in_git_artifacts.sh)" \
     <<< '{"tool_input":{"command":"echo staging && git commit -m \"修正錯誤\""}}'
