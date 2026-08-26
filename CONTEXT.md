@@ -297,7 +297,7 @@ with this file as the argument; pre-#127 it read `CLAUDE.md`.
 │   ├── smoke/                    # 共用 smoke tests
 │   ├── unit/                     # template 自身測試（見 doc/test/TEST.md）
 │   └── integration/              # init.sh 整合測試（見 doc/test/TEST.md）
-├── Makefile.ci                   # template CI 入口
+├── justfile                      # template CI 入口
 ├── compose.yaml                  # Docker CI 執行器
 └── .hadolint.yaml                # 共用 Hadolint 規則
 ```
@@ -383,7 +383,7 @@ git push origin vX.Y.Z
 cd <repo>
 just upgrade vX.Y.Z                          # 指定版本（推薦；下游 consumer）
 # 或 just upgrade                            # 升到最新 tag
-# base self: just ci upgrade vX.Y.Z
+# base 自身無 upgrade recipe：它是來源端,不從別處升級
 # Fallback（wrapper 不可用時，被 hook 擋需 ACK）: ./.base/upgrade.sh vX.Y.Z
 
 # 3. 走 PR merge（branch protection 禁止直接 push main）
@@ -651,7 +651,7 @@ level。base 住 `test/lint/<tool>/`；CI 強制。
 
 入口：
 - `./build.sh test` — Dockerfile `test` stage（ShellCheck → Hadolint → Bats smoke）
-- `just -f justfile.ci test` / `lint` — base 自身的 unit/integration 測試
+- `just test` / `just test lint` — base 自身的 unit/integration 測試
 
 ## 13. Known gotchas
 

@@ -61,8 +61,7 @@ just test lint             # shellcheck + hadolint only
 just -f .claude/test/justfile check # docker_harness harness (CI runs .claude/test/ci.sh)
 ```
 
-For flags/overrides read `<cmd> -h` or bare `just` first. Legacy
-downstream not yet fanned out may still use `make <verb>`.
+For flags/overrides read `<cmd> -h` or bare `just` first.
 
 ## 標準容器結構
 
@@ -94,11 +93,10 @@ from prose.
   `.claude/scripts/batch-pr-{merge,close}.sh`)
 - Version bump + RC + release tag: `[[semver-bump]]` (canonical
   primitive: `.claude/scripts/release-tag.sh`)
-- `.base` subtree upgrade: `just upgrade [vX.Y.Z]` (downstream) /
-  `just ci upgrade` (base self); wrapper-first, raw
+- `.base` subtree upgrade: `just upgrade [vX.Y.Z]` (downstream only --
+  base is the origin and has no upgrade recipe); wrapper-first, raw
   `./.base/upgrade.sh` and `git subtree pull` are BLOCKed by
-  `enforce_wrapper_first_upgrade.sh` (legacy `make -f Makefile.ci
-  upgrade` still accepted during the make->just transition)
+  `enforce_wrapper_first_upgrade.sh`
 - New repo creation under the org: `/new-repo`
 - Land a PR after open (arm GitHub auto-merge + Monitor):
   `[[auto-merge-on-green]]`; pure CI monitoring (no merge):
