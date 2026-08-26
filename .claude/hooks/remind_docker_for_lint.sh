@@ -73,7 +73,7 @@ main() {
   [[ "${cmd}" =~ (^|[\;\&\|][[:space:]]*)(bats|shellcheck|hadolint|kcov)([[:space:]]|$) ]] || return 0
 
   local tool="${BASH_REMATCH[2]}"
-  msg="$(printf '"驗證一律走 Docker" (verify-via-Docker) reminder: detected a direct %s invocation; results may differ from CI (local bats-mock / shellcheck versions may vary). Use just test / just test lint (base), just build test (downstream), or just -f .claude/test/justfile test (docker_harness; legacy ./build.sh test / make -f Makefile.ci still accepted).' "${tool}")"
+  msg="$(printf '"驗證一律走 Docker" (verify-via-Docker) reminder: detected a direct %s invocation; results may differ from CI (local bats-mock / shellcheck versions may vary). Use just test / just test lint (base), just build test (downstream), or just -f .claude/test/justfile test (docker_harness; legacy ./build.sh test still accepted).' "${tool}")"
 
   jq -n --arg m "${msg}" '{
     systemMessage: $m,
