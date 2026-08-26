@@ -217,7 +217,7 @@ docker/
     ├── test/                           # docker_harness 自己的 hook 測試 infra（與下游 repo 的 Dockerfile 無關）
     │   ├── Dockerfile                  # bats 1.11 + shellcheck on Alpine（COPY .claude/hooks/ + .claude/scripts/ + .claude/test/）
     │   ├── bats/                       # ISTQB 測試 specs — unit/integration/system/acceptance + lib/test_helper.bash（見 doc/test/,ADR-00000013）
-    │   ├── ci.sh                       # CI runner driver — both CI (.github/workflows/test.yaml) 與 local justfile 都呼叫；targets build / test / lint / hadolint / check / tree-check / ceiling-check / log-helper-check / doc-count-check / clean
+    │   ├── ci.sh                       # CI runner driver — both CI (.github/workflows/test.yaml) 與 local justfile 都呼叫；targets build / test / lint / hadolint / check / tree-check / ceiling-check / log-helper-check / doc-count-check / clean;lint 的檔案清單由 host 上的 lint_targets()(git ls-files)算出再交給 container,所以 local(掛 live worktree,refs #214)與 CI(clean checkout)蓋同一組 tracked *.sh,refs #282
     │   └── justfile                    # local just wrapper：just -f .claude/test/justfile <target> 轉呼 ci.sh <target>
     ├── settings.json                   # hooks 註冊 + permissions + sandbox（**唯一一份,無 settings.local.json**）
     └── instincts.yaml                  # 結構化 repo conventions (#95 pilot) — hooks/skills/commands 用 `instinct-query.sh` 查詢,取代 CLAUDE.md prose grep

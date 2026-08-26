@@ -34,3 +34,23 @@ load '../lib/test_helper'
     return 1
   }
 }
+
+@test "acceptance: every enforce_*.sh hook is armed in settings.json" {
+  # The complement of the stanza above, and the failure it catches is
+  # worse: a registration pointing at nothing is loud, while an
+  # enforcement hook that ships UNREGISTERED is a gate that silently
+  # never fires -- the session gets no protection and no error either
+  # (refs #282, where the gate against untracked one-off scripts is
+  # only real if a consumer session actually runs it).
+  local registered unarmed=""
+  registered="$(jq -r '.hooks[][].hooks[].command' "${PROJECT_ROOT}/.claude/settings.json")"
+  for h in "${PROJECT_ROOT}"/.claude/hooks/enforce_*.sh; do
+    [[ -e "${h}" ]] || continue   # empty-glob guard
+    grep -qF -- "/$(basename "${h}")" <<< "${registered}" \
+      || unarmed+="  ${h}"$'\n'
+  done
+  [[ -z "${unarmed}" ]] || {
+    echo "enforcement hooks that exist but are registered nowhere:"$'\n'"${unarmed}"
+    return 1
+  }
+}
