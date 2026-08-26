@@ -98,66 +98,154 @@ _is_exempt_path() {
   return 1
 }
 
-# _extract_file_args <cmd> — print, one per line, every path passed via
-# -F / --file / --body-file in the command. Uses Python shlex for
-# quote-aware parsing.
-_extract_file_args() {
+# _target_artifacts <cmd> — print a JSON array of the git artifacts this
+# command actually WRITES, one object per artifact-producing command:
+#   [{"text": "<the command's own tokens>", "files": ["<-F/--file/--body-file path>"]}]
+#
+# Scoping, not matching (refs #283, same lesson as #255): the rule applies
+# to the artifact being written, never to a command that merely NAMES one.
+# So the command string is tokenised (shlex, quote-aware) and split on the
+# shell operators; only a segment whose own command WORD is `git commit` /
+# `gh pr create|edit|comment` / `gh issue create|edit|close|comment`
+# counts. A `git commit` sitting inside another command's quoted argument
+# is one token of that command's argv, so it can never become a segment
+# head -- and the CJK scan then sees only the target's own tokens, never
+# the rest of the line.
+_target_artifacts() {
   python3 -c '
-import shlex, sys
-cmd = sys.argv[1]
-try:
-    tokens = shlex.split(cmd)
-except ValueError:
-    sys.exit(0)
-flag_with_value = {"-F", "--file", "--body-file"}
-i = 0
-while i < len(tokens):
-    t = tokens[i]
-    if t in flag_with_value and i + 1 < len(tokens):
-        print(tokens[i + 1])
-        i += 2
-        continue
-    if "=" in t:
-        flag, _, val = t.partition("=")
-        if flag in flag_with_value:
-            print(val)
-    i += 1
+import json, re, shlex, sys
+
+ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+# A doubled less-than plus a word opens a heredoc (the dash and quoted
+# forms too); a tripled less-than is a herestring and opens nothing.
+HEREDOC_OPEN = re.compile(r"(?:^|[^<])<<-?[ \t]*[\"\x27]?([A-Za-z_][A-Za-z0-9_]*)")
+PUNCT = "();<>|&"
+FILE_FLAGS = {"-F", "--file", "--body-file"}
+GH_SUBCMDS = {
+    "pr": {"create", "edit", "comment"},
+    "issue": {"create", "edit", "close", "comment"},
+}
+
+
+def strip_heredocs(text):
+    """text with every heredoc BODY removed, opening lines kept."""
+    kept = []
+    delimiter = None
+    for line in text.split("\n"):
+        if delimiter is not None:
+            if line.strip() == delimiter:
+                delimiter = None
+            continue
+        kept.append(line)
+        match = HEREDOC_OPEN.search(line)
+        if match:
+            delimiter = match.group(1)
+    return "\n".join(kept)
+
+
+def fold_continuations(text):
+    """text with backslash-continued newlines joined into one line.
+
+    A newline separates two commands, but a newline after a trailing
+    backslash is a continuation inside ONE command -- its flags, and its
+    message, still belong to the command that started above.
+    """
+    return text.replace("\\\n", " ")
+
+
+def split_commands(text):
+    """Every simple command in text, as a token list."""
+    out = []
+    for line in fold_continuations(strip_heredocs(text)).split("\n"):
+        if not line.strip():
+            continue
+        try:
+            lexer = shlex.shlex(line, posix=True, punctuation_chars=True)
+            lexer.whitespace_split = True
+            tokens = list(lexer)
+        except ValueError:
+            tokens = line.split()
+        current = []
+        for tok in tokens:
+            if tok and all(ch in PUNCT for ch in tok):
+                if current:
+                    out.append(current)
+                current = []
+            else:
+                current.append(tok)
+        if current:
+            out.append(current)
+    return out
+
+
+def as_target(tokens):
+    """The argv of tokens if it writes a git artifact, else None."""
+    i = 0
+    while i < len(tokens) and (ENV_ASSIGN.match(tokens[i]) or tokens[i] == "sudo"):
+        i += 1
+    argv = tokens[i:]
+    if not argv:
+        return None
+    if argv[0] == "git" and len(argv) > 1 and argv[1] == "commit":
+        return argv
+    if (
+        argv[0] == "gh"
+        and len(argv) > 2
+        and argv[1] in GH_SUBCMDS
+        and argv[2] in GH_SUBCMDS[argv[1]]
+    ):
+        return argv
+    return None
+
+
+def file_args(argv):
+    out = []
+    i = 0
+    while i < len(argv):
+        tok = argv[i]
+        if tok in FILE_FLAGS and i + 1 < len(argv):
+            out.append(argv[i + 1])
+            i += 2
+            continue
+        flag, sep, value = tok.partition("=")
+        if sep and flag in FILE_FLAGS:
+            out.append(value)
+        i += 1
+    return out
+
+
+artifacts = []
+for tokens in split_commands(sys.argv[1]):
+    argv = as_target(tokens)
+    if argv:
+        artifacts.append({"text": " ".join(argv), "files": file_args(argv)})
+print(json.dumps(artifacts))
 ' "$1" 2>/dev/null
 }
 
-# _is_target_command <cmd> — return 0 if cmd looks like one we should
-# enforce: git commit, gh pr (create|edit|comment), gh issue
-# (create|edit|close|comment).
-_is_target_command() {
-  local cmd="$1"
-  if printf '%s' "${cmd}" | grep -qE '(^|[[:space:]&|;])git[[:space:]]+commit([[:space:]]|$)'; then
-    return 0
-  fi
-  if printf '%s' "${cmd}" | grep -qE '(^|[[:space:]&|;])gh[[:space:]]+pr[[:space:]]+(create|edit|comment)([[:space:]]|$)'; then
-    return 0
-  fi
-  if printf '%s' "${cmd}" | grep -qE '(^|[[:space:]&|;])gh[[:space:]]+issue[[:space:]]+(create|edit|close|comment)([[:space:]]|$)'; then
-    return 0
-  fi
-  return 1
-}
-
 main() {
-  local input cmd
+  local input cmd artifacts count idx text file_path file_hit
   input="$(cat)"
   cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
 
   [[ -z "${cmd}" ]] && return 0
 
-  _is_target_command "${cmd}" || return 0
+  artifacts="$(_target_artifacts "${cmd}")"
+  [[ -z "${artifacts}" || "${artifacts}" == "[]" ]] && return 0
+  count="$(printf '%s' "${artifacts}" | jq 'length' 2>/dev/null)"
+  [[ -z "${count}" ]] && return 0
 
-  # 1. Scan the inline command string itself — covers -m "..." / --body "..." / --title "..."
-  local hit
-  hit="$(_scan_text "${cmd}")"
+  local hit=""
+  for (( idx = 0; idx < count; idx++ )); do
+    # 1. Scan the artifact command's own tokens — covers -m "..." /
+    #    --body "..." / --title "...", and nothing that belongs to
+    #    another command on the same line.
+    text="$(printf '%s' "${artifacts}" | jq -r ".[${idx}].text")"
+    hit="$(_scan_text "${text}")"
+    [[ -n "${hit}" ]] && break
 
-  # 2. Scan referenced files (-F / --file / --body-file). Skip exempt paths.
-  if [[ -z "${hit}" ]]; then
-    local file_path file_hit
+    # 2. Scan its referenced files (-F / --file / --body-file). Skip
+    #    exempt paths.
     while IFS= read -r file_path; do
       [[ -z "${file_path}" ]] && continue
       _is_exempt_path "${file_path}" && continue
@@ -167,8 +255,9 @@ main() {
         hit="${file_path}:${file_hit}"
         break
       fi
-    done < <(_extract_file_args "${cmd}")
-  fi
+    done < <(printf '%s' "${artifacts}" | jq -r ".[${idx}].files[]?")
+    [[ -n "${hit}" ]] && break
+  done
 
   [[ -z "${hit}" ]] && return 0
 

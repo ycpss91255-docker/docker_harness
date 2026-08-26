@@ -114,6 +114,25 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   has one heading and no link block, and `--check` reports it clean.
 
 ### Fixed
+- **Two hooks stopped reading command data as command syntax (fixes #283).**
+  `enforce_gh_body_file.sh` split the command on newlines unconditionally, so
+  a backslash-continued `gh issue create` was cut at line one and a
+  `--body-file` below it was invisible -- a false deny on a valid command --
+  while a line inside a heredoc body that happened to start with `gh` was
+  picked up as the invocation being run, which is why filing #283 itself
+  could not go through the normal path. Continuations are now folded and
+  heredoc bodies dropped before segmenting; a plain newline stays a
+  boundary, so two genuine `gh` commands on separate lines remain
+  independent. `remind_no_chinese_in_git_artifacts.sh` fired on any command
+  whose text merely contained `git commit` / `gh ... create`, so CJK
+  anywhere in it -- a string literal, a comment, an unrelated `echo` -- was
+  denied as though it were a commit message; it now tokenises the command,
+  splits on the shell operators, and scans only the segments whose own
+  command word is the artifact command, the way #255 scoped `gh_segment`.
+  Neither rule is relaxed: body-file routing and English-only artifacts
+  still deny exactly what they denied, and every slice pins both directions.
+  The shared lesson -- establish what the command IS before deciding what it
+  contains -- is recorded once in `CONTEXT.md` section 15.
 - **The agent ack deny is scoped to acks (fixes #276).** #274 placed the
   agent branch at the top of `main()`, before the command was read, so this
   PreToolUse **Bash** hook denied every command a subagent issued -- `ls`,

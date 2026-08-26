@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1135 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1147 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -364,7 +364,7 @@ re-invoke `/wait-pr-ci` on the same PR. Silent on initial `-u` pushes
 | silent on bash -c "cat \<\<EOF > path" (allowed wrapper) | `bash -c` wraps the heredoc → SILENT |
 | fires on chained command: git status && cat \<\<EOF > /path | command-position heredoc after `&&` → FIRE |
 
-### .claude/test/bats/unit/remind_no_chinese_in_git_artifacts_spec.bats (11)
+### .claude/test/bats/unit/remind_no_chinese_in_git_artifacts_spec.bats (17)
 
 Covers `.claude/hooks/remind_no_chinese_in_git_artifacts.sh` — blocking
 PreToolUse hook that DENIES `git commit` and `gh pr|issue` commands when
@@ -386,6 +386,12 @@ exempt from `--body-file` scanning.
 | silent on git commit -m with em-dash and smart quotes (English typography) | allowed non-ASCII typography → SILENT |
 | silent on non-git/gh command containing CJK | matcher narrows to git/gh subcommands → SILENT |
 | silent on gh pr list --json (no body/title editing) | non-editing gh subcommand → SILENT |
+| silent on echo whose quoted argument mentions git commit and holds CJK | - |
+| denies a backslash-continued git commit whose CJK message is on a later line | - |
+| silent on a backslash-continued echo mentioning git commit with CJK | - |
+| silent on a heredoc body holding CJK and a git commit line | - |
+| denies a real git commit with CJK on a line after a heredoc block | - |
+| denies a real git commit with CJK chained after an unrelated echo | - |
 
 ### .claude/test/bats/unit/remind_test_tools_smoke_sync_spec.bats (7)
 | Test | Scenario |
@@ -398,7 +404,7 @@ exempt from `--body-file` scanning.
 | silent when Dockerfile.test-tools has no final-stage apk add | no final apk → SILENT |
 | handles empty smoke step gracefully | YAML run block empty → no crash |
 
-### .claude/test/bats/unit/enforce_gh_body_file_spec.bats (57)
+### .claude/test/bats/unit/enforce_gh_body_file_spec.bats (63)
 
 Covers `.claude/hooks/enforce_gh_body_file.sh` -- the PreToolUse hook
 that BLOCKS gh routing violations from issue #64. Renamed + upgraded
@@ -465,6 +471,12 @@ threshold for short inline bodies.
 | #255: real gh uses --body-file; trailing echo mentioning --body= is silent | detection scoped to the gh segment |
 | #255: a quoted gh-comment mention before a real gh pr view is silent | quoted gh in another command ignored |
 | #255: gh issue create missing --body-file still denied despite trailing echo mentioning one | foreign --body-file does not satisfy the rule |
+| #283: backslash-continued gh issue create with --body-file on a later line allowed | - |
+| #283: backslash-continued gh issue create with inline --body still denied | - |
+| #283: heredoc body containing a gh-leading line does not drive the verdict | - |
+| #283: --body-file on a second gh command line does not satisfy the first | - |
+| #283: a complete gh issue create followed by another gh command is silent | - |
+| #283: a real gh issue create after a heredoc block is still denied | - |
 
 ### .claude/test/bats/unit/wait_pr_ci_spec.bats (32)
 

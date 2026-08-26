@@ -727,6 +727,18 @@ pattern**，改用替代寫法可以根除大量無謂的 user prompt：
 section 的規則 + `[[skillification-candidates]]` skill 在任務結束時主動列
 skill 化候選收斂。
 
+### Hook 解析 command 的共同規則（refs #255 / #276 / #283）
+
+寫 hook 判斷一條 bash command 時，**先確定「跑的是哪個 command」，再判斷
+它包含什麼**——四次同型 bug 都是把資料當語法：
+
+- heredoc body 是資料不是 command（先剝掉）；backslash 續行是同一個
+  command 的一部分（先折成一行）——換行本身仍然是 command 邊界。
+- 以 shell 分隔符（`&&` `||` `|` `;` 換行）切段後，只認「命令字本身」就是
+  目標程式的那一段；引號參數裡提到的 `git` / `gh` 是別人的字串。
+- 放寬的只有「這條是不是那個 command」的判斷，規則本身（`--body-file`
+  routing、artifact 只能英文）一律不放寬。
+
 ## 16. Per-project memory (repo-portable via symlink)
 
 Claude Code 的 per-project memory 預設存在

@@ -80,3 +80,51 @@ teardown() {
     <<< '{"tool_input":{"command":"gh pr list --repo a/b --json title"}}'
   assert_silent
 }
+
+# #283 defect 2: the rule applies to the git artifact being written, not to
+# any command that mentions one. A git/gh named inside another command's
+# quoted argument is a string, so CJK there is not a commit message.
+
+@test "silent on echo whose quoted argument mentions git commit and holds CJK" {
+  run "$(hook remind_no_chinese_in_git_artifacts.sh)" \
+    <<< '{"tool_input":{"command":"echo \"reminder: git commit -m must be English 中文\""}}'
+  assert_silent
+}
+
+# #283 defect 2, third surface: scoping to one command must not lose the
+# rest of THAT command -- a backslash-continued newline is a continuation,
+# so the message on the next line is still the commit message.
+
+@test "denies a backslash-continued git commit whose CJK message is on a later line" {
+  run "$(hook remind_no_chinese_in_git_artifacts.sh)" \
+    <<< '{"tool_input":{"command":"git commit \\\n  -m \"修正錯誤\""}}'
+  assert_permission_decision "deny"
+}
+
+@test "silent on a backslash-continued echo mentioning git commit with CJK" {
+  run "$(hook remind_no_chinese_in_git_artifacts.sh)" \
+    <<< '{"tool_input":{"command":"echo one \\\n  \"reminder about git commit -m 中文\""}}'
+  assert_silent
+}
+
+# #283 defect 2, second surface: heredoc body content is data the command
+# writes, so CJK there is not a commit message either -- while a genuine
+# git commit on its own line after the heredoc still is one.
+
+@test "silent on a heredoc body holding CJK and a git commit line" {
+  run "$(hook remind_no_chinese_in_git_artifacts.sh)" \
+    <<< '{"tool_input":{"command":"cat > /tmp/fixture.txt <<EOF\ngit commit -m \"修正錯誤\"\nEOF"}}'
+  assert_silent
+}
+
+@test "denies a real git commit with CJK on a line after a heredoc block" {
+  run "$(hook remind_no_chinese_in_git_artifacts.sh)" \
+    <<< '{"tool_input":{"command":"cat > /tmp/fixture.txt <<EOF\nplain notes\nEOF\ngit commit -m \"修正錯誤\""}}'
+  assert_permission_decision "deny"
+}
+
+@test "denies a real git commit with CJK chained after an unrelated echo" {
+  run "$(hook remind_no_chinese_in_git_artifacts.sh)" \
+    <<< '{"tool_input":{"command":"echo staging && git commit -m \"修正錯誤\""}}'
+  assert_permission_decision "deny"
+}

@@ -177,8 +177,44 @@ detect_subcmd() {
 # separator inside a quoted body truncates the segment) -- the goal is
 # cross-command isolation, not a full shell parser; the truncation only
 # affects the flag VALUE, never the presence of the gh subcommand + flag.
+#
+# A newline separates two commands, so it IS a boundary -- EXCEPT after a
+# trailing backslash, which is a line continuation inside ONE command.
+# fold_continuations() collapses those first, else a multi-line invocation
+# is cut at line 1 and every flag below it (a --body-file, a --label) is
+# invisible to every rule -- a false deny on a valid command (refs #283).
+fold_continuations() {
+  printf '%s' "${1//\\$'\n'/ }"
+}
+
+# strip_heredocs <cmd> -- drop every heredoc BODY (and its terminator),
+# keeping the line that opens it. Heredoc content is data the command
+# writes somewhere, not commands being run: a body line that happens to
+# start with `gh` is prose, and reading it as the invocation is the same
+# data-as-syntax mistake as #255 (refs #283). `<<<` herestrings are not
+# heredocs and are left alone.
+strip_heredocs() {
+  local line trimmed out="" delim="" in_body=0
+  while IFS= read -r line; do
+    if (( in_body )); then
+      trimmed="${line#"${line%%[![:space:]]*}"}"
+      [[ "${trimmed}" == "${delim}" ]] && in_body=0
+      continue
+    fi
+    out+="${line}"$'\n'
+    if [[ "${line}" =~ (^|[^<])\<\<-?[[:space:]]*[\"\']?([A-Za-z_][A-Za-z0-9_]*) ]]; then
+      delim="${BASH_REMATCH[2]}"
+      in_body=1
+    fi
+  done <<< "$1"
+  printf '%s' "${out}"
+}
+
 gh_segment() {
-  local cmd="$1" seg
+  local cmd
+  cmd="$(strip_heredocs "$1")"
+  cmd="$(fold_continuations "${cmd}")"
+  local seg
   cmd="${cmd//&&/$'\n'}"
   cmd="${cmd//||/$'\n'}"
   cmd="${cmd//|/$'\n'}"
