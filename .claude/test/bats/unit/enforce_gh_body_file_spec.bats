@@ -380,3 +380,18 @@ stub_gh_fail() {
   run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh issue create --title T --label bug && echo 'remember --body-file /tmp/x.md'\"}}"
   assert_permission_decision "deny"
 }
+
+# #283 defect 1: a backslash-continued newline is a continuation INSIDE one
+# command, not a segment boundary. Flags on later lines belong to the same
+# gh invocation and must be seen by every rule.
+
+@test "#283: backslash-continued gh issue create with --body-file on a later line allowed" {
+  local bf="${TMP}/body.md"; printf 'body\n' > "${bf}"
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh issue create --title T \\\\\n  --label bug \\\\\n  --body-file ${bf}\"}}"
+  assert_silent
+}
+
+@test "#283: backslash-continued gh issue create with inline --body still denied" {
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh issue create --title T \\\\\n  --label bug \\\\\n  --body 'inline body'\"}}"
+  assert_permission_decision "deny"
+}
