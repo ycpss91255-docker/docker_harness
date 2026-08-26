@@ -116,6 +116,9 @@ _target_artifacts() {
 import json, re, shlex, sys
 
 ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+# A doubled less-than plus a word opens a heredoc (the dash and quoted
+# forms too); a tripled less-than is a herestring and opens nothing.
+HEREDOC_OPEN = re.compile(r"(?:^|[^<])<<-?[ \t]*[\"\x27]?([A-Za-z_][A-Za-z0-9_]*)")
 PUNCT = "();<>|&"
 FILE_FLAGS = {"-F", "--file", "--body-file"}
 GH_SUBCMDS = {
@@ -124,10 +127,26 @@ GH_SUBCMDS = {
 }
 
 
+def strip_heredocs(text):
+    """text with every heredoc BODY removed, opening lines kept."""
+    kept = []
+    delimiter = None
+    for line in text.split("\n"):
+        if delimiter is not None:
+            if line.strip() == delimiter:
+                delimiter = None
+            continue
+        kept.append(line)
+        match = HEREDOC_OPEN.search(line)
+        if match:
+            delimiter = match.group(1)
+    return "\n".join(kept)
+
+
 def split_commands(text):
     """Every simple command in text, as a token list."""
     out = []
-    for line in text.split("\n"):
+    for line in strip_heredocs(text).split("\n"):
         if not line.strip():
             continue
         try:
