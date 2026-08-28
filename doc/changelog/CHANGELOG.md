@@ -7,6 +7,41 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Changed
+- **the rm guard asks where the bytes are, not how the command was spelled
+  (closes #290).** `permissions.ask: Bash(rm:*)` plus a list of
+  `Bash(rm ...)` allow rules expressed one property -- *a deletion inside a
+  git working tree needs a human, a deletion anywhere else does not* -- as
+  literal prefix matches over the command STRING. The gap between those two
+  things is where every miss lived: the list was widened three times in one
+  afternoon and lost three times (`rm -rf "$TMPDIR/mut957"`, where the
+  opening quote precedes the variable; `SCRATCH=...; rm -rf $SCRATCH/x`,
+  where the caller names the variable; `export T=...; rm -rf "$T/a1"`,
+  where the name is one letter), reaching 480 rules that were still
+  incomplete in one direction and **unsound in the other** -- `rm -rf
+  /tmp/../etc` begins with the allowed prefix `rm -rf /tmp/`. A guard that
+  both under- and over-matches is a different property that happens to
+  correlate, so it is replaced rather than widened again. The new
+  `enforce_rm_outside_git_tree.sh` PreToolUse hook tokenizes the command,
+  resolves each `rm` operand to an absolute PHYSICAL path (assignments in
+  the same command applied, then the environment; `..` collapsed; symlinks
+  resolved by `cd -P`; `cd <dir> &&` moves the effective cwd), and asks
+  `git rev-parse --show-toplevel` per target. What it does not parse --
+  command substitution, subshells, other parameter-expansion forms, globs,
+  `~user`, and `rm` reached through a wrapper such as `xargs` or
+  `find -exec` -- DENIES, because an unparsed command is an unknown target.
+  The one-way doors are recorded beside the code: a gitignored path inside
+  a tree denies like any other (`.env` is gitignored and hand-written), an
+  existing directory is judged as itself so `rm -rf <repo>` is inside the
+  tree it would delete, a symlink is judged where the link lives because rm
+  removes the link, and `git`-family deletions (`git rm`, `git clean`) plus
+  `find -delete` / `shred` / `trash-put` are named out of scope rather than
+  left silently uncovered. `auto_allow_rm_in_workspace.sh` and its spec are
+  gone with the ask rule: it allowed exactly what the new property denies
+  (rm anywhere under the workspace checkout), and two mechanisms
+  disagreeing about one question is the state this change exists to end.
+  The machine-local `settings.local.json` still carries the 480 dead allow
+  rules; that file is untracked, so removing them is a local step, spelled
+  out in the PR body.
 - **the hooks stopped knowing about `make` and `justfile.ci` (closes #280).**
   The make -> just migration finished a while ago: no repo root in the
   workspace carries a `Makefile.ci` or a `justfile.ci`, and every repo has a

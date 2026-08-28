@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1160 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1175 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -12,33 +12,50 @@ stdin and asserts one of three behaviours:
 
 - **FIRE** — emits JSON with `.systemMessage` (reminder hooks like
   `remind_*.sh` / `check_*.sh`). Use `assert_message_contains`.
-- **ALLOW** — emits JSON with `.hookSpecificOutput.permissionDecision`
-  (programmatic auto-allow hooks like
-  `auto_allow_rm_in_workspace.sh`). Use `assert_permission_decision`.
+- **ALLOW / DENY** — emits JSON with
+  `.hookSpecificOutput.permissionDecision` (hooks that decide
+  programmatically: `auto_allow_touch_ack.sh`,
+  `enforce_rm_outside_git_tree.sh`). Use `assert_permission_decision`.
 - **SILENT** — exits 0 with no stdout (no action taken). Use
   `assert_silent`.
 
-### .claude/test/bats/unit/auto_allow_rm_in_workspace_spec.bats (18)
+### .claude/test/bats/unit/enforce_rm_outside_git_tree_spec.bats (33)
+
 | Test | Scenario |
 |------|----------|
-| allows rm \<relative file> (workspace cwd assumed) | relative path → ALLOW |
-| allows rm subdir/file.txt | nested relative → ALLOW |
-| allows rm /tmp/foo.sh | absolute under /tmp → ALLOW |
-| allows rm -rf /tmp/dir | flag + /tmp path → ALLOW |
-| allows rm \<absolute path under workspace> | absolute under workspace → ALLOW |
-| allows rm -- --weird-name (after -- separator) | `--` separator handling |
-| silent on rm /etc/passwd (outside workspace) | absolute outside → SILENT (falls through to ask) |
-| silent on rm /usr/bin/foo (outside workspace) | absolute outside → SILENT |
-| silent on rm /home/yunchien/.bashrc (home outside workspace) | home dotfile → SILENT |
-| silent on rm ~/.ssh/id_rsa (~ rejected) | tilde-expansion guard |
-| silent on rm $HOME/.bashrc ($ rejected) | shell-var guard |
-| silent on rm \`pwd\`/file (backtick rejected) | command-substitution guard |
-| silent on rm ../../etc/passwd (.. traversal rejected) | path-traversal guard |
-| silent on rm /tmp/foo && rm /etc/passwd (chain rejected) | command-chain guard |
-| silent on rm /tmp/foo \| xargs (pipe rejected) | pipe guard |
-| silent on non-rm command (ls -la) | matcher narrowed to rm |
-| silent on rmdir (different command) | exact `rm` match, not prefix |
-| silent on empty CLAUDE_PROJECT_DIR (defensive) | refuses to act without anchor |
+| allows rm -rf "$TMPDIR/mut957" -- the quote precedes the variable | opening quote before the variable -> ALLOW (miss #1 of the prefix rules) |
+| allows a caller-named variable assigned in the same command | `SCRATCH=...; rm -rf $SCRATCH/y` -> ALLOW (miss #2: the caller names the variable) |
+| allows a single-letter exported variable assigned in the same command | `export T=...; rm -rf "$T/a1"` -> ALLOW (miss #3) |
+| allows a literal scratch path that does not exist yet | absent path outside every repo -> ALLOW (nothing to lose) |
+| denies /tmp/../\<repo>/dist -- the case the prefix rules let through | `..` collapses INTO a working tree -> DENY (the unsound direction) |
+| denies rm README.md issued from inside the repo | relative operand resolved against the invocation cwd -> DENY |
+| denies the second operand of a chain whose first operand is fine | `rm <ok> && rm <in-repo>` -> DENY on the second |
+| denies the repo root itself, which its own parent would not catch | an existing directory is judged as itself, not by its parent -> DENY |
+| denies a gitignored file inside the repo (decided, not incidental) | `.env` is gitignored and hand-written -> DENY (the issue's open question) |
+| denies the filesystem root | `rm -rf /` -> DENY |
+| denies an operand whose directory cannot be resolved | a file where a directory must be -> DENY (fail closed) |
+| denies a relative operand when the invocation cwd does not resolve | unknown cwd makes every relative target unknown -> DENY |
+| denies an operand built from a variable nothing defines | unset in both the command and the environment -> DENY |
+| denies a command it cannot parse (command substitution) | `$(...)` is not parsed -> DENY |
+| denies a glob operand, whose matches are not known until the shell runs | `<dir>/*` -> DENY |
+| denies rm reached through xargs | `rm` as another command's argument -> DENY |
+| denies rm reached through find -exec | same rule, second wrapper -> DENY |
+| denies an in-repo target inside a bash -c payload | the payload is re-analysed -> DENY |
+| allows an out-of-repo target inside a bash -c payload | the payload is re-analysed -> ALLOW |
+| denies a repo path reached through a symlinked parent | `cd -P` follows the parent chain -> DENY |
+| allows deleting a symlink that points into a repo | rm removes the link, so the link's location decides -> ALLOW |
+| honours -- as end of options | `rm -rf -- <in-repo>` -> DENY |
+| treats a name after -- as an operand, not a flag | `rm -- <scratch>/-weird-name` -> ALLOW |
+| treats a bare - as a filename, not a flag | `rm -` from inside a repo -> DENY |
+| does not read a redirection target as an rm operand | `rm <scratch>/a > <repo>/log 2>&1` -> ALLOW |
+| keeps a quoted operand containing spaces as one operand | one operand, not two -> ALLOW |
+| silent on a command with no rm word at all | not this hook's question -> SILENT |
+| silent on rmdir, which is a different command | `rm` is not a prefix match here -> SILENT |
+| silent on git rm, which is out of scope by decision | git deletions are named out of scope -> SILENT |
+| silent on an rm word that is quoted data, not an invocation | quoted `rm` inside another command's argument -> SILENT |
+| silent on an rm word inside a heredoc body | heredoc bodies are data and are skipped whole -> SILENT |
+| denies an unquoted loose rm word, the stated cost of failing closed | `echo rm` -> DENY; quoting it lifts the deny |
+| silent when the tool input carries no command | no command -> SILENT |
 
 ### .claude/test/bats/unit/auto_allow_touch_ack_spec.bats (22)
 | Test | Scenario |
