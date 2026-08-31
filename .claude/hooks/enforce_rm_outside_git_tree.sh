@@ -182,6 +182,18 @@ readonly RMG_MAX_DEPTH=2
 # Byte ceiling for the lexer (see WHAT THIS DELIBERATELY DOES NOT COVER).
 readonly RMG_MAX_COMMAND=65536
 
+# Short options a shell takes with NO argument of its own. `c` is handled
+# separately; every other character in a bundle must be on this list, or the
+# guard cannot say which word is the payload (`-o` takes one, so `-o errexit
+# -c ...` would have the guard reading `errexit` as the payload). Anything
+# absent -- `o`, `O`, `s`, and whatever a later bash adds -- denies.
+readonly RMG_SH_NOARG_FLAGS='abBeEfhHiklmnprtTuvxC'
+
+# The same list for long options, space-delimited on both sides so a
+# membership test cannot match a prefix. `--rcfile` / `--init-file` take an
+# argument and are deliberately absent.
+readonly RMG_SH_NOARG_LONG=' --login --noprofile --norc --posix --restricted --verbose --debugger --dump-strings --dump-po-strings --noediting --nolineediting --help --version '
+
 # --------------------------------------------------------------------------
 # Lexer
 #
@@ -699,13 +711,73 @@ rmg_loose_rm() {
   return 0
 }
 
+# rmg_shell_payload <base> <token index...> -- find the `-c` payload of a
+# shell invocation. 0 with RMG_PAYLOAD set, 1 when the invocation has no
+# `-c` at all, 2 (RMG_REASON) when the payload's position is not knowable.
+#
+# `-c` is not always the last character of its bundle: bash runs the payload
+# of `bash -cx '...'` exactly as it runs `bash -xc '...'`. So the bundle is
+# read character by character, and every character other than `c` has to be
+# an option that takes no argument -- otherwise the word after the bundle
+# might be that option's argument rather than the payload, and a guard that
+# guesses is a guard that can be aimed.
+rmg_shell_payload() {
+  local base="$1"
+  shift
+  local -a idx=("$@")
+  local n=$# j=0 w rest ch i
+  while (( j < n )); do
+    w="${RMG_TOK_VAL[${idx[j]}]}"
+    if [[ -n "${RMG_TOK_BAD[${idx[j]}]}" ]]; then
+      RMG_REASON="an argument of '${base}' cannot be resolved: ${RMG_TOK_BAD[${idx[j]}]}, so its payload is unknown"
+      return 2
+    fi
+    # `--` ends options, and a word that is not an option ends them too:
+    # from here on this is a script name and its arguments, not a payload.
+    if [[ "${w}" == "--" || "${w}" != -?* ]]; then
+      return 1
+    fi
+    if [[ "${w}" == --* ]]; then
+      if [[ "${RMG_SH_NOARG_LONG}" != *" ${w} "* ]]; then
+        RMG_REASON="'${base} ${w}' is a shell option this guard does not model, so it cannot say which word is the '-c' payload"
+        return 2
+      fi
+      (( j++ ))
+      continue
+    fi
+    rest="${w#-}"
+    for (( i = 0; i < ${#rest}; i++ )); do
+      ch="${rest:i:1}"
+      [[ "${ch}" == "c" ]] && continue
+      if [[ "${RMG_SH_NOARG_FLAGS}" != *"${ch}"* ]]; then
+        RMG_REASON="'${base} ${w}' bundles a shell option this guard does not model, so it cannot say which word is the '-c' payload"
+        return 2
+      fi
+    done
+    if [[ "${rest}" == *c* ]]; then
+      if (( j + 1 >= n )); then
+        RMG_REASON="a '${base} -c' invocation with no payload cannot be checked"
+        return 2
+      fi
+      if [[ -n "${RMG_TOK_BAD[${idx[j+1]}]}" ]]; then
+        RMG_REASON="the '${base} -c' payload cannot be resolved: ${RMG_TOK_BAD[${idx[j+1]}]}"
+        return 2
+      fi
+      RMG_PAYLOAD="${RMG_TOK_VAL[${idx[j+1]}]}"
+      return 0
+    fi
+    (( j++ ))
+  done
+  return 1
+}
+
 # rmg_simple_command <depth> <token index...> -- classify one simple
 # command. 0 no rm, 1 rm and every target is outside, 2 deny.
 rmg_simple_command() {
   local depth="$1"
   shift
   local -a idx=("$@")
-  local k=0 count=${#idx[@]} cmdword base j payload have=0
+  local k=0 count=${#idx[@]} cmdword base
 
   while (( k < count )) \
     && [[ "${RMG_TOK_VAL[${idx[k]}]}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; do
@@ -739,34 +811,18 @@ rmg_simple_command() {
       return 0
       ;;
     bash|sh|dash|zsh)
-      j=$((k + 1))
-      local w
-      while (( j < count )); do
-        w="${RMG_TOK_VAL[${idx[j]}]}"
-        # `-c`, and the bundled forms `-lc` / `-ec`: the payload follows.
-        if [[ "${w}" == -* && "${w}" != --* && "${w}" == *c ]]; then
-          if (( j + 1 >= count )); then
-            RMG_REASON="a '${base} -c' invocation with no payload cannot be checked"
+      rmg_shell_payload "${base}" "${idx[@]:k+1}"
+      case "$?" in
+        0)
+          if (( depth + 1 > RMG_MAX_DEPTH )); then
+            RMG_REASON="'${base} -c' is nested deeper than this guard follows (${RMG_MAX_DEPTH}), so its targets are unknown"
             return 2
           fi
-          if [[ -n "${RMG_TOK_BAD[${idx[j+1]}]}" ]]; then
-            RMG_REASON="the '${base} -c' payload cannot be resolved: ${RMG_TOK_BAD[${idx[j+1]}]}"
-            return 2
-          fi
-          payload="${RMG_TOK_VAL[${idx[j+1]}]}"
-          have=1
-          break
-        fi
-        (( j++ ))
-      done
-      if (( have )); then
-        if (( depth + 1 > RMG_MAX_DEPTH )); then
-          RMG_REASON="'${base} -c' is nested deeper than this guard follows (${RMG_MAX_DEPTH}), so its targets are unknown"
-          return 2
-        fi
-        rmg_analyse_nested "${payload}" $((depth + 1))
-        return $?
-      fi
+          rmg_analyse_nested "${RMG_PAYLOAD}" $((depth + 1))
+          return $?
+          ;;
+        2) return 2 ;;
+      esac
       rmg_loose_rm "${idx[@]:k+1}" || return 2
       return 0
       ;;
@@ -862,7 +918,7 @@ rmg_emit() {
 rmg_run() {
   local input cmd rc
   # Parser + verdict state, local to main so nothing leaks between hook runs.
-  local RMG_CWD='' RMG_CWD_PHYS='' RMG_REASON=''
+  local RMG_CWD='' RMG_CWD_PHYS='' RMG_REASON='' RMG_PAYLOAD=''
   local -A RMG_VARS=() RMG_VARS_BAD=() RMG_GIT_CACHE=()
 
   input="$(cat)"
