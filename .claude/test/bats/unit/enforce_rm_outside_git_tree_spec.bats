@@ -404,3 +404,56 @@ crash_mutant() {
   assert_permission_decision "deny"
   assert_reason_contains "inside the git working tree"
 }
+
+# --- unquoted expansion: what the shell does with the value ---------------
+#
+# An unquoted `$X` is not one word. The shell splits its value on IFS and
+# then expands globs in the pieces, so the operands rm receives are not
+# knowable from the value read as a path. The guard used to append the value
+# to the current word and resolve it as ONE path: a value holding two paths
+# resolved to a single nonexistent one, which sits outside every repo, and
+# the answer came back ALLOW while the shell deleted a tracked file.
+
+@test "denies an unquoted expansion whose value would split into two paths" {
+  fire "X=\"${SCRATCH}/junk ${REPO}/README.md\"; rm -rf \$X"
+  assert_permission_decision "deny"
+  assert_reason_contains "split"
+}
+
+@test "the shell really does delete the in-tree file that expansion hides" {
+  printf 'j\n' > "${SCRATCH}/junk"
+  bash -c "X=\"${SCRATCH}/junk ${REPO}/README.md\"; rm -rf \$X"
+  if [[ -e "${REPO}/README.md" ]]; then
+    echo "fixture is wrong: the second path survived, so the guard's ALLOW was not a miss" >&2
+    return 1
+  fi
+}
+
+@test "denies an unquoted expansion whose value would glob" {
+  fire "X='${SCRATCH}/*'; rm -rf \$X"
+  assert_permission_decision "deny"
+  assert_reason_contains "glob"
+}
+
+@test "denies the braced spelling of the same unquoted expansion" {
+  fire "X=\"${SCRATCH}/junk ${REPO}/README.md\"; rm -rf \${X}"
+  assert_permission_decision "deny"
+}
+
+@test "denies an unquoted expansion of an environment variable that splits" {
+  RMG_SPLIT_290="${SCRATCH}/junk ${REPO}/README.md" \
+    run --separate-stderr "${HOOK}" <<< \
+    "$(jq -nc --arg c 'rm -rf $RMG_SPLIT_290' --arg d "${SCRATCH}" \
+      '{cwd: $d, tool_input: {command: $c}}')"
+  assert_permission_decision "deny"
+}
+
+@test "allows the same value quoted, which really is one path" {
+  fire "X=\"${SCRATCH}/a b\"; rm -rf \"\$X\""
+  assert_permission_decision "allow"
+}
+
+@test "allows an unquoted expansion whose value is a single plain path" {
+  fire "X=${SCRATCH}/one; rm -rf \$X"
+  assert_permission_decision "allow"
+}
