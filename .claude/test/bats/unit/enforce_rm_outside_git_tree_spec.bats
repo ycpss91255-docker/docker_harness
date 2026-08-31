@@ -516,3 +516,37 @@ crash_mutant() {
   fire "rm -rf ${RMG_BASE}/loose"
   assert_permission_decision "allow"
 }
+
+# --- the message says what was resolved -----------------------------------
+#
+# The deny exists to be read by whoever typed the command, and the one thing
+# it has that they do not is the RESOLVED target. Printing the spelling back
+# at them ("resolves to /tmp/../repo/dist") spends the sentence on the half
+# they already had, and naming the probed directory as the working tree
+# ("the working tree at .../repo/dist") tells them a tree is somewhere it is
+# not.
+
+@test "names the resolved target rather than the spelling" {
+  fire "rm -rf ${SCRATCH}/../repo/dist"
+  assert_permission_decision "deny"
+  assert_reason_contains "resolves to ${REPO}/dist"
+  local got
+  got="$(echo "${output}" | jq -r \
+    '.hookSpecificOutput.permissionDecisionReason // empty')"
+  if [[ "${got}" == *"${SCRATCH}/../"* ]]; then
+    echo "the reason echoed the spelling back: ${got}" >&2
+    return 1
+  fi
+}
+
+@test "names the working tree by its root, not by the directory it probed" {
+  fire "rm -rf ${REPO}/dist"
+  assert_permission_decision "deny"
+  assert_reason_contains "working tree at ${REPO}."
+}
+
+@test "denies a path that resolves to the filesystem root by another spelling" {
+  fire 'rm -rf /tmp/..'
+  assert_permission_decision "deny"
+  assert_reason_contains "filesystem root"
+}
