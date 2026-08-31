@@ -192,6 +192,16 @@ readonly RMG_SH_NOARG_FLAGS='abBeEfhHiklmnprtTuvxC'
 # The same list for long options, space-delimited on both sides so a
 # membership test cannot match a prefix. `--rcfile` / `--init-file` take an
 # argument and are deliberately absent.
+# Budgets for the containment search (see THE QUESTION in the header). A
+# search that exceeds either one is an unanswered question, and an
+# unanswered question denies -- so both can be lowered from the environment
+# without weakening anything: a smaller budget can only produce more denials,
+# and no value makes an unsearched directory read as ALLOW. The defaults sit
+# far below the hook timeout on purpose, because a hook that is killed for
+# running long emits nothing at all.
+readonly RMG_SCAN_MAX_DIRS="${RMG_SCAN_MAX_DIRS:-2000}"
+readonly RMG_SCAN_SECONDS="${RMG_SCAN_SECONDS:-3}"
+
 readonly RMG_SH_NOARG_LONG=' --login --noprofile --norc --posix --restricted --verbose --debugger --dump-strings --dump-po-strings --noediting --nolineediting --help --version '
 
 # --------------------------------------------------------------------------
@@ -614,6 +624,53 @@ rmg_in_git_tree() {
   return "${rc}"
 }
 
+# rmg_contains_git_tree <dir> -- 0 when a git working tree lives somewhere
+# under <dir> (RMG_FOUND_TREE names it), 1 when none does, 2 when the search
+# could not finish and the answer is therefore unknown.
+#
+# Breadth-first, so the shallow repositories that make this question urgent
+# -- a workspace directory holding a dozen checkouts -- are found in the
+# first few directories examined rather than after a full descent. The search
+# does not cross a symlink, because `rm -rf` does not delete through one
+# either, and that is also what keeps the walk finite.
+rmg_contains_git_tree() {
+  local root="$1"
+  local -a queue=("${root}")
+  local head=0 dir entry examined=0 started="${SECONDS}" rc=1
+  local had_nullglob=0 had_dotglob=0
+  shopt -q nullglob && had_nullglob=1
+  shopt -q dotglob && had_dotglob=1
+  shopt -s nullglob dotglob
+  while (( head < ${#queue[@]} )); do
+    dir="${queue[head]}"
+    (( head++ ))
+    (( examined++ ))
+    if (( examined > RMG_SCAN_MAX_DIRS )) \
+      || (( SECONDS - started > RMG_SCAN_SECONDS )); then
+      rc=2
+      break
+    fi
+    if [[ -e "${dir}/.git" ]]; then
+      RMG_FOUND_TREE="${dir}"
+      rc=0
+      break
+    fi
+    if [[ ! -r "${dir}" || ! -x "${dir}" ]]; then
+      RMG_FOUND_TREE="${dir}"
+      rc=2
+      break
+    fi
+    for entry in "${dir}"/*; do
+      [[ -L "${entry}" ]] && continue
+      [[ -d "${entry}" ]] || continue
+      queue+=("${entry}")
+    done
+  done
+  (( had_nullglob )) || shopt -u nullglob
+  (( had_dotglob )) || shopt -u dotglob
+  return "${rc}"
+}
+
 # rmg_operand_verdict <operand> -- 0 when the operand resolves outside every
 # git working tree, 2 (with RMG_REASON set) otherwise.
 rmg_operand_verdict() {
@@ -664,7 +721,26 @@ rmg_operand_verdict() {
       RMG_REASON="rm operand '${operand}' resolves to ${abs}, inside the git working tree at ${decider}. A deletion inside a working tree needs a human: run it yourself, or use 'trash-put' (/safe-delete) or 'git rm', which are recoverable"
       return 2
       ;;
-    1) return 0 ;;
+    1)
+      # Outside every tree -- but a directory that HOLDS trees would take
+      # them with it, so the same question is asked downwards. Only for a
+      # directory the target actually is: a file, a symlink and a path that
+      # does not exist have nothing under them to lose.
+      if [[ "${probe}" == "${abs}" ]]; then
+        rmg_contains_git_tree "${decider}"
+        case "$?" in
+          0)
+            RMG_REASON="rm operand '${operand}' resolves to ${abs}, which is not itself a git working tree but contains the git working tree at ${RMG_FOUND_TREE}. Deleting it would take that tree with it, so it needs a human: run it yourself, or use 'trash-put' (/safe-delete), which is recoverable"
+            return 2
+            ;;
+          2)
+            RMG_REASON="rm operand '${operand}' resolves to ${abs}, and the guard could not finish searching it for git working trees within its budget (${RMG_SCAN_MAX_DIRS} directories / ${RMG_SCAN_SECONDS}s, stopped at ${RMG_FOUND_TREE:-${abs}}). Whether this deletion would take a working tree with it is therefore unknown"
+            return 2
+            ;;
+        esac
+      fi
+      return 0
+      ;;
     *)
       RMG_REASON="git could not say whether ${decider} is a working tree, and an unanswered question is an unknown target"
       return 2
@@ -946,7 +1022,7 @@ rmg_emit() {
 rmg_run() {
   local input cmd rc
   # Parser + verdict state, local to main so nothing leaks between hook runs.
-  local RMG_CWD='' RMG_CWD_PHYS='' RMG_REASON='' RMG_PAYLOAD=''
+  local RMG_CWD='' RMG_CWD_PHYS='' RMG_REASON='' RMG_PAYLOAD='' RMG_FOUND_TREE=''
   local -A RMG_VARS=() RMG_VARS_BAD=() RMG_GIT_CACHE=()
 
   input="$(cat)"
