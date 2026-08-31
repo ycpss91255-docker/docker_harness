@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1242 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1239 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -18,111 +18,6 @@ stdin and asserts one of three behaviours:
   `enforce_rm_outside_git_tree.sh`). Use `assert_permission_decision`.
 - **SILENT** — exits 0 with no stdout (no action taken). Use
   `assert_silent`.
-
-### .claude/test/bats/unit/enforce_rm_outside_git_tree_spec.bats (100)
-
-| Test | Scenario |
-|------|----------|
-| allows rm -rf "$TMPDIR/mut957" -- the quote precedes the variable | opening quote before the variable -> ALLOW (miss #1 of the prefix rules) |
-| allows a caller-named variable assigned in the same command | `SCRATCH=...; rm -rf $SCRATCH/y` -> ALLOW (miss #2: the caller names the variable) |
-| allows a single-letter exported variable assigned in the same command | `export T=...; rm -rf "$T/a1"` -> ALLOW (miss #3) |
-| allows a literal scratch path that does not exist yet | absent path outside every repo -> ALLOW (nothing to lose) |
-| denies /tmp/../\<repo>/dist -- the case the prefix rules let through | `..` collapses INTO a working tree -> DENY (the unsound direction) |
-| denies rm README.md issued from inside the repo | relative operand resolved against the invocation cwd -> DENY |
-| denies the second operand of a chain whose first operand is fine | `rm <ok> && rm <in-repo>` -> DENY on the second |
-| denies the repo root itself, which its own parent would not catch | an existing directory is judged as itself, not by its parent -> DENY |
-| denies a gitignored file inside the repo (decided, not incidental) | `.env` is gitignored and hand-written -> DENY (the issue's open question) |
-| denies the filesystem root | `rm -rf /` -> DENY |
-| denies an operand whose directory cannot be resolved | a file where a directory must be -> DENY (fail closed) |
-| denies a relative operand when the invocation cwd does not resolve | unknown cwd makes every relative target unknown -> DENY |
-| denies an operand built from a variable nothing defines | unset in both the command and the environment -> DENY |
-| denies a command it cannot parse (command substitution) | `$(...)` is not parsed -> DENY |
-| denies a glob operand, whose matches are not known until the shell runs | `<dir>/*` -> DENY |
-| denies rm reached through xargs | `rm` as another command's argument -> DENY |
-| denies rm reached through find -exec | same rule, second wrapper -> DENY |
-| denies an in-repo target inside a bash -c payload | the payload is re-analysed -> DENY |
-| allows an out-of-repo target inside a bash -c payload | the payload is re-analysed -> ALLOW |
-| denies a repo path reached through a symlinked parent | `cd -P` follows the parent chain -> DENY |
-| allows deleting a symlink that points into a repo | rm removes the link, so the link's location decides -> ALLOW |
-| honours -- as end of options | `rm -rf -- <in-repo>` -> DENY |
-| treats a name after -- as an operand, not a flag | `rm -- <scratch>/-weird-name` -> ALLOW |
-| treats a bare - as a filename, not a flag | `rm -` from inside a repo -> DENY |
-| does not read a redirection target as an rm operand | `rm <scratch>/a > <repo>/log 2>&1` -> ALLOW |
-| keeps a quoted operand containing spaces as one operand | one operand, not two -> ALLOW |
-| silent on a command with no rm word at all | not this hook's question -> SILENT |
-| silent on rmdir, which is a different command | `rm` is not a prefix match here -> SILENT |
-| silent on git rm, which is out of scope by decision | git deletions are named out of scope -> SILENT |
-| denies a quoted rm inside a command it does not model | - |
-| silent on an rm word inside a heredoc body | heredoc bodies are data and are skipped whole -> SILENT |
-| denies an unquoted loose rm word, the stated cost of failing closed | `echo rm` -> DENY; quoting it lifts the deny |
-| silent when the tool input carries no command | no command -> SILENT |
-| denies when the guard dies on an unbound variable | - |
-| denies when the guard exits mid-parse | - |
-| denies when the guard is terminated by a signal | - |
-| still says nothing when a command carries no rm at all | - |
-| denies every special parameter, and says which | - |
-| denies a real in-tree operand that follows a special parameter | - |
-| refuses a special parameter without dying on it | - |
-| denies an in-repo target under bash -cx, where -c is not last | - |
-| denies an in-repo target under bash -ce | - |
-| denies an in-repo target under sh -cx | - |
-| allows an out-of-repo target under bash -cx: the payload is read, not refused | - |
-| denies an option bundle it cannot place a payload in, and says so | - |
-| denies a shell option that takes an argument of its own | - |
-| denies a long shell option that takes an argument of its own | - |
-| still reads the payload after a long option that takes none | - |
-| denies an unquoted expansion whose value would split into two paths | - |
-| the shell really does delete the in-tree file that expansion hides | - |
-| denies an unquoted expansion whose value would glob | - |
-| denies the braced spelling of the same unquoted expansion | - |
-| denies an unquoted expansion of an environment variable that splits | - |
-| allows the same value quoted, which really is one path | - |
-| allows an unquoted expansion whose value is a single plain path | - |
-| denies a directory that is not a working tree but contains one | - |
-| denies a directory that contains a working tree several levels down | - |
-| allows a directory tree with no working tree anywhere under it | - |
-| denies a target it could not finish searching | - |
-| allows a directory small enough to search inside the budget | - |
-| does not search past a symlink, which rm would not follow either | - |
-| still allows a file whose parent holds a working tree | - |
-| names the resolved target rather than the spelling | - |
-| names the working tree by its root, not by the directory it probed | - |
-| denies a path that resolves to the filesystem root by another spelling | - |
-| denies rm carried in a quoted payload through xargs | - |
-| denies rm carried in a quoted payload through env | - |
-| denies rm carried in a quoted payload through timeout | - |
-| denies a quoted rm even when its target is outside every tree | - |
-| stays silent on --rm, which is not an rm token | - |
-| stays silent on a word that merely contains the letters rm | - |
-| stays silent on an rm inside a heredoc body, which is data | - |
-| stays silent on git, which is out of scope whatever it mentions | - |
-| falls back to the default budget when the environment sets nonsense | - |
-| settings.json asks a human for every rm, which is what silence means | - |
-| an in-tree target is handed to a human, not refused outright | - |
-| the hook never emits deny, whatever it is asked | - |
-| a crash leaves no verdict at all, so the ask rule decides | - |
-| an exit mid-parse leaves no verdict at all | - |
-| a signal leaves no verdict at all | - |
-| a missing jq cannot turn the hook into an allow | - |
-| an rm in a heredoc body is not data when the reader is a shell | - |
-| an rm in a here-string is not data when the reader is a shell | - |
-| bash -c -- runs the word after the dash-dash, which this guard will not guess | - |
-| builtin cd may have moved the shell, so a later relative operand is unknown | - |
-| command cd is caught by the same rule, without naming it | - |
-| any unmodelled command between a cd and an rm costs the tracked cwd | - |
-| a cd straight to an rm still resolves, so the rule is not a blanket | - |
-| a command word spelled r"m" is still an rm | - |
-| a command word spelled r'm' is still an rm | - |
-| a command word split by a backslash is still an rm | - |
-| an absolute path to rm is read as rm, not as an unknown command | - |
-| an assignment prefix does not feed the expansions of its own command | - |
-| a standalone assignment before the rm still feeds it | - |
-| an exported standalone assignment still feeds it | - |
-| git submodule foreach carrying an rm reaches a human | - |
-| git bisect run carrying an rm reaches a human | - |
-| git rebase -x carrying an rm reaches a human | - |
-| one operand inside the shared budget is answered and allowed | - |
-| two operands that each fit the budget do not both fit it | - |
 
 ### .claude/test/bats/unit/auto_allow_touch_ack_spec.bats (22)
 | Test | Scenario |
@@ -2090,3 +1985,105 @@ escaping, and the read-only `--check` gate.
 | a tracked non-shell file is not a lint target | - |
 | a tracked script deleted in the working tree is not a lint target | - |
 | t_lint lints the computed target list, not a shell glob | - |
+
+### .claude/test/bats/unit/auto_allow_rm_outside_git_tree_spec.bats (97)
+
+| Test | Scenario |
+|------|----------|
+| allows rm -rf "$TMPDIR/mut957" -- the quote precedes the variable | - |
+| allows a caller-named variable assigned in the same command | - |
+| allows a single-letter exported variable assigned in the same command | - |
+| allows a literal scratch path that does not exist yet | - |
+| denies /tmp/../\<repo>/dist -- the case the prefix rules let through | - |
+| denies rm README.md issued from inside the repo | - |
+| denies the second operand of a chain whose first operand is fine | - |
+| denies the repo root itself, which its own parent would not catch | - |
+| denies a gitignored file inside the repo (decided, not incidental) | - |
+| denies the filesystem root | - |
+| denies an operand whose directory cannot be resolved | - |
+| denies a relative operand when the invocation cwd does not resolve | - |
+| denies an operand built from a variable nothing defines | - |
+| denies a command it cannot parse (command substitution) | - |
+| denies a glob operand, whose matches are not known until the shell runs | - |
+| denies rm reached through xargs | - |
+| denies rm reached through find -exec | - |
+| denies an in-repo target inside a bash -c payload | - |
+| allows an out-of-repo target inside a bash -c payload | - |
+| denies a repo path reached through a symlinked parent | - |
+| allows deleting a symlink that points into a repo | - |
+| honours -- as end of options | - |
+| treats a name after -- as an operand, not a flag | - |
+| treats a bare - as a filename, not a flag | - |
+| does not read a redirection target as an rm operand | - |
+| keeps a quoted operand containing spaces as one operand | - |
+| silent on a command with no rm word at all | - |
+| silent on rmdir, which is a different command | - |
+| git rm now costs a prompt, because git can also carry a shell | - |
+| denies a quoted rm inside a command it does not model | - |
+| an rm word inside a heredoc body asks, because a heredoc can feed a shell | - |
+| denies an unquoted loose rm word, the stated cost of failing closed | - |
+| silent when the tool input carries no command | - |
+| still says nothing when a command carries no rm at all | - |
+| denies every special parameter, and says which | - |
+| denies a real in-tree operand that follows a special parameter | - |
+| refuses a special parameter without dying on it | - |
+| denies an in-repo target under bash -cx, where -c is not last | - |
+| denies an in-repo target under bash -ce | - |
+| denies an in-repo target under sh -cx | - |
+| allows an out-of-repo target under bash -cx: the payload is read, not refused | - |
+| denies an option bundle it cannot place a payload in, and says so | - |
+| denies a shell option that takes an argument of its own | - |
+| denies a long shell option that takes an argument of its own | - |
+| still reads the payload after a long option that takes none | - |
+| denies an unquoted expansion whose value would split into two paths | - |
+| the shell really does delete the in-tree file that expansion hides | - |
+| denies an unquoted expansion whose value would glob | - |
+| denies the braced spelling of the same unquoted expansion | - |
+| denies an unquoted expansion of an environment variable that splits | - |
+| allows the same value quoted, which really is one path | - |
+| allows an unquoted expansion whose value is a single plain path | - |
+| denies a directory that is not a working tree but contains one | - |
+| denies a directory that contains a working tree several levels down | - |
+| allows a directory tree with no working tree anywhere under it | - |
+| denies a target it could not finish searching | - |
+| allows a directory small enough to search inside the budget | - |
+| does not search past a symlink, which rm would not follow either | - |
+| still allows a file whose parent holds a working tree | - |
+| names the resolved target rather than the spelling | - |
+| names the working tree by its root, not by the directory it probed | - |
+| denies a path that resolves to the filesystem root by another spelling | - |
+| denies rm carried in a quoted payload through xargs | - |
+| denies rm carried in a quoted payload through env | - |
+| denies rm carried in a quoted payload through timeout | - |
+| denies a quoted rm even when its target is outside every tree | - |
+| stays silent on --rm, which is not an rm token | - |
+| stays silent on a word that merely contains the letters rm | - |
+| a heredoc body with no rm token in it stays silent | - |
+| git asks when it mentions rm, and stays silent when it does not | - |
+| falls back to the default budget when the environment sets nonsense | - |
+| settings.json asks a human for every rm, which is what silence means | - |
+| an in-tree target is handed to a human, not refused outright | - |
+| the hook never emits deny, whatever it is asked | - |
+| a crash leaves no verdict at all, so the ask rule decides | - |
+| an exit mid-parse leaves no verdict at all | - |
+| a signal leaves no verdict at all | - |
+| a missing jq cannot turn the hook into an allow | - |
+| an rm in a heredoc body is not data when the reader is a shell | - |
+| an rm in a here-string is not data when the reader is a shell | - |
+| bash -c -- runs the word after the dash-dash, which this guard will not guess | - |
+| builtin cd may have moved the shell, so a later relative operand is unknown | - |
+| command cd is caught by the same rule, without naming it | - |
+| any unmodelled command between a cd and an rm costs the tracked cwd | - |
+| a cd straight to an rm still resolves, so the rule is not a blanket | - |
+| a command word spelled r"m" is still an rm | - |
+| a command word spelled r'm' is still an rm | - |
+| a command word split by a backslash is still an rm | - |
+| an absolute path to rm is read as rm, not as an unknown command | - |
+| an assignment prefix does not feed the expansions of its own command | - |
+| a standalone assignment before the rm still feeds it | - |
+| an exported standalone assignment still feeds it | - |
+| git submodule foreach carrying an rm reaches a human | - |
+| git bisect run carrying an rm reaches a human | - |
+| git rebase -x carrying an rm reaches a human | - |
+| one operand inside the shared budget is answered and allowed | - |
+| two operands that each fit the budget do not both fit it | - |

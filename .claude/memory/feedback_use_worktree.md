@@ -19,4 +19,4 @@ originSessionId: 57c42783-dd59-4158-905a-b8d90ffa7347
 - merge 後：`git worktree remove <path>` 收尾，或定期 `git worktree prune` 清 stale entry
 - **批次 script 例外**：`batch-base-upgrade.sh` / `batch-gitignore-fix.sh` / `batch-pr-merge.sh` 內部已有 `fetch + checkout -B main FETCH_HEAD + checkout -B <branch>` 流程，且只跑於受控批次 — 不需改寫成 worktree 流程
 - **fresh machine 沒 `<workspace>/worktree/`**：**必須先問 user**「要建在 `<workspace>/worktree/` 還是別處？」或「直接 mkdir？」— 不准自行猜
-- **收 worktree 走 `git worktree remove`，不用問**：`git worktree remove <path>`（`git` 在 rm guard 的 out-of-scope 名單上）與 `.claude/scripts/prune-merged-worktrees.sh`（命令列上沒有 `rm`）都不會被擋，直接做不用問。**改變處**：`enforce_rm_outside_git_tree.sh`（#290）起，raw `rm -rf <workspace>/worktree/<repo>-<N>` 會 deny — worktree dir 本身就是 git working tree，落在 property 的「要人」那一側。
+- **收 worktree 走 `git worktree remove`，不用問**：`git worktree remove <path>`（`git` 在 rm guard 的 out-of-scope 名單上）與 `.claude/scripts/prune-merged-worktrees.sh`（命令列上沒有 `rm`）都不會被擋，直接做不用問。**改變處**：`auto_allow_rm_outside_git_tree.sh`（#290）起，raw `rm -rf <workspace>/worktree/<repo>-<N>` 會跳 prompt（hook 出 ask，不是 deny）— worktree dir 本身就是 git working tree，落在 property 的「要人」那一側。

@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 #
-# enforce_rm_outside_git_tree.sh -- the rm guard whose question is the
-# RESOLVED TARGET, not the command text (refs #290).
+# auto_allow_rm_outside_git_tree.sh -- the hook that spares the human when
+# it can resolve every rm target, and names the tree when it cannot (#290).
 #
 # Every stanza here drives the hook and reads its verdict. That matters more
 # than usual for this hook: the mechanism it replaces was a 480-entry list of
@@ -41,7 +41,7 @@ setup() {
   git -C "${REPO}" add -A >/dev/null
   git -C "${REPO}" commit -qm init >/dev/null
   export TMPDIR="${SCRATCH}"
-  HOOK="$(hook enforce_rm_outside_git_tree.sh)"
+  HOOK="$(hook auto_allow_rm_outside_git_tree.sh)"
 }
 
 teardown() {
@@ -60,6 +60,18 @@ fire() {
   json="$(jq -nc --arg c "$1" --arg d "${2:-}" \
     '{cwd: $d, tool_input: {command: $c}}')"
   run --separate-stderr "${HOOK}" <<< "${json}"
+}
+
+# assert_no_verdict -- assert the hook left NOTHING on stdout. Deliberately
+# says nothing about the exit code: a hook that dies exits non-zero and
+# Claude Code reports that as a hook error, which still leaves the tool call
+# to the permission rules. The only outcome that would be worse than silence
+# is a verdict, so a verdict is the only thing asserted against.
+assert_no_verdict() {
+  if [[ -n "${output}" ]]; then
+    echo "expected no verdict on stdout, got: ${output}" >&2
+    return 1
+  fi
 }
 
 # assert_reason_contains <needle>
@@ -99,34 +111,34 @@ assert_reason_contains() {
 
 @test "denies /tmp/../<repo>/dist -- the case the prefix rules let through" {
   fire "rm -rf ${SCRATCH}/../repo/dist"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "inside the git working tree"
 }
 
 @test "denies rm README.md issued from inside the repo" {
   fire 'rm README.md' "${REPO}"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "denies the second operand of a chain whose first operand is fine" {
   fire "rm -rf ${SCRATCH}/ok && rm -rf ${REPO}/dist"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "${REPO}/dist"
 }
 
 @test "denies the repo root itself, which its own parent would not catch" {
   fire "rm -rf ${REPO}"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "denies a gitignored file inside the repo (decided, not incidental)" {
   fire "rm ${REPO}/.env"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "denies the filesystem root" {
   fire 'rm -rf /'
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "filesystem root"
 }
 
@@ -134,49 +146,49 @@ assert_reason_contains() {
 
 @test "denies an operand whose directory cannot be resolved" {
   fire "rm -rf ${SCRATCH}/afile/inner"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "no resolvable directory"
 }
 
 @test "denies a relative operand when the invocation cwd does not resolve" {
   fire 'rm foo.txt' "${RMG_BASE}/gone"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "does not resolve"
 }
 
 @test "denies an operand built from a variable nothing defines" {
   fire 'rm -rf $RMG_NO_SUCH_VARIABLE_290/x'
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "set neither in the command nor in the environment"
 }
 
 @test "denies a command it cannot parse (command substitution)" {
   fire 'rm -rf $(cat targets.txt)'
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "does not parse"
 }
 
 @test "denies a glob operand, whose matches are not known until the shell runs" {
   fire "rm -rf ${SCRATCH}/*"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "denies rm reached through xargs" {
   fire "find ${SCRATCH} -name x | xargs rm -rf"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "does not model"
 }
 
 @test "denies rm reached through find -exec" {
   fire "find ${SCRATCH} -name x -exec rm {} \\;"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 # --- bash -c --------------------------------------------------------------
 
 @test "denies an in-repo target inside a bash -c payload" {
   fire "bash -c \"rm -rf ${REPO}/dist\""
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "allows an out-of-repo target inside a bash -c payload" {
@@ -189,7 +201,7 @@ assert_reason_contains() {
 @test "denies a repo path reached through a symlinked parent" {
   ln -s "${REPO}" "${SCRATCH}/link"
   fire "rm -rf ${SCRATCH}/link/dist"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "allows deleting a symlink that points into a repo" {
@@ -202,7 +214,7 @@ assert_reason_contains() {
 
 @test "honours -- as end of options" {
   fire "rm -rf -- ${REPO}/dist"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "treats a name after -- as an operand, not a flag" {
@@ -212,7 +224,7 @@ assert_reason_contains() {
 
 @test "treats a bare - as a filename, not a flag" {
   fire 'rm -' "${REPO}"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "does not read a redirection target as an rm operand" {
@@ -237,25 +249,25 @@ assert_reason_contains() {
   assert_silent
 }
 
-@test "silent on git rm, which is out of scope by decision" {
+@test "git rm now costs a prompt, because git can also carry a shell" {
   fire 'git rm README.md' "${REPO}"
-  assert_silent
+  assert_permission_decision "ask"
 }
 
 @test "denies a quoted rm inside a command it does not model" {
   fire "echo 'rm -rf ${REPO}'"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
-@test "silent on an rm word inside a heredoc body" {
+@test "an rm word inside a heredoc body asks, because a heredoc can feed a shell" {
   fire "$(printf 'cat <<%s > %s/f\nrm -rf %s\n%s\n' \
     "'EOF'" "${SCRATCH}" "${REPO}" 'EOF')"
-  assert_silent
+  assert_permission_decision "ask"
 }
 
 @test "denies an unquoted loose rm word, the stated cost of failing closed" {
   fire 'echo rm'
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "silent when the tool input carries no command" {
@@ -265,16 +277,16 @@ assert_reason_contains() {
 
 # --- the process-level default --------------------------------------------
 #
-# A hook that emits nothing is read as "this guard had nothing to say", and
-# the deletion proceeds. So "the guard crashed" and "the guard approved" are
-# the same event to everything downstream, and the guard's default on a
-# process it did not survive must be the same as its default on input it did
-# not recognise: refuse. The stanzas below kill the hook three different ways
-# and assert a deny still reaches stdout.
+# There is no trap and no default verdict. `permissions.ask: Bash(rm:*)` is
+# the guard, so a hook that emits nothing has handed the deletion to a human
+# -- which makes "the guard crashed" and "the guard had no opinion" the same
+# SAFE event instead of the same unsafe one. The stanzas below kill the hook
+# three different ways and assert that nothing reaches stdout, because a
+# half-verdict or a stray `allow` is the only thing a dying hook could do
+# that would be worse than silence.
 #
 # They mutate a COPY: the claim is not "this particular line cannot fail", it
-# is "whatever kills this hook, the deletion is still refused", and only a
-# crash the code does not know about can prove that.
+# is "whatever kills this hook, the deletion still reaches the ask rule".
 
 # crash_mutant <injected code> -- path to a copy of the hook with <injected
 # code> spliced into the top of rmg_tokenize(), i.e. after the hook has read
@@ -288,27 +300,6 @@ crash_mutant() {
     return 1
   fi
   printf '%s\n' "${mutant}"
-}
-
-@test "denies when the guard dies on an unbound variable" {
-  HOOK="$(crash_mutant ': "${RMG_DELIBERATE_CRASH_290}";')"
-  fire "rm -rf ${SCRATCH}/x"
-  assert_permission_decision "deny"
-  assert_reason_contains "before it reached a verdict"
-}
-
-@test "denies when the guard exits mid-parse" {
-  HOOK="$(crash_mutant 'exit 3;')"
-  fire "rm -rf ${SCRATCH}/x"
-  assert_permission_decision "deny"
-  assert_reason_contains "before it reached a verdict"
-}
-
-@test "denies when the guard is terminated by a signal" {
-  HOOK="$(crash_mutant 'kill -TERM $$;')"
-  fire "rm -rf ${SCRATCH}/x"
-  assert_permission_decision "deny"
-  assert_reason_contains "before it reached a verdict"
 }
 
 @test "still says nothing when a command carries no rm at all" {
@@ -328,8 +319,8 @@ crash_mutant() {
   local p
   for p in '$1' '$@' '$*' '$?' '$$' '$#' '$!' '$-'; do
     fire "rm -rf ${p}/x"
-    if ! assert_permission_decision "deny"; then
-      echo "special parameter ${p} was not denied" >&2
+    if ! assert_permission_decision "ask"; then
+      echo "special parameter ${p} was not asked about" >&2
       return 1
     fi
     if ! assert_reason_contains "special parameter"; then
@@ -341,12 +332,12 @@ crash_mutant() {
 
 @test "denies a real in-tree operand that follows a special parameter" {
   fire "rm -rf \$1 ${REPO}/src"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "refuses a special parameter without dying on it" {
   fire 'rm -rf $1'
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   if [[ -n "${stderr}" ]]; then
     echo "the guard wrote to stderr instead of deciding: ${stderr}" >&2
     return 1
@@ -363,17 +354,17 @@ crash_mutant() {
 
 @test "denies an in-repo target under bash -cx, where -c is not last" {
   fire "bash -cx 'rm -rf ${REPO}/src'"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "denies an in-repo target under bash -ce" {
   fire "bash -ce 'rm -rf ${REPO}/src'"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "denies an in-repo target under sh -cx" {
   fire "sh -cx 'rm -rf ${REPO}/src'"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "allows an out-of-repo target under bash -cx: the payload is read, not refused" {
@@ -383,25 +374,25 @@ crash_mutant() {
 
 @test "denies an option bundle it cannot place a payload in, and says so" {
   fire "bash -c'rm -rf ${REPO}/src'"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "does not model"
 }
 
 @test "denies a shell option that takes an argument of its own" {
   fire "bash -o errexit -c 'rm -rf ${SCRATCH}/x'"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "does not model"
 }
 
 @test "denies a long shell option that takes an argument of its own" {
   fire "bash --rcfile ${SCRATCH}/rc -c 'rm -rf ${REPO}/src'"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "does not model"
 }
 
 @test "still reads the payload after a long option that takes none" {
   fire "bash --norc -c 'rm -rf ${REPO}/src'"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "inside the git working tree"
 }
 
@@ -416,7 +407,7 @@ crash_mutant() {
 
 @test "denies an unquoted expansion whose value would split into two paths" {
   fire "X=\"${SCRATCH}/junk ${REPO}/README.md\"; rm -rf \$X"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "split"
 }
 
@@ -431,13 +422,13 @@ crash_mutant() {
 
 @test "denies an unquoted expansion whose value would glob" {
   fire "X='${SCRATCH}/*'; rm -rf \$X"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "glob"
 }
 
 @test "denies the braced spelling of the same unquoted expansion" {
   fire "X=\"${SCRATCH}/junk ${REPO}/README.md\"; rm -rf \${X}"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "denies an unquoted expansion of an environment variable that splits" {
@@ -445,7 +436,7 @@ crash_mutant() {
     run --separate-stderr "${HOOK}" <<< \
     "$(jq -nc --arg c 'rm -rf $RMG_SPLIT_290' --arg d "${SCRATCH}" \
       '{cwd: $d, tool_input: {command: $c}}')"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "allows the same value quoted, which really is one path" {
@@ -468,7 +459,7 @@ crash_mutant() {
 
 @test "denies a directory that is not a working tree but contains one" {
   fire "rm -rf ${RMG_BASE}"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "contains the git working tree"
 }
 
@@ -476,7 +467,7 @@ crash_mutant() {
   mkdir -p "${SCRATCH}/holder/a/b/c"
   git init -q -b main "${SCRATCH}/holder/a/b/c/clone"
   fire "rm -rf ${SCRATCH}/holder"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "contains the git working tree"
 }
 
@@ -492,7 +483,7 @@ crash_mutant() {
   RMG_SCAN_MAX_DIRS=1 run --separate-stderr "${HOOK}" <<< \
     "$(jq -nc --arg c "rm -rf ${SCRATCH}/wide" --arg d "${SCRATCH}" \
       '{cwd: $d, tool_input: {command: $c}}')"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "budget"
 }
 
@@ -528,7 +519,7 @@ crash_mutant() {
 
 @test "names the resolved target rather than the spelling" {
   fire "rm -rf ${SCRATCH}/../repo/dist"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "resolves to ${REPO}/dist"
   # The reason quotes the operand as typed first -- that is how the reader
   # finds which operand it is about -- so the check is on what follows
@@ -544,13 +535,13 @@ crash_mutant() {
 
 @test "names the working tree by its root, not by the directory it probed" {
   fire "rm -rf ${REPO}/dist"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "working tree at ${REPO}."
 }
 
 @test "denies a path that resolves to the filesystem root by another spelling" {
   fire 'rm -rf /tmp/..'
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "filesystem root"
 }
 
@@ -568,22 +559,22 @@ crash_mutant() {
 
 @test "denies rm carried in a quoted payload through xargs" {
   fire "xargs -I{} sh -c 'rm -rf ${REPO}/src'"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "denies rm carried in a quoted payload through env" {
   fire "env bash -c 'rm -rf ${REPO}/src'"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "denies rm carried in a quoted payload through timeout" {
   fire "timeout 5 bash -c 'rm -rf ${REPO}/src'"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
 }
 
 @test "denies a quoted rm even when its target is outside every tree" {
   fire "env bash -c 'rm -rf ${SCRATCH}/x'"
-  assert_permission_decision "deny"
+  assert_permission_decision "ask"
   assert_reason_contains "does not model"
 }
 
@@ -597,14 +588,16 @@ crash_mutant() {
   assert_silent
 }
 
-@test "stays silent on an rm inside a heredoc body, which is data" {
-  fire "$(printf 'cat <<%s > %s/f\nrm -rf %s\n%s\n' \
-    "'EOF'" "${SCRATCH}" "${REPO}" 'EOF')"
+@test "a heredoc body with no rm token in it stays silent" {
+  fire "$(printf 'cat <<%s > %s/f\nhello\n%s\n' \
+    "'EOF'" "${SCRATCH}" 'EOF')"
   assert_silent
 }
 
-@test "stays silent on git, which is out of scope whatever it mentions" {
+@test "git asks when it mentions rm, and stays silent when it does not" {
   fire "git commit -m 'drop the rm guard' " "${REPO}"
+  assert_permission_decision "ask"
+  fire "git commit -m 'drop the guard' " "${REPO}"
   assert_silent
 }
 
@@ -664,19 +657,19 @@ crash_mutant() {
 @test "a crash leaves no verdict at all, so the ask rule decides" {
   HOOK="$(crash_mutant ': "${RMG_DELIBERATE_CRASH_290}";')"
   fire "rm -rf ${SCRATCH}/x"
-  assert_silent
+  assert_no_verdict
 }
 
 @test "an exit mid-parse leaves no verdict at all" {
   HOOK="$(crash_mutant 'exit 3;')"
   fire "rm -rf ${SCRATCH}/x"
-  assert_silent
+  assert_no_verdict
 }
 
 @test "a signal leaves no verdict at all" {
   HOOK="$(crash_mutant 'kill -TERM $$;')"
   fire "rm -rf ${SCRATCH}/x"
-  assert_silent
+  assert_no_verdict
 }
 
 @test "a missing jq cannot turn the hook into an allow" {

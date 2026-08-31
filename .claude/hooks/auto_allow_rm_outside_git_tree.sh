@@ -1,117 +1,147 @@
 #!/usr/bin/env bash
-# enforce_rm_outside_git_tree.sh -- Claude Code PreToolUse hook (matcher: Bash).
+# auto_allow_rm_outside_git_tree.sh -- Claude Code PreToolUse hook (Bash).
 #
-# THE PROPERTY, stated positively:
+# READ THIS FIRST: THIS HOOK IS NOT THE GUARD.
 #
-#   A deletion that would remove any part of any git working tree needs a
-#   human; a deletion that would not does not.
+# The guard is one line in .claude/settings.json:
 #
-# "Any part" runs in both directions, and the second one is not decoration:
-# asking only whether the target is INSIDE a tree denies `rm README.md` and
-# allows `rm -rf <the directory every checkout lives in>`, because that
-# directory is not itself a tree. So the target is judged upwards (is it in
-# a tree?) and, when it is a directory outside every tree, downwards (does
-# it hold one?).
+#     "permissions": { "ask": [ ... "Bash(rm:*)" ... ] }
 #
-# That is a statement about where the bytes live, not about how the command
-# was spelled. This hook computes it: it extracts every `rm` invocation from
-# the command, resolves each operand to an absolute physical path, and asks
-# git one question per target -- plus one bounded search per directory that
-# survives it.
+# That line is what stands between an `rm` and the filesystem, and it is a
+# human. This file only decides when the human can be spared: it emits
 #
-# WHY THIS REPLACES A PREFIX-MATCH ALLOW LIST (refs #290)
+#     allow   -- it resolved every target of every rm in the command and
+#                every one of them is outside every git working tree;
+#     ask     -- it reached a definite reason the human is needed, and says
+#                which target and which tree;
+#     nothing -- anything else.
 #
-# `permissions.ask: Bash(rm:*)` plus a list of `Bash(rm ...)` allow rules
-# expressed the same intent as a set of literal prefix matches over the
-# command STRING. It was widened three times in one afternoon and lost three
-# times, because the spelling is the caller's to choose:
+# It never emits `deny`. Refusal is the permission system's to give.
 #
-#   rm -rf "$TMPDIR/mut957"          the opening quote precedes the variable
-#   SCRATCH=...; rm -rf $SCRATCH/x   the variable name is caller-chosen
-#   export T=...; rm -rf "$T/a1"     ... and can be a single letter
+# WHY THE SHAPE MATTERS MORE THAN THE PARSER (refs #290)
 #
-# At 480 rules it was still incomplete (the next variable name misses) AND
-# unsound in the other direction (`rm -rf /tmp/../etc` begins with the
-# allowed prefix `rm -rf /tmp/`). A guard that both under- and over-matches
-# is not a narrow version of the property; it is a different property that
-# happens to correlate. The answer this hook computes does not depend on
-# quote placement, variable name or flag order, so none of those can be the
-# next miss.
+# The property is unchanged: A DELETION THAT WOULD REMOVE ANY PART OF ANY GIT
+# WORKING TREE NEEDS A HUMAN; A DELETION THAT WOULD NOT DOES NOT. It is a
+# statement about where bytes live, not about how a command was spelled, and
+# a 480-entry list of `Bash(rm ...)` prefix rules could not express it: it
+# missed the next caller-chosen variable name AND allowed `rm -rf /tmp/../etc`
+# because that string starts with the allowed prefix `rm -rf /tmp/`.
 #
-# DECISIONS, so the next reader can check the code against them rather than
-# against an intention:
+# The first fix was to compute the property in a hook and make the hook the
+# guard, with the blanket ask removed. Three review rounds then walked past
+# it, each time through a shell shape the parser did not model:
 #
-# EXTRACTION. The command is tokenized with a small shell lexer that models
+#     bash <<EOF / rm -rf <repo>/src / EOF   heredoc body read as data
+#     sh <<< 'rm -rf <repo>/src'             here-string word discarded
+#     bash -c -- 'rm -rf <repo>/src'         bash discards `--`, the guard did not
+#     builtin cd <repo> && rm -rf src        tracked cwd desynced -> ALLOW
+#     r"m" -rf <repo>/src                    text prefilter never woke up
+#
+# Each was proven by actually deleting a tracked file out of a real working
+# tree. Bash's shapes are not finite, so the lesson is not "model five more".
+# It is that a parser over a command STRING cannot be a guard, because the
+# string does not become a path until the shell expands it, and the only
+# sound answer a string can always give is "I do not know".
+#
+# So "I do not know" was made safe instead of made rare. With the ask rule
+# back, this hook's silence is a human, and every way it can fail -- a
+# construct the lexer refuses, a missing jq, an unbound variable, a signal,
+# the 10s hook timeout, a command it never woke up for -- is silence. The
+# five bypasses above are dead by construction rather than by five branches:
+# not one of them can produce an `allow`, and nothing else this hook can do
+# is weaker than the human it falls back to.
+#
+# WHAT THAT LEAVES UNCOVERED, PLAINLY
+#
+# The ask rule is itself a match on the command text, performed by Claude
+# Code and not by this repo. `rm ...` matches it. These do not, and no hook
+# can fix that from here, because a PreToolUse hook may only ADD a prompt or
+# remove one -- it cannot make the tool call not happen:
+#
+#   - `/bin/rm -rf <repo>/x` and any other absolute path to rm;
+#   - `X=r; ${X}m -rf <repo>/x`, where the two letters are never adjacent;
+#   - a deletion that is not rm at all (see OUT OF SCOPE).
+#
+# For the first two this hook is the only thing that speaks: it lexes
+# `/bin/rm` and `r"m"` correctly and will `ask`. That is a courtesy, not a
+# guarantee, and it is why the header does not claim one.
+#
+# THE OPTION THAT WOULD GIVE A GUARANTEE, AND WHY IT IS NOT HERE
+#
+# Ask the question AFTER expansion, where there is no quoting left to lose:
+# an `rm` shim early on the agent shell's PATH that reads its own argv,
+# resolves each operand and refuses the ones inside a working tree. The shell
+# does the parsing, so all five bypasses stop existing rather than stop
+# working. It is installable -- settings.json `env` does reach Bash tool
+# calls, and CLAUDE_CODE_SHELL_PREFIX does wrap every one of them -- but it
+# needs decisions this file cannot make on its own: `env` values are NOT
+# interpolated (no `${PATH}`), so the wrapper path is machine-specific and
+# has to come from a per-machine settings.local.json that a fresh clone does
+# not have; a shim can only refuse, never ask, so every in-tree deletion
+# becomes a hard failure with no in-loop approval; and a broken wrapper takes
+# every Bash call in the session with it. See doc/adr/00000015.
+#
+# HOW THE ALLOW IS COMPUTED
+#
+# EXTRACTION. The command is lexed with a small shell lexer that models
 #   single quotes, double quotes, backslash escapes, `$VAR` / `${VAR}`,
 #   `~` / `~/`, the separators `&& || ; | & <newline>`, redirections
-#   (including the fd-number prefix and here-strings), heredoc bodies (which
-#   are DATA and are skipped whole), and `#` comments. Each simple command's
-#   command word decides what happens:
-#     - `rm` (or any `*/rm`)      -> its operands are checked, one by one;
-#     - `bash`/`sh` with `-c`     -> the payload is re-analysed, depth <= 2.
-#                                    The bundle is read character by
-#                                    character, because bash runs the
-#                                    payload of `-cx` exactly as it runs
-#                                    `-xc`; every other character in it
-#                                    must be an option that takes no
-#                                    argument of its own, or the guard
-#                                    cannot say which word IS the payload
-#                                    (`-o errexit -c ...`) and denies;
-#     - `git`                     -> skipped, see OUT OF SCOPE below;
+#   (including the fd-number prefix), heredocs, here-strings and `#`
+#   comments. Each simple command's command word decides what happens:
+#     - `rm` (or any `*/rm`)      -> its operands are resolved, one by one;
+#     - `bash`/`sh` with `-c`     -> the payload is re-analysed, depth <= 2;
 #     - `cd`                      -> moves the effective cwd for the simple
 #                                    commands after it, because
 #                                    `cd <repo> && rm -rf dist` deletes in
-#                                    <repo>; a `cd` whose destination is not
-#                                    knowable blanks the cwd instead, so
-#                                    every later relative operand denies;
-#     - anything else             -> if ANY of its words mentions an `rm`
-#                                    token, quoted or not, DENY: that is
+#                                    <repo>;
+#     - anything else             -> the tracked cwd is BLANKED (an
+#                                    unmodelled command may have moved the
+#                                    shell -- `builtin cd`, `command cd`,
+#                                    `eval`, a function -- and a stale cwd is
+#                                    how a relative operand gets resolved
+#                                    against the wrong directory and
+#                                    allowed), and if any of its words
+#                                    mentions an `rm` token, quoted or not,
+#                                    the answer is `ask`: that is
 #                                    `xargs rm`, `sudo rm`, `find -exec rm`,
-#                                    `env bash -c 'rm ...'` and every
-#                                    wrapper nobody has written down yet.
-#                                    Quoting does not lift it, because
-#                                    quoting is how the wrapper cases hid --
-#                                    telling an executing word from an inert
-#                                    one needs each wrapper's semantics, and
-#                                    enumerating wrappers is the mechanism
-#                                    this hook replaces.
-#   NOT PARSED, and therefore DENIED when the command mentions `rm` at all:
-#   command substitution `$(...)` and backticks, subshells `( ... )`,
-#   arithmetic expansion, `${VAR:-default}` and every other parameter
-#   expansion form, positional / special parameters (`$1`, `$@`, `$?`, `$$`,
-#   `$#`, `$*`, `$!`, `$-`), glob and brace expansion in an operand,
-#   `~user`, and an unterminated quote. An unparsed command is an unknown
-#   target, and the default on unrecognised input is the whole point of this
-#   change. "Denied" here means a verdict the parser reached and can name:
-#   the special parameters used to be classified by a `case` pattern that
-#   CONTAINED `$!`, and a pattern is expanded before it is matched, so under
-#   set -u the hook aborted on them instead of deciding about them.
+#                                    `git submodule foreach 'rm ...'` and
+#                                    every wrapper nobody has written down.
+#   NOT LEXED, and therefore never allowed: command substitution `$(...)` and
+#   backticks, subshells, arithmetic expansion, `${VAR:-default}` and every
+#   other parameter expansion form, positional / special parameters, glob and
+#   brace expansion in an operand, `~user`, and an unterminated quote.
+#
+# ACCOUNTING FOR EVERY WORD. A command is allowable only when nothing in it
+#   was skipped. Text the lexer discards as data is still text a shell may
+#   execute -- `bash <<EOF ... EOF` and `sh <<< '...'` both run it -- so a
+#   heredoc body or a here-string word that mentions an `rm` token makes the
+#   whole command un-allowable and produces an `ask`. Likewise `bash -c --`,
+#   where real bash discards the `--` and runs the NEXT word: the guard says
+#   it cannot place the payload rather than analysing the wrong one.
 #
 # VARIABLE RESOLUTION. An UNQUOTED expansion is not one word: the shell
 #   splits the value on IFS and then expands globs in the pieces, so a value
-#   carrying whitespace or a glob character is refused outright rather than
-#   read as a path. (Reading it as a path is how `X="<scratch>/junk
-#   <repo>/README.md"; rm -rf $X` came back ALLOW while bash deleted a
-#   tracked file.) Inside double quotes the value is exactly one word and is
-#   used as it stands.
+#   carrying whitespace or a glob character is refused rather than read as a
+#   path. Inside double quotes the value is exactly one word and is used as
+#   it stands.
 #
-#   Assignments that appear earlier in the same command
-#   (`VAR=...`, and `export`/`declare`/`typeset`/`local`/`readonly`
-#   prefixes) are applied, then the environment the hook itself receives. A
-#   variable that neither supplies is an unknown target: DENY. A `bash -c`
-#   payload is re-analysed against the ENVIRONMENT ONLY -- shell assignments
-#   from the enclosing command do not cross the boundary. Real bash crosses
-#   only the exported ones, and modelling that difference buys nothing: the
-#   conservative side of the mismatch is a DENY.
+#   Assignments take effect only from a simple command that was assignments
+#   and nothing else (`X=v; rm ...`, `export X=v; rm ...`). A command PREFIX
+#   (`X=v rm -rf $X/y`) does not, because bash expands `$X` from the value
+#   that existed BEFORE the prefix; applying it made this hook resolve a path
+#   bash would not, and allow it. After the command's own assignments comes
+#   the environment the hook itself received. A variable that neither
+#   supplies is an unknown target. A `bash -c` payload is re-analysed against
+#   the ENVIRONMENT ONLY: shell assignments do not cross the boundary, and
+#   the conservative side of that mismatch is a prompt.
 #
 # PATH RESOLUTION. A relative operand is resolved against the invocation cwd
-#   (the hook input's `.cwd`); an invocation cwd that does not resolve makes
-#   every relative operand unknown: DENY. `..` is collapsed and symlinks are
-#   resolved PHYSICALLY, by `cd -P`, so `rm -rf /tmp/../etc` resolves to
-#   `/etc`. Symlinks in the parent chain are followed; a symlink in the FINAL
-#   component is not, because `rm` removes the link and not what it points
-#   at -- so a link in /tmp that aims at a repo is judged where the link
-#   lives.
+#   (the hook input's `.cwd`), as moved by any `cd` before it; an invocation
+#   cwd that does not resolve makes every relative operand unknown. `..` is
+#   collapsed and symlinks are resolved PHYSICALLY, by `cd -P`, so
+#   `rm -rf /tmp/../etc` resolves to `/etc`. Symlinks in the parent chain are
+#   followed; a symlink in the FINAL component is not, because `rm` removes
+#   the link and not what it points at.
 #
 # THE QUESTION, UPWARDS. `git -C <dir> rev-parse --show-toplevel`, where
 #   <dir> is the target itself when the target is an existing real directory
@@ -119,123 +149,78 @@
 #   target's parent otherwise. For a path that does not exist, the nearest
 #   EXISTING ancestor decides. `-c safe.directory='*'` is passed so a
 #   host-owned checkout inspected from a container answers "yes, a repo"
-#   instead of failing with dubious ownership and being read as "no".
-#   git failing for any reason other than "not a git repository" is an
-#   unknown answer: DENY.
+#   instead of failing with dubious ownership and being read as "no". git
+#   failing for any other reason is an unanswered question.
 #
-# THE QUESTION, DOWNWARDS. When the target is an existing directory that
-#   sits outside every tree, it is searched breadth-first for a `.git` under
-#   it, and a hit DENIES. Breadth-first because the case that makes this
-#   urgent is shallow -- a workspace directory holding a dozen checkouts is
-#   answered in the first few directories examined. The search does not
-#   cross a symlink, since rm -rf does not delete through one, which is also
-#   what keeps it finite. It is bounded by RMG_SCAN_MAX_DIRS directories and
-#   RMG_SCAN_SECONDS seconds, and exceeding either -- or meeting a directory
-#   that cannot be read -- is an unanswered question: DENY. Both budgets sit
-#   far below the hook timeout, because a hook killed for running long emits
-#   nothing at all, and a hook that emits nothing is read as consent.
+# THE QUESTION, DOWNWARDS. Asking only whether the target is INSIDE a tree
+#   would allow `rm -rf <the directory every checkout lives in>`, since that
+#   directory is not itself a tree. So a target that is an existing directory
+#   outside every tree is searched breadth-first for a `.git` under it, and a
+#   hit asks. Breadth-first because the urgent case is shallow. The search
+#   does not cross a symlink, since rm -rf does not delete through one, which
+#   is also what keeps it finite. ONE budget covers the whole invocation --
+#   RMG_SCAN_MAX_DIRS directories and RMG_SCAN_SECONDS seconds shared across
+#   every operand, not spent again per operand -- because sixty operands each
+#   paying a full budget outlive the hook timeout, and a hook killed for
+#   running long emits nothing. Exceeding either budget, or meeting a
+#   directory that cannot be read, is an unanswered question.
 #
-# FLAGS AND SEPARATORS. `--` ends options. A word starting with `-` before
-#   `--` is a flag. A bare `-` is a filename, as it is for rm itself.
+# FLAGS AND SEPARATORS. `--` ends rm's options. A word starting with `-`
+# before `--` is a flag. A bare `-` is a filename, as it is for rm itself.
 #
-# WHAT THIS DELIBERATELY DOES NOT COVER
+# OUT OF SCOPE, named rather than left silently uncovered
 #
-#   - A path that does not exist and whose nearest existing ancestor is
-#     outside every repo: ALLOWED. There is nothing there to lose.
-#   - A path whose directory cannot be resolved: DENIED. Unresolvable means
-#     unknown, and this is the one place the hook must fail closed.
 #   - Deletions that are not `rm`: `find -delete`, `shred`, `truncate`,
-#     `trash-put`, `git clean`, `git rm`, `>file`. Out of scope, named here
-#     rather than left silently uncovered. `git clean` has its own guard;
-#     `trash-put` is the recoverable path this repo prefers (`/safe-delete`);
-#     `git rm` stages a deletion git can restore. A `git` simple command is
-#     therefore skipped whole.
-#   - A gitignored path INSIDE a repo: DENIED, same as any other path in the
+#     `trash-put`, `git clean`, `>file`. `git clean` has its own guard;
+#     `trash-put` is the recoverable path this repo prefers (`/safe-delete`).
+#   - A path that does not exist and whose nearest existing ancestor is
+#     outside every repo: allowed. There is nothing there to lose.
+#   - A gitignored path INSIDE a repo: asks, same as any other path in the
 #     tree. `gitignored` is not a synonym for `safe to lose` -- `.env` is
-#     gitignored and hand-written, and so is every `*.local` override in
-#     this workspace. The cheap-to-compute question ("is it in the tree?")
-#     is also the one that matches the risk; adding `git check-ignore` would
-#     spend a second git call to reach a WEAKER answer.
-#   - A target outside every git working tree that holds no working tree
-#     either, including a system path: ALLOWED (the filesystem root itself
-#     is refused, by any spelling -- `/tmp/..` resolves to it). This hook
-#     owns the "would this destroy somebody's source tree?" question and
-#     nothing else. What stops `rm -rf /etc` is the Bash sandbox's
-#     `filesystem.allowWrite` list, which `rm` is not excluded from -- the
-#     old blanket ask rule was not that guard either, since it allowed
-#     `rm -rf /tmp/../etc` outright.
-#   - A scratch directory that HOLDS a clone: DENIED, by the downwards
-#     question. This is the cost of that question and it is a real one --
-#     `rm -rf /tmp/<parent of a throwaway clone>` used to pass. A throwaway
-#     clone is still a working tree, and this guard's whole claim is that
-#     removing one needs a human: delete it with `trash-put`
-#     (`/safe-delete`), which is recoverable and out of scope here, or run
-#     the rm yourself. Deleting the clone directly was already denied
-#     before this rule existed, since a clone is a tree.
-#   - A directory too large or too slow to search within the budget:
-#     DENIED, not allowed. The budget bounds the COST of the answer, never
-#     which answer is given when it runs out.
-#   - A command longer than RMG_MAX_COMMAND bytes: DENIED unparsed. The
-#     lexer is O(n^2) in bash and the hook has a 10s budget.
-#   - The hook failing to run at all: DENIED, by the trap below. See THE
-#     PROCESS-LEVEL DEFAULT.
+#     gitignored and hand-written, and so is every `*.local` override in this
+#     workspace. Adding `git check-ignore` would spend a second git call to
+#     reach a WEAKER answer.
+#   - A target outside every working tree that holds none either, including a
+#     system path: allowed (the filesystem root itself is not, by any
+#     spelling -- `/tmp/..` resolves to it). What stops `rm -rf /etc` is the
+#     Bash sandbox's `filesystem.allowWrite` list, not this hook and not the
+#     old blanket ask, which allowed `rm -rf /tmp/../etc` outright.
+#   - A scratch directory that HOLDS a clone: asks, by the downwards
+#     question. A throwaway clone is still a working tree.
 #
-# COST, stated so it is not a surprise: an `rm` token in a command this hook
-# does not model is denied even when it is inert -- `echo rm`,
-# `grep 'rm' file`, `sed 's/rm -rf/trash-put/' f`. Quoting does not lift it.
-# What does: a heredoc body, which this hook skips as data; a file instead of
-# an inline string; or running the command yourself. `--rm` is not an rm
-# token and `docker run --rm` is silent, as is any word with the letters
-# inside it (`confirm-rm-helper`).
+# THE COST, stated so it is not a surprise: a prompt, never a refusal. An
+# `rm` token in a command this hook cannot place produces one even when the
+# token is inert -- `echo rm`, `grep 'rm' file`, `git rm README.md`,
+# `git commit -m 'drop rm'`. Quoting does not lift it, because quoting is how
+# three of the five bypasses hid. What does lift it: a heredoc body with no
+# `rm` token, a file instead of an inline string, or running the command
+# yourself. `--rm` is not an rm token and `docker run --rm` is silent, as is
+# any word with the letters inside it (`confirm-rm-helper`).
 #
 # Refs: #290 (this hook), #287 / #288 (same defect class, same batch).
+# ADR: doc/adr/00000015-rm-safety-lives-in-the-ask.md
 
 set -uo pipefail
 
 # --------------------------------------------------------------------------
 # THE PROCESS-LEVEL DEFAULT
 #
-# Everything below this block computes a verdict. This block is what happens
-# when it cannot compute one. A hook that emits nothing is read downstream as
-# "this guard had no opinion", and the tool call proceeds -- so "the guard
-# crashed" and "the guard approved" are the same event to everything that
-# reads the guard. That is the fail-open default this hook exists to remove,
-# reappearing one level up, inside the guard. It is closed the same way: a
-# verdict leaves this process no matter how the process ends.
+# Nothing. On purpose, and it is the whole reason this file is safe.
 #
-# RMG_FINISHED is set only by the path that ran to completion -- including
-# the deliberate silence for a command with no `rm` in it. Any other ending
-# (an unbound variable, an exit, a signal) leaves it 0, and the trap turns
-# that into a deny. Two crashes the trap cannot cover, named so they are not
-# mistaken for coverage: a syntax error in this file, where the file never
-# runs at all (bash exits 2, which Claude Code already reads as "block"), and
-# SIGKILL, which no handler sees.
+# The previous revision printed a `deny` from an EXIT trap, because with the
+# blanket ask removed a hook that said nothing was read as consent. That made
+# every crash a verdict and every unmodelled shell shape a silent approval --
+# the failure this change exists to remove, one level up inside the guard.
+#
+# With `permissions.ask: Bash(rm:*)` restored, silence means "a human sees
+# it". So this hook needs no default of its own: an unbound variable, an
+# `exit`, a signal, a missing jq, a hook timeout and a construct the lexer
+# refuses all end the process without stdout, and every one of them lands on
+# the same human. No trap can be forgotten because there is no trap to write.
+#
+# The one thing the process must never do is print half a verdict, so the
+# JSON is built whole in rmg_emit() before any of it is written.
 # --------------------------------------------------------------------------
-
-RMG_FINISHED=0
-RMG_VERDICT_SENT=0
-
-readonly RMG_CRASH_JSON='{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"The rm guard exited before it reached a verdict; its stderr says why. A guard that cannot answer must not be read as permission, so this deletion is refused. Run it yourself, or use trash-put (/safe-delete), which is recoverable."}}'
-
-# rmg_exit_guard -- the last thing this process does. Emits a deny unless a
-# verdict was already emitted, and exits 0 either way, because Claude Code
-# parses hook stdout as a verdict only on exit 0: a non-zero exit carrying
-# perfect JSON is reported as a hook error and the call proceeds.
-rmg_exit_guard() {
-  local rc=$?
-  if (( RMG_FINISHED )); then
-    exit "${rc}"
-  fi
-  # Set before printing, not after: this function also runs on the EXIT that
-  # follows a signal it just handled, and two verdicts on stdout parse as
-  # neither.
-  if (( ! RMG_VERDICT_SENT )); then
-    RMG_VERDICT_SENT=1
-    printf '%s\n' "${RMG_CRASH_JSON}"
-  fi
-  exit 0
-}
-trap rmg_exit_guard EXIT HUP INT TERM
 
 # Nesting budget for `bash -c '... bash -c "..." ...'`.
 readonly RMG_MAX_DEPTH=2
@@ -247,7 +232,7 @@ readonly RMG_MAX_COMMAND=65536
 # separately; every other character in a bundle must be on this list, or the
 # guard cannot say which word is the payload (`-o` takes one, so `-o errexit
 # -c ...` would have the guard reading `errexit` as the payload). Anything
-# absent -- `o`, `O`, `s`, and whatever a later bash adds -- denies.
+# absent -- `o`, `O`, `s`, and whatever a later bash adds -- asks.
 readonly RMG_SH_NOARG_FLAGS='abBeEfhHiklmnprtTuvxC'
 
 # The same list for long options, space-delimited on both sides so a
@@ -255,9 +240,9 @@ readonly RMG_SH_NOARG_FLAGS='abBeEfhHiklmnprtTuvxC'
 # argument and are deliberately absent.
 # Budgets for the containment search (see THE QUESTION in the header). A
 # search that exceeds either one is an unanswered question, and an
-# unanswered question denies -- so both can be lowered from the environment
-# without weakening anything: a smaller budget can only produce more denials,
-# and no value makes an unsearched directory read as ALLOW. The defaults sit
+# unanswered question is never an allow -- so both can be lowered from the
+# environment without weakening anything: a smaller budget can only produce
+# more prompts, and no value makes an unsearched directory read as ALLOW. The defaults sit
 # far below the hook timeout on purpose, because a hook that is killed for
 # running long emits nothing at all.
 # Validated and clamped rather than trusted: a value that is not a number
@@ -290,10 +275,26 @@ readonly RMG_SH_NOARG_LONG=' --login --noprofile --norc --posix --restricted --v
 # redirection target we agreed to discard. Also maintains the assignment
 # map, because assignment context is a property of position in the token
 # stream and this is where position is known.
+#
+# RMG_SKIP is 1 for a plain redirection target (a filename, inert) and 2 for
+# a here-string word, whose reader may be a shell -- `sh <<< 'rm -rf x'`
+# executes it. Discarded text that mentions an `rm` token is therefore
+# recorded, not dropped: this hook may only ALLOW a command in which every
+# word is accounted for.
+#
+# An assignment is BUFFERED rather than applied. `X=v rm -rf $X/y` is a
+# command prefix, and bash expands `$X` from the value that existed BEFORE
+# the prefix -- applying it here made the hook resolve a path bash would
+# not. The buffer is committed only by rmg_commit_assignments(), which runs
+# where a simple command ends, and only when nothing but assignments stood
+# in it.
 rmg_end_word() {
   local val bad name value
   if (( RMG_WOPEN )); then
     if (( RMG_SKIP )); then
+      if (( RMG_SKIP == 2 )) && rmg_mentions_rm "${RMG_W}"; then
+        RMG_DATA_RM="a here-string carries an 'rm' this guard cannot place -- its reader may well be a shell, and what it would delete is unknown"
+      fi
       RMG_SKIP=0
     else
       val="${RMG_W}"
@@ -306,17 +307,16 @@ rmg_end_word() {
         if [[ "${val}" =~ ^([A-Za-z_][A-Za-z0-9_]*)= ]]; then
           name="${BASH_REMATCH[1]}"
           value="${val#*=}"
-          if [[ -n "${bad}" ]]; then
-            RMG_VARS["${name}"]=''
-            RMG_VARS_BAD["${name}"]="${bad}"
-          else
-            RMG_VARS["${name}"]="${value}"
-            unset "RMG_VARS_BAD[${name}]"
-          fi
+          RMG_PEND_NAME+=("${name}")
+          RMG_PEND_VALUE+=("${value}")
+          RMG_PEND_BAD+=("${bad}")
         elif [[ "${val}" != export && "${val}" != declare && \
                 "${val}" != typeset && "${val}" != local && \
                 "${val}" != readonly ]]; then
+          # A command word: every assignment before it was that command's
+          # environment, not this shell's. Drop them.
           RMG_ASSIGN_CTX=0
+          RMG_PEND_NAME=(); RMG_PEND_VALUE=(); RMG_PEND_BAD=()
         fi
       fi
     fi
@@ -327,9 +327,31 @@ rmg_end_word() {
   RMG_WOPEN=0
 }
 
+# rmg_commit_assignments -- apply the buffered assignments of a simple
+# command that ended. They take effect only when the command was assignments
+# and nothing else (`X=v; ...`, `export X=v; ...`); a prefix (`X=v cmd ...`)
+# has already cleared the buffer in rmg_end_word.
+rmg_commit_assignments() {
+  local k name
+  if (( RMG_ASSIGN_CTX )); then
+    for (( k = 0; k < ${#RMG_PEND_NAME[@]}; k++ )); do
+      name="${RMG_PEND_NAME[k]}"
+      if [[ -n "${RMG_PEND_BAD[k]}" ]]; then
+        RMG_VARS["${name}"]=''
+        RMG_VARS_BAD["${name}"]="${RMG_PEND_BAD[k]}"
+      else
+        RMG_VARS["${name}"]="${RMG_PEND_VALUE[k]}"
+        unset "RMG_VARS_BAD[${name}]"
+      fi
+    done
+  fi
+  RMG_PEND_NAME=(); RMG_PEND_VALUE=(); RMG_PEND_BAD=()
+}
+
 # rmg_push_sep <text> -- close the in-progress word and push a separator.
 rmg_push_sep() {
   rmg_end_word
+  rmg_commit_assignments
   RMG_TOK_VAL+=("$1")
   RMG_TOK_KIND+=("sep")
   RMG_TOK_BAD+=("")
@@ -342,7 +364,7 @@ rmg_push_sep() {
 # whitespace makes it several operands, and a glob character makes it however
 # many paths happen to exist when the command runs. `{` and `}` are refused
 # with them although brace expansion happens BEFORE parameter expansion and
-# so cannot fire here -- the cost of that is a deny on a value nobody deletes
+# so cannot fire here -- the cost of that is a prompt on a value nobody deletes
 # by that name, and the alternative is a reader having to know that ordering
 # to check the code.
 rmg_value_splits_or_globs() {
@@ -483,6 +505,10 @@ rmg_read_heredoc_delimiter() {
 
 # rmg_skip_heredoc_bodies <string> <index> -- consume the bodies of every
 # heredoc opened on the line just ended. Sets RMG_NEXT.
+#
+# The body is not an operand, but it is not inert either: `bash <<EOF` runs
+# it. So it is read for an `rm` token on the way past, and a body that has
+# one makes the command un-allowable rather than invisible.
 rmg_skip_heredoc_bodies() {
   local s="$1" i="$2"
   local n=${#s} delim strip line
@@ -502,6 +528,9 @@ rmg_skip_heredoc_bodies() {
         while [[ "${line}" == $'\t'* ]]; do line="${line#$'\t'}"; done
       fi
       [[ "${line}" == "${delim}" ]] && break
+      if [[ -z "${RMG_DATA_RM}" ]] && rmg_mentions_rm "${line}"; then
+        RMG_DATA_RM="a heredoc body carries an 'rm' this guard cannot place -- its reader may well be a shell, and what it would delete is unknown"
+      fi
     done
   done
   RMG_NEXT=${i}
@@ -587,8 +616,9 @@ rmg_tokenize() {
           strip=0
           if [[ "${s:i:1}" == '-' ]]; then strip=1; (( i++ )); fi
           if [[ "${s:i:1}" == '<' ]]; then
-            # `<<<` here-string: its word is data, not an operand.
-            (( i++ )); RMG_SKIP=1; continue
+            # `<<<` here-string: its word is data, but data a shell may
+            # execute, so it is discarded as an operand and still read.
+            (( i++ )); RMG_SKIP=2; continue
           fi
           while [[ "${s:i:1}" == ' ' || "${s:i:1}" == $'\t' ]]; do (( i++ )); done
           rmg_read_heredoc_delimiter "${s}" "${i}"
@@ -648,6 +678,7 @@ rmg_tokenize() {
 
   [[ "${state}" != plain ]] && return 1
   rmg_end_word
+  rmg_commit_assignments
   return 0
 }
 
@@ -750,7 +781,7 @@ rmg_contains_git_tree() {
   local root="$1"
   local -a queue=("${root}")
   RMG_FOUND_TREE=''
-  local head=0 dir entry examined=0 started="${SECONDS}" rc=1
+  local head=0 dir entry rc=1
   local had_nullglob=0 had_dotglob=0
   shopt -q nullglob && had_nullglob=1
   shopt -q dotglob && had_dotglob=1
@@ -758,9 +789,9 @@ rmg_contains_git_tree() {
   while (( head < ${#queue[@]} )); do
     dir="${queue[head]}"
     (( head++ ))
-    (( examined++ ))
-    if (( examined > RMG_SCAN_MAX_DIRS )) \
-      || (( SECONDS - started > RMG_SCAN_SECONDS )); then
+    (( RMG_SCAN_USED++ ))
+    if (( RMG_SCAN_USED > RMG_SCAN_MAX_DIRS )) \
+      || (( SECONDS - RMG_SCAN_T0 > RMG_SCAN_SECONDS )); then
       rc=2
       break
     fi
@@ -799,7 +830,11 @@ rmg_operand_verdict() {
     abs="${operand}"
   else
     if [[ -z "${RMG_CWD_PHYS}" ]]; then
-      RMG_REASON="rm operand '${operand}' is relative and the invocation cwd (${RMG_CWD:-unset}) does not resolve, so its target is unknown"
+      if [[ -n "${RMG_CWD_LOST}" ]]; then
+        RMG_REASON="rm operand '${operand}' is relative and ${RMG_CWD_LOST}, so the directory it would be deleted from is unknown"
+      else
+        RMG_REASON="rm operand '${operand}' is relative and the invocation cwd (${RMG_CWD:-unset}) does not resolve, so its target is unknown"
+      fi
       return 2
     fi
     abs="${RMG_CWD_PHYS}/${operand}"
@@ -915,22 +950,24 @@ rmg_check_rm() {
 #
 # The test is on the TOKEN, not on the quoting. The older rule -- an
 # UNQUOTED word equal to `rm` -- reads as a rule about invocations and is
-# really a rule about quoting: it denied `xargs rm -rf` and let
+# really a rule about quoting: it stopped `xargs rm -rf` and let
 # `xargs -I{} sh -c 'rm -rf <repo>'` through silently, one quote further in.
 # Telling an executing word from an inert one needs each wrapper's
 # semantics, and enumerating wrappers is the mechanism this hook replaces.
 #
-# The cost is that an inert mention is refused too -- `echo 'rm -rf x'`,
-# `grep rm file` -- and quoting no longer lifts it, because quoting is how
-# the wrapper cases hid. A heredoc body is still data and still exempt, and
-# `git` never reaches here.
+# The cost is that an inert mention is asked about too -- `echo 'rm -rf x'`,
+# `grep rm file`, `git rm README.md` -- and quoting no longer lifts it,
+# because quoting is how the wrapper cases hid. `git` used to be skipped with
+# its words on the grounds that `git rm` stages a recoverable deletion; that
+# also made `git submodule foreach 'rm -rf <repo>/src'` invisible, so the
+# special case is gone and git reaches this rule like every other wrapper.
 rmg_unmodelled_rm() {
   local cmdword="$1"
   shift
   local t
   for t in "$@"; do
     if rmg_mentions_rm "${RMG_TOK_VAL[t]}"; then
-      RMG_REASON="'${cmdword}' is a command this guard does not model and one of its words mentions 'rm', so what it would delete is unknown. If it really deletes nothing, run it yourself; if it deletes, run the rm as its own command so the target can be resolved"
+      RMG_REASON="'${cmdword}' is a command this guard does not model and one of its words mentions 'rm', so what it would delete is unknown. Approve it only if you know what it removes; running the rm as its own command lets the guard resolve the target instead"
       return 2
     fi
   done
@@ -958,9 +995,19 @@ rmg_shell_payload() {
       RMG_REASON="an argument of '${base}' cannot be resolved: ${RMG_TOK_BAD[${idx[j]}]}, so its payload is unknown"
       return 2
     fi
-    # `--` ends options, and a word that is not an option ends them too:
-    # from here on this is a script name and its arguments, not a payload.
-    if [[ "${w}" == "--" || "${w}" != -?* ]]; then
+    # A word that is not an option ends them: from here on this is a script
+    # name and its arguments, not a payload.
+    #
+    # `--` is NOT that word. Real bash DISCARDS it and reads the next word as
+    # the command string, so `bash -c -- '<payload>'` runs the payload while a
+    # guard that treats `--` as end-of-options analyses the string `--` and
+    # sees nothing. Rather than model one more spelling, the guard says it
+    # cannot place the payload, which costs a prompt and cannot cost a file.
+    if [[ "${w}" == "--" ]]; then
+      RMG_REASON="'${base} --' places the payload somewhere this guard does not model, so what it would delete is unknown"
+      return 2
+    fi
+    if [[ "${w}" != -?* ]]; then
       return 1
     fi
     if [[ "${w}" == --* ]]; then
@@ -989,6 +1036,12 @@ rmg_shell_payload() {
         RMG_REASON="the '${base} -c' payload cannot be resolved: ${RMG_TOK_BAD[${idx[j+1]}]}"
         return 2
       fi
+      # Real bash DISCARDS a `--` here and runs the word after it, so the
+      # word this guard can see is not the one that executes.
+      if [[ "${RMG_TOK_VAL[${idx[j+1]}]}" == "--" ]]; then
+        RMG_REASON="'${base} -c --' places the payload somewhere this guard does not model, so what it would delete is unknown"
+        return 2
+      fi
       RMG_PAYLOAD="${RMG_TOK_VAL[${idx[j+1]}]}"
       return 0
     fi
@@ -998,7 +1051,7 @@ rmg_shell_payload() {
 }
 
 # rmg_simple_command <depth> <token index...> -- classify one simple
-# command. 0 no rm, 1 rm and every target is outside, 2 deny.
+# command. 0 no rm, 1 rm and every target is outside, 2 ask (RMG_REASON).
 rmg_simple_command() {
   local depth="$1"
   shift
@@ -1019,24 +1072,18 @@ rmg_simple_command() {
       rmg_check_rm "${idx[@]:k+1}"
       return $?
       ;;
-    git)
-      # Out of scope by decision, not by omission: see WHAT THIS
-      # DELIBERATELY DOES NOT COVER.
-      return 0
-      ;;
     cd)
       # `cd <dir> && rm <relative>` deletes in <dir>, not in the invocation
       # cwd. Track it, and treat a cd we cannot follow as an unknown cwd, so
-      # every later relative operand denies instead of resolving somewhere
-      # the command will not be.
+      # every later relative operand is unresolved instead of resolving
+      # somewhere the command will not be.
       rmg_apply_cd "${idx[@]:k+1}"
       return 0
       ;;
-    pushd|popd)
-      RMG_CWD_PHYS=''
-      return 0
-      ;;
     bash|sh|dash|zsh)
+      # A shell can chdir whatever it likes before it returns.
+      RMG_CWD_PHYS=''
+      RMG_CWD_LOST="an earlier '${cmdword}' in the same command may have moved the shell"
       rmg_shell_payload "${base}" "${idx[@]:k+1}"
       case "$?" in
         0)
@@ -1053,6 +1100,15 @@ rmg_simple_command() {
       return 0
       ;;
     *)
+      # Anything this guard does not model may have moved the shell, and
+      # `builtin cd <repo> && rm -rf src` proved that guessing it did not is
+      # how a relative operand gets resolved against the wrong directory and
+      # ALLOWED. Only the two commands modelled above leave the tracked cwd
+      # standing; every other one blanks it, so a later relative operand is
+      # unknown and goes to a human. One rule, no list of builtins to keep
+      # up with.
+      RMG_CWD_PHYS=''
+      RMG_CWD_LOST="an earlier '${cmdword}' in the same command may have moved the shell"
       rmg_unmodelled_rm "${cmdword}" "${idx[@]:k+1}" || return 2
       return 0
       ;;
@@ -1060,7 +1116,7 @@ rmg_simple_command() {
 }
 
 # rmg_walk <depth> -- split the token stream into simple commands and
-# classify each. 0 no rm, 1 rm and every target is outside, 2 deny.
+# classify each. 0 no rm, 1 rm and every target is outside, 2 ask.
 rmg_walk() {
   local depth="$1"
   local n=${#RMG_TOK_VAL[@]}
@@ -1085,14 +1141,16 @@ rmg_walk() {
 }
 
 # rmg_analyse <command> <depth> -- tokenize and walk one command string.
-# 0 no rm, 1 allow, 2 deny (RMG_REASON set).
+# 0 no rm, 1 allow, 2 ask (RMG_REASON set).
 rmg_analyse() {
   local cmd="$1" depth="$2"
   # Per-frame parser state; see the Lexer note above on dynamic scoping.
   local -a RMG_TOK_VAL=() RMG_TOK_KIND=() RMG_TOK_BAD=() RMG_TOK_Q=()
   local -a RMG_HD=() RMG_HDS=()
+  local -a RMG_PEND_NAME=() RMG_PEND_VALUE=() RMG_PEND_BAD=()
   local RMG_W='' RMG_WBAD='' RMG_WQ=0 RMG_WOPEN=0 RMG_SKIP=0
-  local RMG_NEXT=0 RMG_HD_DELIM='' RMG_ASSIGN_CTX=1
+  local RMG_NEXT=0 RMG_HD_DELIM='' RMG_ASSIGN_CTX=1 RMG_DATA_RM=''
+  local rc
 
   if (( ${#cmd} > RMG_MAX_COMMAND )); then
     RMG_REASON="the command is longer than ${RMG_MAX_COMMAND} bytes, which this guard does not parse, so its rm targets are unknown"
@@ -1103,28 +1161,49 @@ rmg_analyse() {
     return 2
   fi
   rmg_walk "${depth}"
+  rc=$?
+  # Text the lexer discarded as data is still text a shell may execute. A
+  # command carrying one is never allowed, whatever its own operands say.
+  if (( rc != 2 )) && [[ -n "${RMG_DATA_RM}" ]]; then
+    RMG_REASON="${RMG_DATA_RM}"
+    return 2
+  fi
+  return "${rc}"
 }
 
 # rmg_analyse_nested <payload> <depth> -- analyse a `bash -c` payload with a
 # fresh variable map: only the environment crosses the boundary.
 rmg_analyse_nested() {
   local -A RMG_VARS=() RMG_VARS_BAD=()
-  local RMG_CWD_PHYS="${RMG_CWD_PHYS}"
+  local RMG_CWD_PHYS="${RMG_CWD_PHYS}" RMG_CWD_LOST="${RMG_CWD_LOST}"
   rmg_analyse "$1" "$2"
 }
 
 # --------------------------------------------------------------------------
 
 # rmg_mentions_rm <command> -- cheap gate so a command with no `rm` word in
-# it is never parsed, and so a parse failure can safely mean DENY.
+# it is never lexed.
+#
+# It is a TEXT match, which is the mechanism this hook replaces, and it is
+# only sound here because of which way it can be wrong: a miss produces
+# SILENCE, and silence is the ask rule, i.e. a human. It never produces an
+# allow. Quote characters are stripped first, so `r"m"`, `r'"'"'m'"'"'` and
+# `r\m` -- each of which the shell runs as `rm`, and each of which walked
+# past the previous revision -- reach the lexer, which normalises them
+# properly. Both spellings are tried, raw and stripped, so removing the
+# quotes can only widen the gate and never narrow it. A spelling that survives even that (`X=r; ${X}m ...`) is not
+# lexed and gets the human by default.
 rmg_mentions_rm() {
-  [[ "$1" =~ (^|[^A-Za-z0-9_.-])rm([^A-Za-z0-9_.-]|$) ]]
+  local t
+  [[ "$1" =~ (^|[^A-Za-z0-9_.-])rm([^A-Za-z0-9_.-]|$) ]] && return 0
+  t="${1//[\'\"\\]/}"
+  [[ "${t}" =~ (^|[^A-Za-z0-9_.-])rm([^A-Za-z0-9_.-]|$) ]]
 }
 
-# rmg_emit <decision> <reason> -- print one verdict, or return 1 having
-# printed nothing. The JSON is built whole before any of it is written, so a
-# failure inside jq cannot leave half a verdict on stdout for the caller to
-# parse; returning 1 hands the answer to rmg_exit_guard, which denies.
+# rmg_emit <decision> <reason> -- print one verdict, or print nothing. The
+# JSON is built whole before any of it is written, so a failure inside jq
+# cannot leave half a verdict on stdout for the caller to parse. A jq that
+# does not run therefore produces silence, which is the ask rule.
 rmg_emit() {
   local out
   out="$(jq -n --arg d "$1" --arg r "$2" '{
@@ -1133,10 +1212,9 @@ rmg_emit() {
       permissionDecision: $d,
       permissionDecisionReason: $r
     }
-  }')" || return 1
-  [[ -n "${out}" ]] || return 1
+  }')" || return 0
+  [[ -n "${out}" ]] || return 0
   printf '%s\n' "${out}"
-  RMG_VERDICT_SENT=1
 }
 
 # rmg_run -- read the hook input, decide, emit. Everything that can fail
@@ -1145,7 +1223,12 @@ rmg_run() {
   local input cmd rc
   # Parser + verdict state, local to main so nothing leaks between hook runs.
   local RMG_CWD='' RMG_CWD_PHYS='' RMG_REASON='' RMG_PAYLOAD='' RMG_FOUND_TREE=''
+  local RMG_CWD_LOST=''
   local RMG_PHYS='' RMG_ANCHOR='' RMG_IS_DIR=0 RMG_TREE_TOP=''
+  # One containment-search budget for the whole invocation, not one per
+  # operand: sixty operands each paying a full per-operand budget outlive the
+  # hook timeout, and a hook killed for running long is not a verdict.
+  local RMG_SCAN_USED=0 RMG_SCAN_T0="${SECONDS}"
   local -A RMG_VARS=() RMG_VARS_BAD=() RMG_GIT_CACHE=() RMG_GIT_TOP=()
 
   input="$(cat)"
@@ -1168,17 +1251,16 @@ rmg_run() {
   rc=$?
   case "${rc}" in
     0) return 0 ;;
-    1) rmg_emit allow "every rm target resolves outside any git working tree" || exit 1 ;;
-    *) rmg_emit deny "${RMG_REASON}" || exit 1 ;;
+    1) rmg_emit allow "every rm target resolves outside any git working tree" ;;
+    *) rmg_emit ask "${RMG_REASON}" ;;
   esac
   return 0
 }
 
-# main -- the only place RMG_FINISHED is set, and it is set after rmg_run
-# returns, so every other way out of this process lands in rmg_exit_guard.
+# main -- the whole of the hook. Every way out of it that is not a verdict
+# is silence, and silence is the ask rule.
 main() {
   rmg_run
-  RMG_FINISHED=1
 }
 
 main "$@"
