@@ -315,3 +315,40 @@ crash_mutant() {
   fire 'ls -la /tmp'
   assert_silent
 }
+
+# --- special parameters ---------------------------------------------------
+#
+# The header says `$1` / `$@` / `$?` are not parsed and are therefore denied.
+# "Denied" has to mean a verdict the guard reached, not a crash the trap
+# above caught: a guard that dies on a whole class of input tells its author
+# nothing about the class. So these stanzas assert the deny AND assert the
+# reason names the parameter, which only the parser can do.
+
+@test "denies every special parameter, and says which" {
+  local p
+  for p in '$1' '$@' '$*' '$?' '$$' '$#' '$!' '$-'; do
+    fire "rm -rf ${p}/x"
+    if ! assert_permission_decision "deny"; then
+      echo "special parameter ${p} was not denied" >&2
+      return 1
+    fi
+    if ! assert_reason_contains "special parameter"; then
+      echo "... for special parameter ${p}" >&2
+      return 1
+    fi
+  done
+}
+
+@test "denies a real in-tree operand that follows a special parameter" {
+  fire "rm -rf \$1 ${REPO}/src"
+  assert_permission_decision "deny"
+}
+
+@test "refuses a special parameter without dying on it" {
+  fire 'rm -rf $1'
+  assert_permission_decision "deny"
+  if [[ -n "${stderr}" ]]; then
+    echo "the guard wrote to stderr instead of deciding: ${stderr}" >&2
+    return 1
+  fi
+}
