@@ -131,6 +131,51 @@
 
 set -uo pipefail
 
+# --------------------------------------------------------------------------
+# THE PROCESS-LEVEL DEFAULT
+#
+# Everything below this block computes a verdict. This block is what happens
+# when it cannot compute one. A hook that emits nothing is read downstream as
+# "this guard had no opinion", and the tool call proceeds -- so "the guard
+# crashed" and "the guard approved" are the same event to everything that
+# reads the guard. That is the fail-open default this hook exists to remove,
+# reappearing one level up, inside the guard. It is closed the same way: a
+# verdict leaves this process no matter how the process ends.
+#
+# RMG_FINISHED is set only by the path that ran to completion -- including
+# the deliberate silence for a command with no `rm` in it. Any other ending
+# (an unbound variable, an exit, a signal) leaves it 0, and the trap turns
+# that into a deny. Two crashes the trap cannot cover, named so they are not
+# mistaken for coverage: a syntax error in this file, where the file never
+# runs at all (bash exits 2, which Claude Code already reads as "block"), and
+# SIGKILL, which no handler sees.
+# --------------------------------------------------------------------------
+
+RMG_FINISHED=0
+RMG_VERDICT_SENT=0
+
+readonly RMG_CRASH_JSON='{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"The rm guard exited before it reached a verdict; its stderr says why. A guard that cannot answer must not be read as permission, so this deletion is refused. Run it yourself, or use trash-put (/safe-delete), which is recoverable."}}'
+
+# rmg_exit_guard -- the last thing this process does. Emits a deny unless a
+# verdict was already emitted, and exits 0 either way, because Claude Code
+# parses hook stdout as a verdict only on exit 0: a non-zero exit carrying
+# perfect JSON is reported as a hook error and the call proceeds.
+rmg_exit_guard() {
+  local rc=$?
+  if (( RMG_FINISHED )); then
+    exit "${rc}"
+  fi
+  # Set before printing, not after: this function also runs on the EXIT that
+  # follows a signal it just handled, and two verdicts on stdout parse as
+  # neither.
+  if (( ! RMG_VERDICT_SENT )); then
+    RMG_VERDICT_SENT=1
+    printf '%s\n' "${RMG_CRASH_JSON}"
+  fi
+  exit 0
+}
+trap rmg_exit_guard EXIT HUP INT TERM
+
 # Nesting budget for `bash -c '... bash -c "..." ...'`.
 readonly RMG_MAX_DEPTH=2
 
@@ -785,18 +830,27 @@ rmg_mentions_rm() {
   [[ "$1" =~ (^|[^A-Za-z0-9_.-])rm([^A-Za-z0-9_.-]|$) ]]
 }
 
-# rmg_emit <decision> <reason>
+# rmg_emit <decision> <reason> -- print one verdict, or return 1 having
+# printed nothing. The JSON is built whole before any of it is written, so a
+# failure inside jq cannot leave half a verdict on stdout for the caller to
+# parse; returning 1 hands the answer to rmg_exit_guard, which denies.
 rmg_emit() {
-  jq -n --arg d "$1" --arg r "$2" '{
+  local out
+  out="$(jq -n --arg d "$1" --arg r "$2" '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: $d,
       permissionDecisionReason: $r
     }
-  }'
+  }')" || return 1
+  [[ -n "${out}" ]] || return 1
+  printf '%s\n' "${out}"
+  RMG_VERDICT_SENT=1
 }
 
-main() {
+# rmg_run -- read the hook input, decide, emit. Everything that can fail
+# lives here; main() exists only to record that it did not.
+rmg_run() {
   local input cmd rc
   # Parser + verdict state, local to main so nothing leaks between hook runs.
   local RMG_CWD='' RMG_CWD_PHYS='' RMG_REASON=''
@@ -822,10 +876,17 @@ main() {
   rc=$?
   case "${rc}" in
     0) return 0 ;;
-    1) rmg_emit allow "every rm target resolves outside any git working tree" ;;
-    *) rmg_emit deny "${RMG_REASON}" ;;
+    1) rmg_emit allow "every rm target resolves outside any git working tree" || exit 1 ;;
+    *) rmg_emit deny "${RMG_REASON}" || exit 1 ;;
   esac
   return 0
+}
+
+# main -- the only place RMG_FINISHED is set, and it is set after rmg_run
+# returns, so every other way out of this process lands in rmg_exit_guard.
+main() {
+  rmg_run
+  RMG_FINISHED=1
 }
 
 main "$@"
