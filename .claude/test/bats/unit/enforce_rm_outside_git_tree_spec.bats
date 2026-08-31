@@ -457,3 +457,62 @@ crash_mutant() {
   fire "X=${SCRATCH}/one; rm -rf \$X"
   assert_permission_decision "allow"
 }
+
+# --- containment: a target that is not a tree but holds one ---------------
+#
+# Asking only "is the target inside a working tree?" denies `rm README.md`
+# and allows `rm -rf <the directory every repo lives in>`, because that
+# directory is not itself a tree. The trivial deletion is refused and the
+# maximally destructive one is waved through. The question the guard asks is
+# therefore about any part of any tree: inside one, or holding one.
+
+@test "denies a directory that is not a working tree but contains one" {
+  fire "rm -rf ${RMG_BASE}"
+  assert_permission_decision "deny"
+  assert_reason_contains "contains the git working tree"
+}
+
+@test "denies a directory that contains a working tree several levels down" {
+  mkdir -p "${SCRATCH}/holder/a/b/c"
+  git init -q -b main "${SCRATCH}/holder/a/b/c/clone"
+  fire "rm -rf ${SCRATCH}/holder"
+  assert_permission_decision "deny"
+  assert_reason_contains "contains the git working tree"
+}
+
+@test "allows a directory tree with no working tree anywhere under it" {
+  mkdir -p "${SCRATCH}/holder/a/b/c"
+  printf 'x\n' > "${SCRATCH}/holder/a/b/c/file"
+  fire "rm -rf ${SCRATCH}/holder"
+  assert_permission_decision "allow"
+}
+
+@test "denies a target it could not finish searching" {
+  mkdir -p "${SCRATCH}/wide/a" "${SCRATCH}/wide/b" "${SCRATCH}/wide/c"
+  RMG_SCAN_MAX_DIRS=1 run --separate-stderr "${HOOK}" <<< \
+    "$(jq -nc --arg c "rm -rf ${SCRATCH}/wide" --arg d "${SCRATCH}" \
+      '{cwd: $d, tool_input: {command: $c}}')"
+  assert_permission_decision "deny"
+  assert_reason_contains "budget"
+}
+
+@test "allows a directory small enough to search inside the budget" {
+  mkdir -p "${SCRATCH}/narrow"
+  RMG_SCAN_MAX_DIRS=1 run --separate-stderr "${HOOK}" <<< \
+    "$(jq -nc --arg c "rm -rf ${SCRATCH}/narrow" --arg d "${SCRATCH}" \
+      '{cwd: $d, tool_input: {command: $c}}')"
+  assert_permission_decision "allow"
+}
+
+@test "does not search past a symlink, which rm would not follow either" {
+  mkdir -p "${SCRATCH}/holder"
+  ln -s "${REPO}" "${SCRATCH}/holder/link"
+  fire "rm -rf ${SCRATCH}/holder"
+  assert_permission_decision "allow"
+}
+
+@test "still allows a file whose parent holds a working tree" {
+  printf 'x\n' > "${RMG_BASE}/loose"
+  fire "rm -rf ${RMG_BASE}/loose"
+  assert_permission_decision "allow"
+}
