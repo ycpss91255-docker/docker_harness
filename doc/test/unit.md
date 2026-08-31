@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1239 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1244 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -1986,7 +1986,7 @@ escaping, and the read-only `--check` gate.
 | a tracked script deleted in the working tree is not a lint target | - |
 | t_lint lints the computed target list, not a shell glob | - |
 
-### .claude/test/bats/unit/auto_allow_rm_outside_git_tree_spec.bats (97)
+### .claude/test/bats/unit/auto_allow_rm_outside_git_tree_spec.bats (102)
 
 | Test | Scenario |
 |------|----------|
@@ -2087,3 +2087,8 @@ escaping, and the read-only `--check` gate.
 | git rebase -x carrying an rm reaches a human | - |
 | one operand inside the shared budget is answered and allowed | - |
 | two operands that each fit the budget do not both fit it | - |
+| ANSI-C quoting is a quoting form, not a literal dollar | - |
+| the locale-translation spelling is refused the same way | - |
+| a command that redefines IFS is not one whose word splitting is known | - |
+| an IFS assignment inside a bash -c payload counts too | - |
+| the same command without the IFS assignment is still allowed | - |

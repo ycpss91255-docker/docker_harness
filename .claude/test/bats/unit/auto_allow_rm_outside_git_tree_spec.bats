@@ -841,3 +841,49 @@ crash_mutant() {
   assert_permission_decision "ask"
   assert_reason_contains "could not finish searching"
 }
+
+# --- two ways a resolved operand is still not the path bash deletes -------
+#
+# Found by driving the hook against real fixtures rather than by reading it.
+# Both produced an affirmative ALLOW while bash deleted a tracked file, which
+# is the one outcome this hook must not be able to reach -- everything else
+# it gets wrong costs a prompt.
+
+@test "ANSI-C quoting is a quoting form, not a literal dollar" {
+  # `$'...'` is one word to bash and expands escapes inside it. The lexer
+  # used to add a literal `$` and carry on, so the operand became the
+  # relative path `$/tmp/...`, which resolved under the invocation cwd,
+  # sat outside every tree, and was ALLOWED -- while bash deleted the
+  # absolute in-tree path the quoting really names.
+  fire "rm -rf \$'${REPO}/src'"
+  assert_permission_decision "ask"
+  assert_reason_contains "does not model"
+}
+
+@test "the locale-translation spelling is refused the same way" {
+  fire "rm -rf \$\"${REPO}/src\""
+  assert_permission_decision "ask"
+  assert_reason_contains "does not model"
+}
+
+@test "a command that redefines IFS is not one whose word splitting is known" {
+  # `IFS=/; X=/a/b; rm -rf $X` makes bash split the unquoted expansion into
+  # the RELATIVE words `a` and `b`, deleting them in the cwd -- while the
+  # hook read the value as one absolute path outside every tree and allowed
+  # it. Splitting is the guard's own assumption, so a command that changes
+  # it is a command it cannot answer for.
+  fire "IFS=/; X=${SCRATCH}/y; rm -rf \$X" "${REPO}"
+  assert_permission_decision "ask"
+  assert_reason_contains "IFS"
+}
+
+@test "an IFS assignment inside a bash -c payload counts too" {
+  fire "bash -c 'IFS=/; X=${SCRATCH}/y; rm -rf \$X'" "${REPO}"
+  assert_permission_decision "ask"
+  assert_reason_contains "IFS"
+}
+
+@test "the same command without the IFS assignment is still allowed" {
+  fire "X=${SCRATCH}/y; rm -rf \$X" "${REPO}"
+  assert_permission_decision "allow"
+}
