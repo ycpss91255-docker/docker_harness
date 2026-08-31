@@ -530,11 +530,14 @@ crash_mutant() {
   fire "rm -rf ${SCRATCH}/../repo/dist"
   assert_permission_decision "deny"
   assert_reason_contains "resolves to ${REPO}/dist"
+  # The reason quotes the operand as typed first -- that is how the reader
+  # finds which operand it is about -- so the check is on what follows
+  # "resolves to": that half must be the resolution, not the spelling again.
   local got
   got="$(echo "${output}" | jq -r \
     '.hookSpecificOutput.permissionDecisionReason // empty')"
-  if [[ "${got}" == *"${SCRATCH}/../"* ]]; then
-    echo "the reason echoed the spelling back: ${got}" >&2
+  if [[ "${got#*resolves to }" == *"${SCRATCH}/../"* ]]; then
+    echo "the reason resolved the spelling to itself: ${got}" >&2
     return 1
   fi
 }
