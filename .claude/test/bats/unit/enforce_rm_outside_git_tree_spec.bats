@@ -242,9 +242,9 @@ assert_reason_contains() {
   assert_silent
 }
 
-@test "silent on an rm word that is quoted data, not an invocation" {
+@test "denies a quoted rm inside a command it does not model" {
   fire "echo 'rm -rf ${REPO}'"
-  assert_silent
+  assert_permission_decision "deny"
 }
 
 @test "silent on an rm word inside a heredoc body" {
@@ -552,4 +552,68 @@ crash_mutant() {
   fire 'rm -rf /tmp/..'
   assert_permission_decision "deny"
   assert_reason_contains "filesystem root"
+}
+
+# --- a wrapper carrying its rm inside a quoted word -----------------------
+#
+# The rule for a command this guard does not model used to be "an UNQUOTED
+# word equal to rm denies", which reads as a rule about invocations and is
+# really a rule about quoting: `xargs rm -rf` denied, and
+# `xargs -I{} sh -c 'rm -rf <repo>'` -- the same deletion, one quote further
+# in -- returned silently, and silence is consent to everything downstream.
+# The guard cannot tell an executing word from an inert one without knowing
+# each wrapper's semantics, which is exactly the enumeration this issue
+# exists to stop writing. So the rule is now about the token: a command this
+# guard does not model that mentions `rm` at all denies, quoted or not.
+
+@test "denies rm carried in a quoted payload through xargs" {
+  fire "xargs -I{} sh -c 'rm -rf ${REPO}/src'"
+  assert_permission_decision "deny"
+}
+
+@test "denies rm carried in a quoted payload through env" {
+  fire "env bash -c 'rm -rf ${REPO}/src'"
+  assert_permission_decision "deny"
+}
+
+@test "denies rm carried in a quoted payload through timeout" {
+  fire "timeout 5 bash -c 'rm -rf ${REPO}/src'"
+  assert_permission_decision "deny"
+}
+
+@test "denies a quoted rm even when its target is outside every tree" {
+  fire "env bash -c 'rm -rf ${SCRATCH}/x'"
+  assert_permission_decision "deny"
+  assert_reason_contains "does not model"
+}
+
+@test "stays silent on --rm, which is not an rm token" {
+  fire 'docker run --rm alpine true'
+  assert_silent
+}
+
+@test "stays silent on a word that merely contains the letters rm" {
+  fire "confirm-rm-helper ${REPO}/x"
+  assert_silent
+}
+
+@test "stays silent on an rm inside a heredoc body, which is data" {
+  fire "$(printf 'cat <<%s > %s/f\nrm -rf %s\n%s\n' \
+    "'EOF'" "${SCRATCH}" "${REPO}" 'EOF')"
+  assert_silent
+}
+
+@test "stays silent on git, which is out of scope whatever it mentions" {
+  fire "git commit -m 'drop the rm guard' " "${REPO}"
+  assert_silent
+}
+
+# --- the search budgets are the operator's to lower, not to break ---------
+
+@test "falls back to the default budget when the environment sets nonsense" {
+  mkdir -p "${SCRATCH}/holder/a/b"
+  RMG_SCAN_MAX_DIRS=not-a-number run --separate-stderr "${HOOK}" <<< \
+    "$(jq -nc --arg c "rm -rf ${SCRATCH}/holder" --arg d "${SCRATCH}" \
+      '{cwd: $d, tool_input: {command: $c}}')"
+  assert_permission_decision "allow"
 }
