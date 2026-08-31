@@ -109,7 +109,8 @@
 #   NOT LEXED, and therefore never allowed: command substitution `$(...)` and
 #   backticks, subshells, arithmetic expansion, `${VAR:-default}` and every
 #   other parameter expansion form, positional / special parameters, glob and
-#   brace expansion in an operand, `~user`, and an unterminated quote.
+#   brace expansion in an operand, `~user`, the ANSI-C and locale quoting
+#   forms `$'...'` / `$"..."`, and an unterminated quote.
 #
 # ACCOUNTING FOR EVERY WORD. A command is allowable only when nothing in it
 #   was skipped. Text the lexer discards as data is still text a shell may
@@ -123,7 +124,9 @@
 #   splits the value on IFS and then expands globs in the pieces, so a value
 #   carrying whitespace or a glob character is refused rather than read as a
 #   path. Inside double quotes the value is exactly one word and is used as
-#   it stands.
+#   it stands. DEFAULT splitting is assumed throughout, so a command that
+#   assigns IFS is never allowed: `IFS=/; X=/a/b; rm -rf $X` deletes the
+#   relative `a` and `b`, not the absolute path the guard would read.
 #
 #   Assignments take effect only from a simple command that was assignments
 #   and nothing else (`X=v; rm ...`, `export X=v; rm ...`). A command PREFIX
@@ -293,7 +296,7 @@ rmg_end_word() {
   if (( RMG_WOPEN )); then
     if (( RMG_SKIP )); then
       if (( RMG_SKIP == 2 )) && rmg_mentions_rm "${RMG_W}"; then
-        RMG_DATA_RM="a here-string carries an 'rm' this guard cannot place -- its reader may well be a shell, and what it would delete is unknown"
+        RMG_NO_ALLOW="a here-string carries an 'rm' this guard cannot place -- its reader may well be a shell, and what it would delete is unknown"
       fi
       RMG_SKIP=0
     else
@@ -306,6 +309,14 @@ rmg_end_word() {
       if (( RMG_ASSIGN_CTX )); then
         if [[ "${val}" =~ ^([A-Za-z_][A-Za-z0-9_]*)= ]]; then
           name="${BASH_REMATCH[1]}"
+          if [[ "${name}" == IFS ]]; then
+            # Default word splitting is what every unquoted expansion here
+            # is resolved against. A command that redefines IFS splits its
+            # own operands somewhere else -- `IFS=/; X=/a/b; rm -rf $X`
+            # deletes the relative `a` and `b` -- so this guard cannot
+            # answer for it, wherever the assignment sits.
+            RMG_NO_ALLOW="the command assigns IFS, which changes how the shell splits the words it then deletes, so this guard cannot say what the operands resolve to"
+          fi
           value="${val#*=}"
           RMG_PEND_NAME+=("${name}")
           RMG_PEND_VALUE+=("${value}")
@@ -425,6 +436,15 @@ rmg_read_dollar() {
     '(')
       return 1
       ;;
+    "'"|'"')
+      # `$'...'` (ANSI-C) and `$"..."` (locale translation) are QUOTING
+      # forms, not a literal dollar followed by a quote. Treating them as
+      # the latter turned `rm -rf $'<repo>/src'` into the relative operand
+      # `$/<repo>/src`, which resolved outside every tree and was allowed
+      # while bash deleted the absolute in-tree path.
+      RMG_WBAD="\$${c} is a quoting form this guard does not model"
+      RMG_NEXT=${j}
+      ;;
     '{')
       k=$((j + 1))
       body=''
@@ -528,8 +548,8 @@ rmg_skip_heredoc_bodies() {
         while [[ "${line}" == $'\t'* ]]; do line="${line#$'\t'}"; done
       fi
       [[ "${line}" == "${delim}" ]] && break
-      if [[ -z "${RMG_DATA_RM}" ]] && rmg_mentions_rm "${line}"; then
-        RMG_DATA_RM="a heredoc body carries an 'rm' this guard cannot place -- its reader may well be a shell, and what it would delete is unknown"
+      if [[ -z "${RMG_NO_ALLOW}" ]] && rmg_mentions_rm "${line}"; then
+        RMG_NO_ALLOW="a heredoc body carries an 'rm' this guard cannot place -- its reader may well be a shell, and what it would delete is unknown"
       fi
     done
   done
@@ -1149,7 +1169,7 @@ rmg_analyse() {
   local -a RMG_HD=() RMG_HDS=()
   local -a RMG_PEND_NAME=() RMG_PEND_VALUE=() RMG_PEND_BAD=()
   local RMG_W='' RMG_WBAD='' RMG_WQ=0 RMG_WOPEN=0 RMG_SKIP=0
-  local RMG_NEXT=0 RMG_HD_DELIM='' RMG_ASSIGN_CTX=1 RMG_DATA_RM=''
+  local RMG_NEXT=0 RMG_HD_DELIM='' RMG_ASSIGN_CTX=1 RMG_NO_ALLOW=''
   local rc
 
   if (( ${#cmd} > RMG_MAX_COMMAND )); then
@@ -1162,10 +1182,12 @@ rmg_analyse() {
   fi
   rmg_walk "${depth}"
   rc=$?
-  # Text the lexer discarded as data is still text a shell may execute. A
-  # command carrying one is never allowed, whatever its own operands say.
-  if (( rc != 2 )) && [[ -n "${RMG_DATA_RM}" ]]; then
-    RMG_REASON="${RMG_DATA_RM}"
+  # Anything that makes this command un-allowable -- text discarded as data
+  # that a shell may still execute, an IFS assignment that moves word
+  # splitting out from under the operands -- outranks whatever the operands
+  # themselves resolved to.
+  if (( rc != 2 )) && [[ -n "${RMG_NO_ALLOW}" ]]; then
+    RMG_REASON="${RMG_NO_ALLOW}"
     return 2
   fi
   return "${rc}"

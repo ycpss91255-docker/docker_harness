@@ -76,6 +76,15 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   ask. Pruning them is a local step for that file's owner:
   `jq '.permissions.allow |= map(select(startswith("Bash(rm ") | not))'
   .claude/settings.local.json > /tmp/pruned.json` and move it into place.
+  Two operands the hook used to resolve to the WRONG path, both found by
+  driving it against real fixtures and both reaching the one outcome it must
+  not be able to reach -- an affirmative allow while bash deletes a tracked
+  file -- are closed with it: `$'...'` and `$"..."` are quoting forms rather
+  than a literal dollar (`rm -rf $'<repo>/src'` became the relative operand
+  `$/<repo>/src`, which resolved outside every tree), and a command that
+  assigns `IFS` is never allowed, because default word splitting is what
+  every unquoted expansion here is resolved against (`IFS=/; X=/a/b;
+  rm -rf $X` deletes the relative `a` and `b` in the cwd).
 - **the hooks stopped knowing about `make` and `justfile.ci` (closes #280).**
   The make -> just migration finished a while ago: no repo root in the
   workspace carries a `Makefile.ci` or a `justfile.ci`, and every repo has a
