@@ -352,3 +352,55 @@ crash_mutant() {
     return 1
   fi
 }
+
+# --- bash -c, spelled the way bash accepts it -----------------------------
+#
+# `-c` is not always the last character of the option bundle. Real bash runs
+# the payload of `bash -cx '...'` exactly as it runs `bash -xc '...'`, and a
+# guard that only recognises the second spelling looks covered while the
+# first walks past it -- into the same fail-open the process-level stanzas
+# above close, reached through the parser instead of through a crash.
+
+@test "denies an in-repo target under bash -cx, where -c is not last" {
+  fire "bash -cx 'rm -rf ${REPO}/src'"
+  assert_permission_decision "deny"
+}
+
+@test "denies an in-repo target under bash -ce" {
+  fire "bash -ce 'rm -rf ${REPO}/src'"
+  assert_permission_decision "deny"
+}
+
+@test "denies an in-repo target under sh -cx" {
+  fire "sh -cx 'rm -rf ${REPO}/src'"
+  assert_permission_decision "deny"
+}
+
+@test "allows an out-of-repo target under bash -cx: the payload is read, not refused" {
+  fire "bash -cx 'rm -rf ${SCRATCH}/x'"
+  assert_permission_decision "allow"
+}
+
+@test "denies an option bundle it cannot place a payload in, and says so" {
+  fire "bash -c'rm -rf ${REPO}/src'"
+  assert_permission_decision "deny"
+  assert_reason_contains "does not model"
+}
+
+@test "denies a shell option that takes an argument of its own" {
+  fire "bash -o errexit -c 'rm -rf ${SCRATCH}/x'"
+  assert_permission_decision "deny"
+  assert_reason_contains "does not model"
+}
+
+@test "denies a long shell option that takes an argument of its own" {
+  fire "bash --rcfile ${SCRATCH}/rc -c 'rm -rf ${REPO}/src'"
+  assert_permission_decision "deny"
+  assert_reason_contains "does not model"
+}
+
+@test "still reads the payload after a long option that takes none" {
+  fire "bash --norc -c 'rm -rf ${REPO}/src'"
+  assert_permission_decision "deny"
+  assert_reason_contains "inside the git working tree"
+}
