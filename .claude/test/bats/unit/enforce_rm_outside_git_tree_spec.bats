@@ -21,6 +21,8 @@
 #   <base>/repo/README.md   a tracked file
 #   <base>/repo/.env        a GITIGNORED file (the open question, decided)
 
+bats_require_minimum_version 1.5.0
+
 load '../lib/test_helper'
 
 setup() {
@@ -47,11 +49,17 @@ teardown() {
 }
 
 # fire <command> [cwd] -- run the hook on <command>, as if issued from [cwd].
+#
+# --separate-stderr because the verdict is what the hook writes to STDOUT:
+# that is the only stream Claude Code parses, and a hook that dies has its
+# diagnostic on stderr. Merging the two would make a crash's error text look
+# like a malformed verdict, which is precisely the difference the process-level
+# stanzas below exist to measure.
 fire() {
   local json
   json="$(jq -nc --arg c "$1" --arg d "${2:-}" \
     '{cwd: $d, tool_input: {command: $c}}')"
-  run "${HOOK}" <<< "${json}"
+  run --separate-stderr "${HOOK}" <<< "${json}"
 }
 
 # assert_reason_contains <needle>
