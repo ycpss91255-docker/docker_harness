@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1175 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1207 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -19,7 +19,7 @@ stdin and asserts one of three behaviours:
 - **SILENT** — exits 0 with no stdout (no action taken). Use
   `assert_silent`.
 
-### .claude/test/bats/unit/enforce_rm_outside_git_tree_spec.bats (33)
+### .claude/test/bats/unit/enforce_rm_outside_git_tree_spec.bats (65)
 
 | Test | Scenario |
 |------|----------|
@@ -56,6 +56,38 @@ stdin and asserts one of three behaviours:
 | silent on an rm word inside a heredoc body | heredoc bodies are data and are skipped whole -> SILENT |
 | denies an unquoted loose rm word, the stated cost of failing closed | `echo rm` -> DENY; quoting it lifts the deny |
 | silent when the tool input carries no command | no command -> SILENT |
+| denies when the guard dies on an unbound variable | - |
+| denies when the guard exits mid-parse | - |
+| denies when the guard is terminated by a signal | - |
+| still says nothing when a command carries no rm at all | - |
+| denies every special parameter, and says which | - |
+| denies a real in-tree operand that follows a special parameter | - |
+| refuses a special parameter without dying on it | - |
+| denies an in-repo target under bash -cx, where -c is not last | - |
+| denies an in-repo target under bash -ce | - |
+| denies an in-repo target under sh -cx | - |
+| allows an out-of-repo target under bash -cx: the payload is read, not refused | - |
+| denies an option bundle it cannot place a payload in, and says so | - |
+| denies a shell option that takes an argument of its own | - |
+| denies a long shell option that takes an argument of its own | - |
+| still reads the payload after a long option that takes none | - |
+| denies an unquoted expansion whose value would split into two paths | - |
+| the shell really does delete the in-tree file that expansion hides | - |
+| denies an unquoted expansion whose value would glob | - |
+| denies the braced spelling of the same unquoted expansion | - |
+| denies an unquoted expansion of an environment variable that splits | - |
+| allows the same value quoted, which really is one path | - |
+| allows an unquoted expansion whose value is a single plain path | - |
+| denies a directory that is not a working tree but contains one | - |
+| denies a directory that contains a working tree several levels down | - |
+| allows a directory tree with no working tree anywhere under it | - |
+| denies a target it could not finish searching | - |
+| allows a directory small enough to search inside the budget | - |
+| does not search past a symlink, which rm would not follow either | - |
+| still allows a file whose parent holds a working tree | - |
+| names the resolved target rather than the spelling | - |
+| names the working tree by its root, not by the directory it probed | - |
+| denies a path that resolves to the filesystem root by another spelling | - |
 
 ### .claude/test/bats/unit/auto_allow_touch_ack_spec.bats (22)
 | Test | Scenario |

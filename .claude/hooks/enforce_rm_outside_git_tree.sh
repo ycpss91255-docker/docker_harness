@@ -3,13 +3,21 @@
 #
 # THE PROPERTY, stated positively:
 #
-#   A deletion whose RESOLVED TARGET is inside a git working tree needs a
-#   human; a deletion anywhere else does not.
+#   A deletion that would remove any part of any git working tree needs a
+#   human; a deletion that would not does not.
+#
+# "Any part" runs in both directions, and the second one is not decoration:
+# asking only whether the target is INSIDE a tree denies `rm README.md` and
+# allows `rm -rf <the directory every checkout lives in>`, because that
+# directory is not itself a tree. So the target is judged upwards (is it in
+# a tree?) and, when it is a directory outside every tree, downwards (does
+# it hold one?).
 #
 # That is a statement about where the bytes live, not about how the command
 # was spelled. This hook computes it: it extracts every `rm` invocation from
 # the command, resolves each operand to an absolute physical path, and asks
-# git one question per target.
+# git one question per target -- plus one bounded search per directory that
+# survives it.
 #
 # WHY THIS REPLACES A PREFIX-MATCH ALLOW LIST (refs #290)
 #
@@ -40,7 +48,15 @@
 #   are DATA and are skipped whole), and `#` comments. Each simple command's
 #   command word decides what happens:
 #     - `rm` (or any `*/rm`)      -> its operands are checked, one by one;
-#     - `bash`/`sh` with `-c`     -> the payload is re-analysed, depth <= 2;
+#     - `bash`/`sh` with `-c`     -> the payload is re-analysed, depth <= 2.
+#                                    The bundle is read character by
+#                                    character, because bash runs the
+#                                    payload of `-cx` exactly as it runs
+#                                    `-xc`; every other character in it
+#                                    must be an option that takes no
+#                                    argument of its own, or the guard
+#                                    cannot say which word IS the payload
+#                                    (`-o errexit -c ...`) and denies;
 #     - `git`                     -> skipped, see OUT OF SCOPE below;
 #     - `cd`                      -> moves the effective cwd for the simple
 #                                    commands after it, because
@@ -59,12 +75,24 @@
 #   NOT PARSED, and therefore DENIED when the command mentions `rm` at all:
 #   command substitution `$(...)` and backticks, subshells `( ... )`,
 #   arithmetic expansion, `${VAR:-default}` and every other parameter
-#   expansion form, positional / special parameters (`$1`, `$@`, `$?`),
-#   glob and brace expansion in an operand, `~user`, and an unterminated
-#   quote. An unparsed command is an unknown target, and the default on
-#   unrecognised input is the whole point of this change.
+#   expansion form, positional / special parameters (`$1`, `$@`, `$?`, `$$`,
+#   `$#`, `$*`, `$!`, `$-`), glob and brace expansion in an operand,
+#   `~user`, and an unterminated quote. An unparsed command is an unknown
+#   target, and the default on unrecognised input is the whole point of this
+#   change. "Denied" here means a verdict the parser reached and can name:
+#   the special parameters used to be classified by a `case` pattern that
+#   CONTAINED `$!`, and a pattern is expanded before it is matched, so under
+#   set -u the hook aborted on them instead of deciding about them.
 #
-# VARIABLE RESOLUTION. Assignments that appear earlier in the same command
+# VARIABLE RESOLUTION. An UNQUOTED expansion is not one word: the shell
+#   splits the value on IFS and then expands globs in the pieces, so a value
+#   carrying whitespace or a glob character is refused outright rather than
+#   read as a path. (Reading it as a path is how `X="<scratch>/junk
+#   <repo>/README.md"; rm -rf $X` came back ALLOW while bash deleted a
+#   tracked file.) Inside double quotes the value is exactly one word and is
+#   used as it stands.
+#
+#   Assignments that appear earlier in the same command
 #   (`VAR=...`, and `export`/`declare`/`typeset`/`local`/`readonly`
 #   prefixes) are applied, then the environment the hook itself receives. A
 #   variable that neither supplies is an unknown target: DENY. A `bash -c`
@@ -82,15 +110,27 @@
 #   at -- so a link in /tmp that aims at a repo is judged where the link
 #   lives.
 #
-# THE QUESTION. `git -C <dir> rev-parse --show-toplevel`, where <dir> is the
-#   target itself when the target is an existing real directory (so
-#   `rm -rf <repo>` is judged inside the tree it would delete) and the
+# THE QUESTION, UPWARDS. `git -C <dir> rev-parse --show-toplevel`, where
+#   <dir> is the target itself when the target is an existing real directory
+#   (so `rm -rf <repo>` is judged inside the tree it would delete) and the
 #   target's parent otherwise. For a path that does not exist, the nearest
 #   EXISTING ancestor decides. `-c safe.directory='*'` is passed so a
 #   host-owned checkout inspected from a container answers "yes, a repo"
 #   instead of failing with dubious ownership and being read as "no".
 #   git failing for any reason other than "not a git repository" is an
 #   unknown answer: DENY.
+#
+# THE QUESTION, DOWNWARDS. When the target is an existing directory that
+#   sits outside every tree, it is searched breadth-first for a `.git` under
+#   it, and a hit DENIES. Breadth-first because the case that makes this
+#   urgent is shallow -- a workspace directory holding a dozen checkouts is
+#   answered in the first few directories examined. The search does not
+#   cross a symlink, since rm -rf does not delete through one, which is also
+#   what keeps it finite. It is bounded by RMG_SCAN_MAX_DIRS directories and
+#   RMG_SCAN_SECONDS seconds, and exceeding either -- or meeting a directory
+#   that cannot be read -- is an unanswered question: DENY. Both budgets sit
+#   far below the hook timeout, because a hook killed for running long emits
+#   nothing at all, and a hook that emits nothing is read as consent.
 #
 # FLAGS AND SEPARATORS. `--` ends options. A word starting with `-` before
 #   `--` is a flag. A bare `-` is a filename, as it is for rm itself.
@@ -113,14 +153,29 @@
 #     this workspace. The cheap-to-compute question ("is it in the tree?")
 #     is also the one that matches the risk; adding `git check-ignore` would
 #     spend a second git call to reach a WEAKER answer.
-#   - A target outside every git working tree, including a system path:
-#     ALLOWED (only the filesystem root itself is refused). This hook owns
-#     the "is it somebody's source tree?" question and nothing else. What
-#     stops `rm -rf /etc` is the Bash sandbox's `filesystem.allowWrite`
-#     list, which `rm` is not excluded from -- the old blanket ask rule was
-#     not that guard either, since it allowed `rm -rf /tmp/../etc` outright.
+#   - A target outside every git working tree that holds no working tree
+#     either, including a system path: ALLOWED (the filesystem root itself
+#     is refused, by any spelling -- `/tmp/..` resolves to it). This hook
+#     owns the "would this destroy somebody's source tree?" question and
+#     nothing else. What stops `rm -rf /etc` is the Bash sandbox's
+#     `filesystem.allowWrite` list, which `rm` is not excluded from -- the
+#     old blanket ask rule was not that guard either, since it allowed
+#     `rm -rf /tmp/../etc` outright.
+#   - A scratch directory that HOLDS a clone: DENIED, by the downwards
+#     question. This is the cost of that question and it is a real one --
+#     `rm -rf /tmp/<parent of a throwaway clone>` used to pass. A throwaway
+#     clone is still a working tree, and this guard's whole claim is that
+#     removing one needs a human: delete it with `trash-put`
+#     (`/safe-delete`), which is recoverable and out of scope here, or run
+#     the rm yourself. Deleting the clone directly was already denied
+#     before this rule existed, since a clone is a tree.
+#   - A directory too large or too slow to search within the budget:
+#     DENIED, not allowed. The budget bounds the COST of the answer, never
+#     which answer is given when it runs out.
 #   - A command longer than RMG_MAX_COMMAND bytes: DENIED unparsed. The
 #     lexer is O(n^2) in bash and the hook has a 10s budget.
+#   - The hook failing to run at all: DENIED, by the trap below. See THE
+#     PROCESS-LEVEL DEFAULT.
 #
 # COST, stated so it is not a surprise: an unquoted `rm` word in a command
 # this hook does not model is denied even when it is inert -- `echo rm`,

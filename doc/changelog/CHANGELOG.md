@@ -39,9 +39,30 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   gone with the ask rule: it allowed exactly what the new property denies
   (rm anywhere under the workspace checkout), and two mechanisms
   disagreeing about one question is the state this change exists to end.
+  The property is asked in BOTH directions: a target inside a working tree
+  denies, and so does a directory that is not one but CONTAINS one, found
+  by a breadth-first search bounded by a directory count and a wall-clock
+  budget (exceeding either denies -- the budget bounds the cost of the
+  answer, never which answer is given when it runs out). Without the second
+  direction the guard denied `rm README.md` and allowed
+  `rm -rf <the directory every checkout lives in>`, which under the ask
+  rule this change removes had gone to a human. The cost is stated beside
+  the code: `rm -rf <a scratch directory holding a throwaway clone>` now
+  denies, and the recoverable way out is `trash-put` (`/safe-delete`).
+  Finally, the guard's own failure is a deny: a trap armed before any
+  parsing emits a deny verdict unless one was already emitted, because a
+  hook that dies emits nothing, and a hook that emits nothing is read
+  downstream as consent -- the same fail-open default this change exists to
+  remove, one level up. Three spec stanzas kill a copy of the hook (unbound
+  variable, exit, signal) and assert the deny still arrives.
   The machine-local `settings.local.json` still carries the 480 dead allow
-  rules; that file is untracked, so removing them is a local step, spelled
-  out in the PR body.
+  rules. That file is untracked and mode 444, so removing them is a local
+  step for its owner, and it must happen for the "both come out" half of
+  #290 to be true:
+  `jq '.permissions.allow |= map(select(startswith("Bash(rm ") | not))'
+  .claude/settings.local.json > /tmp/pruned.json` and move it into place.
+  Until then the leftovers are inert -- a PreToolUse deny outranks an allow
+  rule -- but they are still 480 rules describing a property nothing reads.
 - **the hooks stopped knowing about `make` and `justfile.ci` (closes #280).**
   The make -> just migration finished a while ago: no repo root in the
   workspace carries a `Makefile.ci` or a `justfile.ci`, and every repo has a
