@@ -254,3 +254,56 @@ assert_reason_contains() {
   run "${HOOK}" <<< '{"tool_input":{}}'
   assert_silent
 }
+
+# --- the process-level default --------------------------------------------
+#
+# A hook that emits nothing is read as "this guard had nothing to say", and
+# the deletion proceeds. So "the guard crashed" and "the guard approved" are
+# the same event to everything downstream, and the guard's default on a
+# process it did not survive must be the same as its default on input it did
+# not recognise: refuse. The stanzas below kill the hook three different ways
+# and assert a deny still reaches stdout.
+#
+# They mutate a COPY: the claim is not "this particular line cannot fail", it
+# is "whatever kills this hook, the deletion is still refused", and only a
+# crash the code does not know about can prove that.
+
+# crash_mutant <injected code> -- path to a copy of the hook with <injected
+# code> spliced into the top of rmg_tokenize(), i.e. after the hook has read
+# its input and before it can reach any verdict.
+crash_mutant() {
+  local mutant="${RMG_BASE}/crash-mutant.sh"
+  sed "s|^rmg_tokenize() {\$|rmg_tokenize() { $1|" "${HOOK}" > "${mutant}"
+  chmod +x "${mutant}"
+  if cmp -s "${HOOK}" "${mutant}"; then
+    echo "crash_mutant: injection anchor 'rmg_tokenize() {' not found" >&2
+    return 1
+  fi
+  printf '%s\n' "${mutant}"
+}
+
+@test "denies when the guard dies on an unbound variable" {
+  HOOK="$(crash_mutant ': "${RMG_DELIBERATE_CRASH_290}";')"
+  fire "rm -rf ${SCRATCH}/x"
+  assert_permission_decision "deny"
+  assert_reason_contains "before it reached a verdict"
+}
+
+@test "denies when the guard exits mid-parse" {
+  HOOK="$(crash_mutant 'exit 3;')"
+  fire "rm -rf ${SCRATCH}/x"
+  assert_permission_decision "deny"
+  assert_reason_contains "before it reached a verdict"
+}
+
+@test "denies when the guard is terminated by a signal" {
+  HOOK="$(crash_mutant 'kill -TERM $$;')"
+  fire "rm -rf ${SCRATCH}/x"
+  assert_permission_decision "deny"
+  assert_reason_contains "before it reached a verdict"
+}
+
+@test "still says nothing when a command carries no rm at all" {
+  fire 'ls -la /tmp'
+  assert_silent
+}
