@@ -617,3 +617,234 @@ crash_mutant() {
       '{cwd: $d, tool_input: {command: $c}}')"
   assert_permission_decision "allow"
 }
+
+# --- WHERE THE GUARD ACTUALLY IS (refs #290, round 4) ---------------------
+#
+# Three review rounds proved that no parser over a command STRING can decide
+# what a shell will delete: a heredoc fed to a shell, a here-string fed to a
+# shell, `bash -c --`, `builtin cd` and `r"m"` each walked past a guard that
+# had just been widened for the previous five. Bash's shapes are not finite,
+# so the parser cannot be the guard.
+#
+# What can: `permissions.ask: Bash(rm:*)`, which is the human this property
+# has always been asking for. Once that rule is back, this hook's SILENCE
+# means "a human sees it" instead of "the deletion proceeds", and every way
+# the hook can fail -- an unparsed construct, a missing jq, a crash, a
+# timeout -- lands on the same safe default without a branch of its own.
+#
+# The stanzas below pin that inversion. They are the reason the hook may
+# emit exactly two things and never a third.
+
+@test "settings.json asks a human for every rm, which is what silence means" {
+  run jq -r '.permissions.ask[]?' "${PROJECT_ROOT}/.claude/settings.json"
+  assert_success
+  assert_line "Bash(rm:*)"
+}
+
+@test "an in-tree target is handed to a human, not refused outright" {
+  fire "rm -rf ${REPO}/dist"
+  assert_permission_decision "ask"
+}
+
+@test "the hook never emits deny, whatever it is asked" {
+  local c
+  for c in "rm -rf ${REPO}/dist" \
+           "rm -rf \$1" \
+           "rm -rf ${SCRATCH}/*" \
+           "xargs rm -rf ${SCRATCH}/x" \
+           "rm -rf \$(echo x)"; do
+    fire "${c}"
+    if [[ "${output}" == *'"deny"'* ]]; then
+      echo "hook denied '${c}'; deny is the permission system's to give, not this hook's" >&2
+      return 1
+    fi
+  done
+}
+
+@test "a crash leaves no verdict at all, so the ask rule decides" {
+  HOOK="$(crash_mutant ': "${RMG_DELIBERATE_CRASH_290}";')"
+  fire "rm -rf ${SCRATCH}/x"
+  assert_silent
+}
+
+@test "an exit mid-parse leaves no verdict at all" {
+  HOOK="$(crash_mutant 'exit 3;')"
+  fire "rm -rf ${SCRATCH}/x"
+  assert_silent
+}
+
+@test "a signal leaves no verdict at all" {
+  HOOK="$(crash_mutant 'kill -TERM $$;')"
+  fire "rm -rf ${SCRATCH}/x"
+  assert_silent
+}
+
+@test "a missing jq cannot turn the hook into an allow" {
+  local stub="${RMG_BASE}/nojq"
+  mkdir -p "${stub}"
+  printf '#!/bin/sh\nexit 127\n' > "${stub}/jq"
+  chmod +x "${stub}/jq"
+  local json
+  json="$(jq -nc --arg c "rm -rf ${SCRATCH}/x" --arg d /tmp \
+    '{cwd: $d, tool_input: {command: $c}}')"
+  PATH="${stub}:${PATH}" run --separate-stderr "${HOOK}" <<< "${json}"
+  if [[ "${output}" == *'"allow"'* ]]; then
+    echo "hook allowed a deletion while jq was unavailable: ${output}" >&2
+    return 1
+  fi
+}
+
+# --- the five bypasses, dead by construction ------------------------------
+#
+# Round 3 proved each of these by deleting a tracked file out of a real git
+# working tree, and each was one shell shape further out than the shape the
+# previous round had just modelled. They are not fixed here by five more
+# branches. They are fixed by three rules that cannot be spelled around:
+#
+#   1. text the lexer discards as DATA is still text a shell may execute, so
+#      an `rm` token in a heredoc body or a here-string word makes the whole
+#      command un-allowable;
+#   2. a word this guard cannot PLACE is never analysed as if it could be --
+#      `bash -c --` says so instead of reading the `--`;
+#   3. a simple command this guard does not model may have moved the shell,
+#      so it blanks the tracked cwd and every later relative operand is
+#      unknown.
+#
+# And the gate in front of them reads quoting as the shell does, so a command
+# word spelled `r"m"` reaches the lexer instead of never waking the hook.
+
+@test "an rm in a heredoc body is not data when the reader is a shell" {
+  fire "$(printf 'rm -rf %s/a; bash <<EOF\nrm -rf %s/src\nEOF\n' \
+    "${SCRATCH}" "${REPO}")"
+  assert_permission_decision "ask"
+  assert_reason_contains "heredoc body"
+}
+
+@test "an rm in a here-string is not data when the reader is a shell" {
+  fire "sh <<< 'rm -rf ${REPO}/src'"
+  assert_permission_decision "ask"
+  assert_reason_contains "here-string"
+}
+
+@test "bash -c -- runs the word after the dash-dash, which this guard will not guess" {
+  fire "bash -c -- 'rm -rf ${REPO}/src'"
+  assert_permission_decision "ask"
+  assert_reason_contains "does not model"
+}
+
+@test "builtin cd may have moved the shell, so a later relative operand is unknown" {
+  fire "builtin cd ${REPO} && rm -rf src" /tmp
+  assert_permission_decision "ask"
+  assert_reason_contains "may have moved the shell"
+}
+
+@test "command cd is caught by the same rule, without naming it" {
+  fire "command cd ${REPO} && rm -rf src" /tmp
+  assert_permission_decision "ask"
+  assert_reason_contains "may have moved the shell"
+}
+
+@test "any unmodelled command between a cd and an rm costs the tracked cwd" {
+  fire "cd ${REPO} && ls && rm -rf dist" /tmp
+  assert_permission_decision "ask"
+  assert_reason_contains "may have moved the shell"
+}
+
+@test "a cd straight to an rm still resolves, so the rule is not a blanket" {
+  fire "cd ${SCRATCH} && rm -rf junk" /tmp
+  assert_permission_decision "allow"
+}
+
+@test "a command word spelled r\"m\" is still an rm" {
+  fire "r\"m\" -rf ${REPO}/src"
+  assert_permission_decision "ask"
+  assert_reason_contains "inside the git working tree"
+}
+
+@test "a command word spelled r'm' is still an rm" {
+  fire "r'm' -rf ${REPO}/src"
+  assert_permission_decision "ask"
+  assert_reason_contains "inside the git working tree"
+}
+
+@test "a command word split by a backslash is still an rm" {
+  fire "r\\m -rf ${REPO}/src"
+  assert_permission_decision "ask"
+  assert_reason_contains "inside the git working tree"
+}
+
+@test "an absolute path to rm is read as rm, not as an unknown command" {
+  fire "/bin/rm -rf ${REPO}/src"
+  assert_permission_decision "ask"
+  assert_reason_contains "inside the git working tree"
+}
+
+# --- an assignment PREFIX is not this command's own variable ---------------
+
+@test "an assignment prefix does not feed the expansions of its own command" {
+  fire "X=${SCRATCH} rm -rf \$X/y"
+  assert_permission_decision "ask"
+  assert_reason_contains "set neither in the command nor in the environment"
+}
+
+@test "a standalone assignment before the rm still feeds it" {
+  fire "X=${SCRATCH}; rm -rf \$X/y"
+  assert_permission_decision "allow"
+}
+
+@test "an exported standalone assignment still feeds it" {
+  fire "export X=${SCRATCH}; rm -rf \"\$X/y\""
+  assert_permission_decision "allow"
+}
+
+# --- git carries shells too ------------------------------------------------
+#
+# `git` used to be skipped whole, on the grounds that `git rm` stages a
+# deletion git can restore. That reasoning covers subcommands that delete
+# THROUGH git and not subcommands that run a shell, and the second kind was
+# invisible. The cost of dropping the special case is a prompt on `git rm`
+# and on a git command that merely says `rm`; the benefit is that the ones
+# below are seen at all.
+
+@test "git submodule foreach carrying an rm reaches a human" {
+  fire "git submodule foreach 'rm -rf ${REPO}/src'"
+  assert_permission_decision "ask"
+}
+
+@test "git bisect run carrying an rm reaches a human" {
+  fire "git bisect run rm -rf ${REPO}/src"
+  assert_permission_decision "ask"
+}
+
+@test "git rebase -x carrying an rm reaches a human" {
+  fire "git rebase -x 'rm -rf ${REPO}/src' main"
+  assert_permission_decision "ask"
+}
+
+# --- the containment budget bounds the INVOCATION -------------------------
+#
+# A per-operand budget is not a bound: sixty directory operands each paying a
+# full one outlive the 10s hook timeout, and a hook killed for running long
+# emits nothing at all. These two stanzas differ only in operand count, so
+# the budget they share is the thing under test.
+
+@test "one operand inside the shared budget is answered and allowed" {
+  local a="${SCRATCH}/many-a" i
+  mkdir -p "${a}"
+  for i in 1 2 3 4; do mkdir -p "${a}/d${i}"; done
+  export RMG_SCAN_MAX_DIRS=6
+  fire "rm -rf ${a}"
+  unset RMG_SCAN_MAX_DIRS
+  assert_permission_decision "allow"
+}
+
+@test "two operands that each fit the budget do not both fit it" {
+  local a="${SCRATCH}/many-a" b="${SCRATCH}/many-b" i
+  mkdir -p "${a}" "${b}"
+  for i in 1 2 3 4; do mkdir -p "${a}/d${i}" "${b}/d${i}"; done
+  export RMG_SCAN_MAX_DIRS=6
+  fire "rm -rf ${a} ${b}"
+  unset RMG_SCAN_MAX_DIRS
+  assert_permission_decision "ask"
+  assert_reason_contains "could not finish searching"
+}

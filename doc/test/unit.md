@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1216 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1242 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -19,7 +19,7 @@ stdin and asserts one of three behaviours:
 - **SILENT** — exits 0 with no stdout (no action taken). Use
   `assert_silent`.
 
-### .claude/test/bats/unit/enforce_rm_outside_git_tree_spec.bats (74)
+### .claude/test/bats/unit/enforce_rm_outside_git_tree_spec.bats (100)
 
 | Test | Scenario |
 |------|----------|
@@ -97,6 +97,32 @@ stdin and asserts one of three behaviours:
 | stays silent on an rm inside a heredoc body, which is data | - |
 | stays silent on git, which is out of scope whatever it mentions | - |
 | falls back to the default budget when the environment sets nonsense | - |
+| settings.json asks a human for every rm, which is what silence means | - |
+| an in-tree target is handed to a human, not refused outright | - |
+| the hook never emits deny, whatever it is asked | - |
+| a crash leaves no verdict at all, so the ask rule decides | - |
+| an exit mid-parse leaves no verdict at all | - |
+| a signal leaves no verdict at all | - |
+| a missing jq cannot turn the hook into an allow | - |
+| an rm in a heredoc body is not data when the reader is a shell | - |
+| an rm in a here-string is not data when the reader is a shell | - |
+| bash -c -- runs the word after the dash-dash, which this guard will not guess | - |
+| builtin cd may have moved the shell, so a later relative operand is unknown | - |
+| command cd is caught by the same rule, without naming it | - |
+| any unmodelled command between a cd and an rm costs the tracked cwd | - |
+| a cd straight to an rm still resolves, so the rule is not a blanket | - |
+| a command word spelled r"m" is still an rm | - |
+| a command word spelled r'm' is still an rm | - |
+| a command word split by a backslash is still an rm | - |
+| an absolute path to rm is read as rm, not as an unknown command | - |
+| an assignment prefix does not feed the expansions of its own command | - |
+| a standalone assignment before the rm still feeds it | - |
+| an exported standalone assignment still feeds it | - |
+| git submodule foreach carrying an rm reaches a human | - |
+| git bisect run carrying an rm reaches a human | - |
+| git rebase -x carrying an rm reaches a human | - |
+| one operand inside the shared budget is answered and allowed | - |
+| two operands that each fit the budget do not both fit it | - |
 
 ### .claude/test/bats/unit/auto_allow_touch_ack_spec.bats (22)
 | Test | Scenario |
