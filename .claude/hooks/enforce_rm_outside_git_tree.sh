@@ -64,14 +64,17 @@
 #                                    <repo>; a `cd` whose destination is not
 #                                    knowable blanks the cwd instead, so
 #                                    every later relative operand denies;
-#     - anything else             -> if an unquoted literal `rm` token
-#                                    appears among its words, DENY: that is
-#                                    `xargs rm`, `sudo rm`, `find -exec rm`
-#                                    and every wrapper nobody has written
-#                                    down yet, and we cannot tell an
-#                                    executing position from an inert one
-#                                    without knowing the wrapper's
-#                                    semantics.
+#     - anything else             -> if ANY of its words mentions an `rm`
+#                                    token, quoted or not, DENY: that is
+#                                    `xargs rm`, `sudo rm`, `find -exec rm`,
+#                                    `env bash -c 'rm ...'` and every
+#                                    wrapper nobody has written down yet.
+#                                    Quoting does not lift it, because
+#                                    quoting is how the wrapper cases hid --
+#                                    telling an executing word from an inert
+#                                    one needs each wrapper's semantics, and
+#                                    enumerating wrappers is the mechanism
+#                                    this hook replaces.
 #   NOT PARSED, and therefore DENIED when the command mentions `rm` at all:
 #   command substitution `$(...)` and backticks, subshells `( ... )`,
 #   arithmetic expansion, `${VAR:-default}` and every other parameter
@@ -177,10 +180,13 @@
 #   - The hook failing to run at all: DENIED, by the trap below. See THE
 #     PROCESS-LEVEL DEFAULT.
 #
-# COST, stated so it is not a surprise: an unquoted `rm` word in a command
-# this hook does not model is denied even when it is inert -- `echo rm`,
-# `grep rm file`. Quoting it (`grep 'rm' file`) is the fix, and the deny
-# message says so.
+# COST, stated so it is not a surprise: an `rm` token in a command this hook
+# does not model is denied even when it is inert -- `echo rm`,
+# `grep 'rm' file`, `sed 's/rm -rf/trash-put/' f`. Quoting does not lift it.
+# What does: a heredoc body, which this hook skips as data; a file instead of
+# an inline string; or running the command yourself. `--rm` is not an rm
+# token and `docker run --rm` is silent, as is any word with the letters
+# inside it (`confirm-rm-helper`).
 #
 # Refs: #290 (this hook), #287 / #288 (same defect class, same batch).
 
@@ -254,8 +260,19 @@ readonly RMG_SH_NOARG_FLAGS='abBeEfhHiklmnprtTuvxC'
 # and no value makes an unsearched directory read as ALLOW. The defaults sit
 # far below the hook timeout on purpose, because a hook that is killed for
 # running long emits nothing at all.
-readonly RMG_SCAN_MAX_DIRS="${RMG_SCAN_MAX_DIRS:-2000}"
-readonly RMG_SCAN_SECONDS="${RMG_SCAN_SECONDS:-3}"
+# Validated and clamped rather than trusted: a value that is not a number
+# would abort the arithmetic that uses it, and an enormous one would let the
+# search outlive the hook timeout -- and a hook killed for running long emits
+# nothing, which is the one outcome no verdict can be recovered from.
+RMG_SCAN_MAX_DIRS="${RMG_SCAN_MAX_DIRS:-2000}"
+[[ "${RMG_SCAN_MAX_DIRS}" =~ ^[0-9]+$ ]] || RMG_SCAN_MAX_DIRS=2000
+(( RMG_SCAN_MAX_DIRS > 20000 )) && RMG_SCAN_MAX_DIRS=20000
+readonly RMG_SCAN_MAX_DIRS
+
+RMG_SCAN_SECONDS="${RMG_SCAN_SECONDS:-3}"
+[[ "${RMG_SCAN_SECONDS}" =~ ^[0-9]+$ ]] || RMG_SCAN_SECONDS=3
+(( RMG_SCAN_SECONDS > 5 )) && RMG_SCAN_SECONDS=5
+readonly RMG_SCAN_SECONDS
 
 readonly RMG_SH_NOARG_LONG=' --login --noprofile --norc --posix --restricted --verbose --debugger --dump-strings --dump-po-strings --noediting --nolineediting --help --version '
 
@@ -732,6 +749,7 @@ rmg_in_git_tree() {
 rmg_contains_git_tree() {
   local root="$1"
   local -a queue=("${root}")
+  RMG_FOUND_TREE=''
   local head=0 dir entry examined=0 started="${SECONDS}" rc=1
   local had_nullglob=0 had_dotglob=0
   shopt -q nullglob && had_nullglob=1
@@ -892,13 +910,27 @@ rmg_check_rm() {
   return 1
 }
 
-# rmg_loose_rm <token index...> -- 2 when an unquoted literal `rm` appears
-# among words this hook cannot place, 0 otherwise.
-rmg_loose_rm() {
+# rmg_unmodelled_rm <command word> <token index...> -- 2 when any word of a
+# command this hook cannot place mentions an `rm` token, 0 otherwise.
+#
+# The test is on the TOKEN, not on the quoting. The older rule -- an
+# UNQUOTED word equal to `rm` -- reads as a rule about invocations and is
+# really a rule about quoting: it denied `xargs rm -rf` and let
+# `xargs -I{} sh -c 'rm -rf <repo>'` through silently, one quote further in.
+# Telling an executing word from an inert one needs each wrapper's
+# semantics, and enumerating wrappers is the mechanism this hook replaces.
+#
+# The cost is that an inert mention is refused too -- `echo 'rm -rf x'`,
+# `grep rm file` -- and quoting no longer lifts it, because quoting is how
+# the wrapper cases hid. A heredoc body is still data and still exempt, and
+# `git` never reaches here.
+rmg_unmodelled_rm() {
+  local cmdword="$1"
+  shift
   local t
   for t in "$@"; do
-    if [[ "${RMG_TOK_VAL[t]}" == "rm" && "${RMG_TOK_Q[t]}" == 0 ]]; then
-      RMG_REASON="'rm' appears as an argument to another command, an invocation form this guard does not model (xargs / sudo / find -exec / a wrapper), so its targets are unknown. If the word is inert, quote it"
+    if rmg_mentions_rm "${RMG_TOK_VAL[t]}"; then
+      RMG_REASON="'${cmdword}' is a command this guard does not model and one of its words mentions 'rm', so what it would delete is unknown. If it really deletes nothing, run it yourself; if it deletes, run the rm as its own command so the target can be resolved"
       return 2
     fi
   done
@@ -1017,11 +1049,11 @@ rmg_simple_command() {
           ;;
         2) return 2 ;;
       esac
-      rmg_loose_rm "${idx[@]:k+1}" || return 2
+      rmg_unmodelled_rm "${cmdword}" "${idx[@]:k+1}" || return 2
       return 0
       ;;
     *)
-      rmg_loose_rm "${idx[@]:k+1}" || return 2
+      rmg_unmodelled_rm "${cmdword}" "${idx[@]:k+1}" || return 2
       return 0
       ;;
   esac
