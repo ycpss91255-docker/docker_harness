@@ -306,13 +306,22 @@ rmg_read_dollar() {
       rmg_expand_var "${name}"
       RMG_NEXT=${k}
       ;;
-    [0-9@*?$!#-])
-      RMG_WBAD="\$${c} is a special parameter this guard does not model"
-      RMG_NEXT=$((j + 1))
-      ;;
     *)
-      RMG_W+='$'
-      RMG_NEXT=${j}
+      # The special parameters, tested one literal at a time rather than as
+      # a bracket expression: a `case` pattern is expanded before it is
+      # matched, and a pattern containing $! aborts this hook under set -u
+      # in any shell that never backgrounded a job -- which is every shell
+      # this hook runs in. The quoting on each right-hand side below is what
+      # keeps these literals literal.
+      if [[ "${c}" == [0-9] || "${c}" == '@' || "${c}" == '*' \
+         || "${c}" == '?' || "${c}" == '$' || "${c}" == '!' \
+         || "${c}" == '#' || "${c}" == '-' ]]; then
+        RMG_WBAD="\$${c} is a special parameter this guard does not model"
+        RMG_NEXT=$((j + 1))
+      else
+        RMG_W+='$'
+        RMG_NEXT=${j}
+      fi
       ;;
   esac
   return 0
