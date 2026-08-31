@@ -255,32 +255,60 @@ rmg_push_sep() {
   RMG_ASSIGN_CTX=1
 }
 
-# rmg_expand_var <name> -- append <name>'s value to the in-progress word,
-# preferring an assignment seen earlier in this command over the hook's own
-# environment. Neither -> the word is unresolvable.
+# rmg_value_splits_or_globs <value> -- 0 when the shell would turn <value>,
+# expanded UNQUOTED, into something other than the one word it reads as:
+# whitespace makes it several operands, and a glob character makes it however
+# many paths happen to exist when the command runs. `{` and `}` are refused
+# with them although brace expansion happens BEFORE parameter expansion and
+# so cannot fire here -- the cost of that is a deny on a value nobody deletes
+# by that name, and the alternative is a reader having to know that ordering
+# to check the code.
+rmg_value_splits_or_globs() {
+  local v="$1"
+  [[ "${v}" == *" "* || "${v}" == *$'\t'* || "${v}" == *$'\n'* ]] && return 0
+  [[ "${v}" == *'*'* || "${v}" == *'?'* || "${v}" == *'['* || "${v}" == *']'* \
+     || "${v}" == *'{'* || "${v}" == *'}'* ]] && return 0
+  return 1
+}
+
+# rmg_expand_var <name> <quoted> -- append <name>'s value to the in-progress
+# word, preferring an assignment seen earlier in this command over the hook's
+# own environment. Neither -> the word is unresolvable.
+#
+# <quoted> is 1 inside double quotes, where the value is exactly one word,
+# and 0 outside them, where the shell splits and globs it afterwards. The
+# distinction is the whole reason the parameter exists: reading an unquoted
+# value as one path is how a variable holding two paths -- one of them inside
+# a working tree -- resolved to one path outside every tree and came back
+# ALLOW.
 rmg_expand_var() {
-  local name="$1"
+  local name="$1" quoted="$2" value
   if [[ -n "${RMG_VARS[${name}]+set}" ]]; then
     if [[ -n "${RMG_VARS_BAD[${name}]+set}" ]]; then
       RMG_WBAD="\$${name} was assigned a value this guard cannot resolve"
-    else
-      RMG_W+="${RMG_VARS[${name}]}"
+      return 0
     fi
+    value="${RMG_VARS[${name}]}"
+  elif [[ -v "${name}" ]]; then
+    value="${!name}"
+  else
+    RMG_WBAD="\$${name} is set neither in the command nor in the environment"
     return 0
   fi
-  if [[ -v "${name}" ]]; then
-    RMG_W+="${!name}"
+  if (( ! quoted )) && rmg_value_splits_or_globs "${value}"; then
+    RMG_WBAD="\$${name} is unquoted and expands to '${value}', which the shell would split or glob into words this guard cannot know before it runs (quoting it makes it one path)"
     return 0
   fi
-  RMG_WBAD="\$${name} is set neither in the command nor in the environment"
+  RMG_W+="${value}"
 }
 
-# rmg_read_dollar <string> <index> -- consume the `$...` expansion at
-# <index>, appending to the in-progress word. Sets RMG_NEXT to the index
-# just past it. Returns 1 for command / arithmetic substitution, which the
-# caller turns into a whole-command parse failure.
+# rmg_read_dollar <string> <index> <quoted> -- consume the `$...` expansion
+# at <index>, appending to the in-progress word. <quoted> is 1 when the
+# expansion sits inside double quotes. Sets RMG_NEXT to the index just past
+# it. Returns 1 for command / arithmetic substitution, which the caller turns
+# into a whole-command parse failure.
 rmg_read_dollar() {
-  local s="$1" i="$2"
+  local s="$1" i="$2" quoted="$3"
   local n=${#s}
   local j=$((i + 1))
   local c="${s:j:1}"
@@ -302,7 +330,7 @@ rmg_read_dollar() {
       done
       (( k >= n )) && return 1
       if [[ "${body}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
-        rmg_expand_var "${body}"
+        rmg_expand_var "${body}" "${quoted}"
       else
         RMG_WBAD="\${${body}} is a parameter expansion form this guard does not model"
       fi
@@ -315,7 +343,7 @@ rmg_read_dollar() {
         name+="${s:k:1}"
         (( k++ ))
       done
-      rmg_expand_var "${name}"
+      rmg_expand_var "${name}" "${quoted}"
       RMG_NEXT=${k}
       ;;
     *)
@@ -426,7 +454,7 @@ rmg_tokenize() {
           esac
           ;;
         '$')
-          rmg_read_dollar "${s}" "${i}" || return 1
+          rmg_read_dollar "${s}" "${i}" 1 || return 1
           i="${RMG_NEXT}"
           ;;
         *) RMG_W+="${c}"; (( i++ )) ;;
@@ -451,7 +479,7 @@ rmg_tokenize() {
         ;;
       '$')
         RMG_WOPEN=1
-        rmg_read_dollar "${s}" "${i}" || return 1
+        rmg_read_dollar "${s}" "${i}" 0 || return 1
         i="${RMG_NEXT}"
         ;;
       ' '|$'\t') rmg_end_word; (( i++ )) ;;
