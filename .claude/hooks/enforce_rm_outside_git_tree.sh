@@ -583,44 +583,85 @@ rmg_tokenize() {
 # Target resolution
 # --------------------------------------------------------------------------
 
-# rmg_nearest_existing_dir <path> -- print the physical directory that
-# decides for <path>: <path> itself when it exists, else its nearest
-# existing ancestor. Returns 1 when something exists there but cannot be
-# entered (a file where a directory must be, an unsearchable directory),
-# because that is an unknown target rather than an absent one.
-rmg_nearest_existing_dir() {
-  local d="$1" out
+# rmg_resolve_target <absolute path> -- resolve <path> physically, as far as
+# it exists, and name the directory whose repository decides for it. Returns
+# 1 when neither is knowable. Sets:
+#
+#   RMG_PHYS    the target with `..` collapsed and symlinks in its parent
+#               chain followed -- what the message should print, since the
+#               spelling is the half the reader already has;
+#   RMG_ANCHOR  the existing directory git is asked about: the target itself
+#               when it is one, otherwise the target's parent, otherwise the
+#               nearest existing ancestor;
+#   RMG_IS_DIR  1 when the target IS that directory, which is the only case
+#               with anything underneath it to lose.
+rmg_resolve_target() {
+  local p="$1" suffix='' base dir out
+  RMG_PHYS=''
+  RMG_ANCHOR=''
+  RMG_IS_DIR=0
   while :; do
-    if [[ -e "${d}" ]]; then
-      out="$(cd -P -- "${d}" 2>/dev/null && pwd -P)" || return 1
+    # A symlink AS THE TARGET is judged where the link lives: rm removes the
+    # link, not what it points at. A symlink in the parent chain is followed,
+    # because rm deletes through it.
+    if [[ -L "${p}" && -z "${suffix}" ]] || { [[ -e "${p}" && ! -d "${p}" ]]; }; then
+      # Not something to enter. As the target, its parent decides; as an
+      # ancestor, the path cannot resolve at all (rm gets ENOTDIR).
+      [[ -n "${suffix}" ]] && return 1
+      base="${p##*/}"
+      dir="${p%/*}"
+      [[ -z "${dir}" ]] && dir="/"
+      out="$(cd -P -- "${dir}" 2>/dev/null && pwd -P)" || return 1
       [[ -z "${out}" ]] && return 1
-      printf '%s\n' "${out}"
+      RMG_ANCHOR="${out}"
+      RMG_PHYS="${out%/}/${base}"
       return 0
     fi
-    [[ "${d}" == "/" ]] && return 1
-    d="${d%/*}"
-    [[ -z "${d}" ]] && d="/"
+    if [[ -d "${p}" ]]; then
+      out="$(cd -P -- "${p}" 2>/dev/null && pwd -P)" || return 1
+      [[ -z "${out}" ]] && return 1
+      RMG_ANCHOR="${out}"
+      if [[ -n "${suffix}" ]]; then
+        RMG_PHYS="${out%/}${suffix}"
+      else
+        # `${out%/}` would empty the root itself, and the root is the one
+        # path this hook must still be able to name.
+        RMG_PHYS="${out}"
+        RMG_IS_DIR=1
+      fi
+      return 0
+    fi
+    [[ "${p}" == "/" ]] && return 1
+    base="${p##*/}"
+    suffix="/${base}${suffix}"
+    p="${p%/*}"
+    [[ -z "${p}" ]] && p="/"
   done
 }
 
 # rmg_in_git_tree <dir> -- 0 inside a working tree, 1 definitively outside,
-# 2 unknown (which the caller fails closed on).
+# 2 unknown (which the caller fails closed on). Sets RMG_TREE_TOP to the
+# tree's ROOT on 0, because that is the fact a reader can act on -- the
+# directory that happened to be probed is not.
 rmg_in_git_tree() {
   local dir="$1" out rc
   if [[ -n "${RMG_GIT_CACHE[${dir}]+set}" ]]; then
+    RMG_TREE_TOP="${RMG_GIT_TOP[${dir}]}"
     return "${RMG_GIT_CACHE[${dir}]}"
   fi
+  RMG_TREE_TOP=''
   out="$(LC_ALL=C git -c safe.directory='*' -C "${dir}" \
     rev-parse --show-toplevel 2>&1)"
   rc=$?
   if (( rc == 0 )); then
-    if [[ -n "${out}" ]]; then rc=0; else rc=2; fi
+    if [[ -n "${out}" ]]; then rc=0; RMG_TREE_TOP="${out}"; else rc=2; fi
   elif [[ "${out}" == *"not a git repository"* ]]; then
     rc=1
   else
     rc=2
   fi
   RMG_GIT_CACHE["${dir}"]="${rc}"
+  RMG_GIT_TOP["${dir}"]="${RMG_TREE_TOP}"
   return "${rc}"
 }
 
@@ -674,7 +715,7 @@ rmg_contains_git_tree() {
 # rmg_operand_verdict <operand> -- 0 when the operand resolves outside every
 # git working tree, 2 (with RMG_REASON set) otherwise.
 rmg_operand_verdict() {
-  local operand="$1" abs dir probe decider
+  local operand="$1" abs
 
   if [[ -z "${operand}" ]]; then
     RMG_REASON="rm was given an empty operand, so its target is unknown"
@@ -698,27 +739,21 @@ rmg_operand_verdict() {
     return 2
   fi
 
-  dir="${abs%/*}"
-  [[ -z "${dir}" ]] && dir="/"
-
-  # An existing real directory is judged as itself, so deleting a repo root
-  # is inside the tree it would delete. A symlink is judged where the link
-  # lives, because rm removes the link and not its target.
-  if [[ -d "${abs}" && ! -L "${abs}" ]]; then
-    probe="${abs}"
-  else
-    probe="${dir}"
-  fi
-
-  if ! decider="$(rmg_nearest_existing_dir "${probe}")"; then
-    RMG_REASON="rm operand '${operand}' has no resolvable directory (${probe}), and an unresolvable target is an unknown target"
+  if ! rmg_resolve_target "${abs}"; then
+    RMG_REASON="rm operand '${operand}' has no resolvable directory (${abs}), and an unresolvable target is an unknown target"
     return 2
   fi
 
-  rmg_in_git_tree "${decider}"
+  # The root under another spelling -- `/tmp/..`, `/x/../..` -- is the root.
+  if [[ "${RMG_PHYS}" == "/" ]]; then
+    RMG_REASON="rm operand '${operand}' resolves to the filesystem root, which is never a routine deletion"
+    return 2
+  fi
+
+  rmg_in_git_tree "${RMG_ANCHOR}"
   case "$?" in
     0)
-      RMG_REASON="rm operand '${operand}' resolves to ${abs}, inside the git working tree at ${decider}. A deletion inside a working tree needs a human: run it yourself, or use 'trash-put' (/safe-delete) or 'git rm', which are recoverable"
+      RMG_REASON="rm operand '${operand}' resolves to ${RMG_PHYS}, inside the git working tree at ${RMG_TREE_TOP}. A deletion inside a working tree needs a human: run it yourself, or use 'trash-put' (/safe-delete) or 'git rm', which are recoverable"
       return 2
       ;;
     1)
@@ -726,15 +761,15 @@ rmg_operand_verdict() {
       # them with it, so the same question is asked downwards. Only for a
       # directory the target actually is: a file, a symlink and a path that
       # does not exist have nothing under them to lose.
-      if [[ "${probe}" == "${abs}" ]]; then
-        rmg_contains_git_tree "${decider}"
+      if (( RMG_IS_DIR )); then
+        rmg_contains_git_tree "${RMG_PHYS}"
         case "$?" in
           0)
-            RMG_REASON="rm operand '${operand}' resolves to ${abs}, which is not itself a git working tree but contains the git working tree at ${RMG_FOUND_TREE}. Deleting it would take that tree with it, so it needs a human: run it yourself, or use 'trash-put' (/safe-delete), which is recoverable"
+            RMG_REASON="rm operand '${operand}' resolves to ${RMG_PHYS}, which is not itself a git working tree but contains the git working tree at ${RMG_FOUND_TREE}. Deleting it would take that tree with it, so it needs a human: run it yourself, or use 'trash-put' (/safe-delete), which is recoverable"
             return 2
             ;;
           2)
-            RMG_REASON="rm operand '${operand}' resolves to ${abs}, and the guard could not finish searching it for git working trees within its budget (${RMG_SCAN_MAX_DIRS} directories / ${RMG_SCAN_SECONDS}s, stopped at ${RMG_FOUND_TREE:-${abs}}). Whether this deletion would take a working tree with it is therefore unknown"
+            RMG_REASON="rm operand '${operand}' resolves to ${RMG_PHYS}, and the guard could not finish searching it for git working trees within its budget (${RMG_SCAN_MAX_DIRS} directories / ${RMG_SCAN_SECONDS}s, stopped at ${RMG_FOUND_TREE:-${RMG_PHYS}}). Whether this deletion would take a working tree with it is therefore unknown"
             return 2
             ;;
         esac
@@ -742,7 +777,7 @@ rmg_operand_verdict() {
       return 0
       ;;
     *)
-      RMG_REASON="git could not say whether ${decider} is a working tree, and an unanswered question is an unknown target"
+      RMG_REASON="git could not say whether ${RMG_ANCHOR} is a working tree, and an unanswered question is an unknown target"
       return 2
       ;;
   esac
@@ -1023,7 +1058,8 @@ rmg_run() {
   local input cmd rc
   # Parser + verdict state, local to main so nothing leaks between hook runs.
   local RMG_CWD='' RMG_CWD_PHYS='' RMG_REASON='' RMG_PAYLOAD='' RMG_FOUND_TREE=''
-  local -A RMG_VARS=() RMG_VARS_BAD=() RMG_GIT_CACHE=()
+  local RMG_PHYS='' RMG_ANCHOR='' RMG_IS_DIR=0 RMG_TREE_TOP=''
+  local -A RMG_VARS=() RMG_VARS_BAD=() RMG_GIT_CACHE=() RMG_GIT_TOP=()
 
   input="$(cat)"
   cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
