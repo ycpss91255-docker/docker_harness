@@ -175,7 +175,7 @@ docker/
     │   ├── remind_no_chinese_in_git_artifacts.sh # git commit / gh PR / issue title|body|comment 前 BLOCK CJK 與全形字符
     │   ├── enforce_gh_body_file.sh     # gh issue/pr create/edit/comment/close/review 前 BLOCK 違反 body-file 規律的 8 種 pattern(配合 [[gh-artifact-format]] skill,refs #64)
     │   ├── remind_test_tools_smoke_sync.sh # Dockerfile.test-tools 改動但同層 release-test-tools.yaml 未同步時提醒
-    │   ├── enforce_rm_outside_git_tree.sh # rm 每個 operand 解析成實體絕對路徑(展開變數、collapse ..、cd -P 解 symlink)後問 `git rev-parse --show-toplevel`：落在 git working tree 內就 deny、外面 allow、解析不出來一律 deny(fail closed);取代 480 條 Bash(rm ...) prefix allow + 全域 ask Bash(rm:*),refs #290
+    │   ├── enforce_rm_outside_git_tree.sh # rm 每個 operand 解析成實體絕對路徑(展開變數、collapse ..、cd -P 解 symlink)後兩個方向各問一次：落在 git working tree 內 deny、本身是目錄且底下藏著 working tree 也 deny(BFS,不穿 symlink,超出 directory/秒數 budget 一樣 deny);其餘 allow。解析不出來、unquoted $VAR 會被 shell 拆字或 glob、特殊參數($1/$@/$!)、hook 不認識的指令裡出現 rm token(含引號內,如 `xargs sh -c 'rm ...'`)一律 deny(fail closed);hook 自己 crash 也由 EXIT trap 補一則 deny,因為沒有輸出等於同意。取代 480 條 Bash(rm ...) prefix allow + 全域 ask Bash(rm:*),refs #290
     │   ├── auto_allow_touch_ack.sh       # touch $TMPDIR/claude-checkpoint-*.ack 自動 allow（/tmp checkpoint 協定一鍵 ack,refs ADR-00000002 / #117）
     │   ├── check_tag_version_consistency.sh # git tag/push v* 前 BLOCK：repo root 有 .version 且不等於 tag 則 deny（refs #36；defensive 第二層,主要 gate 由 enforce_semver_tag_via_script.sh 接手）
     │   ├── enforce_semver_tag_via_script.sh # git tag/push v* 前 BLOCK：raw 命令一律拒絕,強制走 .claude/scripts/release-tag.sh canonical script(refs #106)

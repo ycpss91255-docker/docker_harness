@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1207 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1216 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -19,7 +19,7 @@ stdin and asserts one of three behaviours:
 - **SILENT** — exits 0 with no stdout (no action taken). Use
   `assert_silent`.
 
-### .claude/test/bats/unit/enforce_rm_outside_git_tree_spec.bats (65)
+### .claude/test/bats/unit/enforce_rm_outside_git_tree_spec.bats (74)
 
 | Test | Scenario |
 |------|----------|
@@ -52,7 +52,7 @@ stdin and asserts one of three behaviours:
 | silent on a command with no rm word at all | not this hook's question -> SILENT |
 | silent on rmdir, which is a different command | `rm` is not a prefix match here -> SILENT |
 | silent on git rm, which is out of scope by decision | git deletions are named out of scope -> SILENT |
-| silent on an rm word that is quoted data, not an invocation | quoted `rm` inside another command's argument -> SILENT |
+| denies a quoted rm inside a command it does not model | - |
 | silent on an rm word inside a heredoc body | heredoc bodies are data and are skipped whole -> SILENT |
 | denies an unquoted loose rm word, the stated cost of failing closed | `echo rm` -> DENY; quoting it lifts the deny |
 | silent when the tool input carries no command | no command -> SILENT |
@@ -88,6 +88,15 @@ stdin and asserts one of three behaviours:
 | names the resolved target rather than the spelling | - |
 | names the working tree by its root, not by the directory it probed | - |
 | denies a path that resolves to the filesystem root by another spelling | - |
+| denies rm carried in a quoted payload through xargs | - |
+| denies rm carried in a quoted payload through env | - |
+| denies rm carried in a quoted payload through timeout | - |
+| denies a quoted rm even when its target is outside every tree | - |
+| stays silent on --rm, which is not an rm token | - |
+| stays silent on a word that merely contains the letters rm | - |
+| stays silent on an rm inside a heredoc body, which is data | - |
+| stays silent on git, which is out of scope whatever it mentions | - |
+| falls back to the default budget when the environment sets nonsense | - |
 
 ### .claude/test/bats/unit/auto_allow_touch_ack_spec.bats (22)
 | Test | Scenario |
