@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration level (ISTQB): several hooks / components together. **9 tests**
+Integration level (ISTQB): several hooks / components together. **11 tests**
 under `.claude/test/bats/integration/`.
 
 ### .claude/test/bats/integration/chain_spec.bats (3)
@@ -10,7 +10,7 @@ under `.claude/test/bats/integration/`.
 | gh pr create with attribution body fires both pre-tool hooks | `remind_ci_auto_merge` + `remind_no_ai_attribution` both FIRE |
 | editing a Dockerfile fires only the TDD reminder, not content-scan hooks | `remind_tdd_categories` FIRE; emoji/AI-attribution/coverage-excl SILENT |
 
-### .claude/test/bats/integration/update_stale_pr_autoresolve_spec.bats (6)
+### .claude/test/bats/integration/update_stale_pr_autoresolve_spec.bats (8)
 
 | Test | Scenario |
 |------|----------|
@@ -20,3 +20,5 @@ under `.claude/test/bats/integration/`.
 | one prose conflict among many count conflicts resolves nothing, exits 2 | all-or-nothing: exits 2, markers intact, no merge commit, nothing pushed |
 | --dry-run classifies an in-progress merge and writes nothing | auto-resolvable verdict printed; markers, HEAD and origin tip all unchanged |
 | --dry-run reports the manual verdict without touching the tree | manual verdict, whole-tree classification, nothing written |
+| prose differing only in a digit is refused, not silently kept | mask-equal but generator-preserved: exits 2, markers intact, nothing pushed |
+| --dry-run refuses a digit-only prose conflict and writes nothing | dry-run verdict matches the live refusal; nothing written |

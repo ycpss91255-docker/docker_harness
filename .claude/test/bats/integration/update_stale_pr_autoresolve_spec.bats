@@ -143,6 +143,28 @@ add_prose_conflict() {
   git -C "${WT}" checkout -q "${BRANCH}"
 }
 
+# add_digit_prose_conflict -- rewrite doc/test/unit.md's `Owner:` line on
+# each side so the two differ ONLY in a digit, and push both. Masked, the
+# two sides are identical, so the shape test alone calls this count drift.
+# But the generator preserves that line VERBATIM -- prose is exactly what it
+# refuses to derive -- so nothing recomputes it, and whichever side the
+# script keeps is the side that lands while the other is dropped. The whole
+# promise of #287 is that the landed figure was recomputed rather than
+# chosen; this fixture is the shape where the mask cannot tell the two
+# apart. Real instances: a catalogue row description carrying `refs #265`
+# against `refs #287`, or "covers 3 of the supported hosts" against 7.
+add_digit_prose_conflict() {
+  git -C "${WT}" checkout -q "${BRANCH}"
+  edit_owner_line "rota slot 3"
+  git -C "${WT}" commit -qam 'branch: rota slot'
+  git -C "${WT}" push -q origin "${BRANCH}"
+  git -C "${WT}" checkout -q main
+  edit_owner_line "rota slot 7"
+  git -C "${WT}" commit -qam 'main: rota slot'
+  git -C "${WT}" push -q origin main
+  git -C "${WT}" checkout -q "${BRANCH}"
+}
+
 # start_merge -- leave the worktree mid-merge, exactly as the script's own
 # failure path would. --dry-run has nothing to classify until a merge is in
 # progress: classifying by performing the merge would be the write it
@@ -234,6 +256,10 @@ assert_nothing_resolved() {
   assert_output --partial "**7 tests**"
   assert_output --partial "**8 tests**"
   assert_output --partial "**11 tests**"
+  # And the claim is backed: the run says it proved the generator lands the
+  # same tree from either side, which is what makes "recomputed" true rather
+  # than an assumption printed next to a value that was picked.
+  assert_output --partial "same tree from either side"
 }
 
 @test "a numeric conflict outside the generator's output set exits 2" {
@@ -345,6 +371,63 @@ assert_nothing_resolved() {
   # The classification is reported for the whole tree, not abandoned at the
   # first disqualifying file -- that is what makes it worth reading.
   assert_output --partial "doc/test/TEST.md: owned=yes"
+
+  assert_nothing_resolved "${head_before}" "${tip_before}"
+  [[ "$(conflicted_checksum)" == "${sum_before}" ]] || {
+    echo "conflicted files changed under --dry-run" >&2
+    return 1
+  }
+}
+
+@test "prose differing only in a digit is refused, not silently kept" {
+  # Every hunk in the tree masks equal, so the classifier calls the whole
+  # thing count drift and reports real=0. Keeping OURS on the `Owner:` line
+  # would discard main's committed edit, commit it and push it -- under an
+  # annotation claiming the value was recomputed. The mask says the two
+  # sides differ only in numbers; it cannot say the generator will write
+  # that line. Only running the generator can.
+  mk_repo unit
+  add_digit_prose_conflict
+  stub_gh "${BRANCH}" main
+
+  local head_before tip_before
+  head_before="$(git -C "${WT}" rev-parse HEAD)"
+  tip_before="$(git -C "${ORIGIN}" rev-parse "${BRANCH}")"
+
+  run "$(script update-stale-pr.sh)" 42 --repo a/b --worktree "${WT}"
+  assert_failure 2
+  assert_output --partial "real=0"
+  assert_output --partial "not auto-resolvable"
+  assert_output --partial "depends on which side"
+  assert_output --partial "doc/test/unit.md"
+
+  assert_nothing_resolved "${head_before}" "${tip_before}"
+
+  # main's side of the line is still only on main -- nothing landed it, and
+  # nothing dropped it either.
+  run git -C "${WT}" show "origin/main:doc/test/unit.md"
+  assert_output --partial "rota slot 7"
+}
+
+@test "--dry-run refuses a digit-only prose conflict and writes nothing" {
+  # The dry-run verdict and the live decision are the same answer or the
+  # flag is a lie: a tree the live path will refuse must not be advertised
+  # here as auto-resolvable.
+  mk_repo unit
+  add_digit_prose_conflict
+  start_merge
+  stub_gh "${BRANCH}" main
+
+  local head_before tip_before sum_before
+  head_before="$(git -C "${WT}" rev-parse HEAD)"
+  tip_before="$(git -C "${ORIGIN}" rev-parse "${BRANCH}")"
+  sum_before="$(conflicted_checksum)"
+
+  run "$(script update-stale-pr.sh)" --dry-run 42 --repo a/b --worktree "${WT}"
+  assert_success
+  assert_output --partial "verdict: manual"
+  assert_output --partial "depends on which side"
+  assert_output --partial "nothing written"
 
   assert_nothing_resolved "${head_before}" "${tip_before}"
   [[ "$(conflicted_checksum)" == "${sum_before}" ]] || {
