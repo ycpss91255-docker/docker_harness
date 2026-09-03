@@ -128,6 +128,37 @@ edit_owner_line() {
   sed -i "s/^Owner: .*/Owner: ${1}./" "${WT}/doc/test/unit.md"
 }
 
+# add_prose_conflict -- rewrite doc/test/unit.md's `Owner:` line differently
+# on each side and push both, so the merge gains one conflict that is not
+# count drift on top of the ones mk_repo produced.
+add_prose_conflict() {
+  git -C "${WT}" checkout -q "${BRANCH}"
+  edit_owner_line "the branch author"
+  git -C "${WT}" commit -qam 'branch: prose'
+  git -C "${WT}" push -q origin "${BRANCH}"
+  git -C "${WT}" checkout -q main
+  edit_owner_line "the main author"
+  git -C "${WT}" commit -qam 'main: prose'
+  git -C "${WT}" push -q origin main
+  git -C "${WT}" checkout -q "${BRANCH}"
+}
+
+# start_merge -- leave the worktree mid-merge, exactly as the script's own
+# failure path would. --dry-run has nothing to classify until a merge is in
+# progress: classifying by performing the merge would be the write it
+# promises not to make.
+start_merge() {
+  git -C "${WT}" fetch -q origin main
+  git -C "${WT}" merge origin/main > /dev/null 2>&1 || true
+}
+
+# conflicted_checksum -- one number over every unmerged file's bytes, so a
+# single comparison covers "nothing was written".
+conflicted_checksum() {
+  git -C "${WT}" diff --name-only --diff-filter=U \
+    | while IFS= read -r f; do cksum < "${WT}/${f}"; done | cksum
+}
+
 # total_regenerated -- sum the `regenerated=N` figures in $output.
 total_regenerated() {
   printf '%s\n' "${output}" | grep -o 'regenerated=[0-9]*' | cut -d= -f2 \
@@ -245,15 +276,7 @@ assert_nothing_resolved() {
   # tempting bug: every other conflicted file IS auto-resolvable on its own.
   # The rule is all-or-nothing across the whole tree.
   mk_repo unit integration system acceptance
-  git -C "${WT}" checkout -q "${BRANCH}"
-  edit_owner_line "the branch author"
-  git -C "${WT}" commit -qam 'branch: prose'
-  git -C "${WT}" push -q origin "${BRANCH}"
-  git -C "${WT}" checkout -q main
-  edit_owner_line "the main author"
-  git -C "${WT}" commit -qam 'main: prose'
-  git -C "${WT}" push -q origin main
-  git -C "${WT}" checkout -q "${BRANCH}"
+  add_prose_conflict
   stub_gh "${BRANCH}" main
 
   local head_before tip_before
@@ -278,4 +301,54 @@ assert_nothing_resolved() {
   }
 
   assert_nothing_resolved "${head_before}" "${tip_before}"
+}
+
+@test "--dry-run classifies an in-progress merge and writes nothing" {
+  mk_repo unit
+  start_merge
+  stub_gh "${BRANCH}" main
+
+  local head_before tip_before sum_before
+  head_before="$(git -C "${WT}" rev-parse HEAD)"
+  tip_before="$(git -C "${ORIGIN}" rev-parse "${BRANCH}")"
+  sum_before="$(conflicted_checksum)"
+
+  run "$(script update-stale-pr.sh)" --dry-run 42 --repo a/b --worktree "${WT}"
+  assert_success
+  assert_output --partial "doc/test/unit.md: owned=yes"
+  assert_output --partial "regenerated="
+  assert_output --partial "verdict: auto-resolvable"
+  assert_output --partial "nothing written"
+
+  assert_nothing_resolved "${head_before}" "${tip_before}"
+  [[ "$(conflicted_checksum)" == "${sum_before}" ]] || {
+    echo "conflicted files changed under --dry-run" >&2
+    return 1
+  }
+}
+
+@test "--dry-run reports the manual verdict without touching the tree" {
+  mk_repo unit integration system acceptance
+  add_prose_conflict
+  start_merge
+  stub_gh "${BRANCH}" main
+
+  local head_before tip_before sum_before
+  head_before="$(git -C "${WT}" rev-parse HEAD)"
+  tip_before="$(git -C "${ORIGIN}" rev-parse "${BRANCH}")"
+  sum_before="$(conflicted_checksum)"
+
+  run "$(script update-stale-pr.sh)" --dry-run 42 --repo a/b --worktree "${WT}"
+  assert_success
+  assert_output --partial "verdict: manual"
+  assert_output --partial "real=1"
+  # The classification is reported for the whole tree, not abandoned at the
+  # first disqualifying file -- that is what makes it worth reading.
+  assert_output --partial "doc/test/TEST.md: owned=yes"
+
+  assert_nothing_resolved "${head_before}" "${tip_before}"
+  [[ "$(conflicted_checksum)" == "${sum_before}" ]] || {
+    echo "conflicted files changed under --dry-run" >&2
+    return 1
+  }
 }
