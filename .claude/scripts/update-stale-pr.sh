@@ -54,7 +54,10 @@ Options:
   --worktree PATH       Override worktree path (default: scan
                         ${WORKSPACE_DIR:-pwd}/worktree/* for the head
                         branch).
-  --dry-run             Print planned actions; no fetch/merge/push.
+  --dry-run             Print planned actions; no fetch/merge/push. If a
+                        merge is already in progress, classify its
+                        conflicts instead and print the verdict, writing
+                        nothing.
   -h, --help            Show this help.
 
 Mechanism:
@@ -506,6 +509,17 @@ main() {
     "${pr}" "${head}" "${base}" "${worktree}"
 
   if (( dry_run )); then
+    if [[ -n "$(git -C "${worktree}" diff --name-only --diff-filter=U 2>/dev/null)" ]]; then
+      printf '[dry-run] a merge is already in progress; classifying its conflicts:\n'
+      if _rp_classify "${worktree}"; then
+        printf '[dry-run] verdict: auto-resolvable -- %d regenerated hunk(s) in %d file(s)\n' \
+          "${_RP_TOTAL_HUNKS}" "${#_RP_PLAN[@]}"
+      else
+        printf '[dry-run] verdict: manual -- %s\n' "${_RP_REASON}"
+      fi
+      printf '[dry-run] nothing written.\n'
+      return 0
+    fi
     printf '[dry-run] would: git -C %s fetch origin %s\n' "${worktree}" "${base}"
     printf '[dry-run] would: git -C %s merge origin/%s\n' "${worktree}" "${base}"
     printf '[dry-run] would: git -C %s push\n' "${worktree}"
