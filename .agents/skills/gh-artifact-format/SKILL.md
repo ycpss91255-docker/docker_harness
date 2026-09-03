@@ -214,6 +214,40 @@ Empty `--label ""` / `--label=` does not satisfy the rule. The hook is
 lexical -- if the label name does not exist on the target repo, `gh`
 itself errors out with a clear message; no API call from the hook.
 
+## 7. `ready-for-agent` -- the four headings
+
+`ready-for-agent` is not a feeling. Per ADR-00000015 it asserts that
+four things are present in the issue, and `enforce_ready_for_agent.sh`
+BLOCKS `gh issue edit N --add-label ready-for-agent` until they are.
+
+Write them under these headings, exactly:
+
+```markdown
+## Seams
+## First slice
+## Gate
+## Bound
+```
+
+- **Seams** -- which files change, what the interface is.
+- **First slice** -- the first failing test to write.
+- **Gate** -- the command that decides done.
+- **Bound** -- how many red-green cycles before stopping.
+
+**Headings fixed, prose free.** The implementer is an LLM and reads
+prose fine; the headings exist only so "are all four present" is
+machine-answerable. Any heading level from `##` down counts, and
+trailing prose on the heading line is fine (`## Bound -- 10 cycles`).
+
+**Put them in a COMMENT, not the body.** The body stays the original
+spec (the issue-scope-change-in-comments rule), so a grill writes its
+conclusions back as a comment. Both gates read the body and the
+comments together, so parts may be split across them.
+
+`.claude/scripts/check-ready-for-agent.sh <issue>` answers the same
+question outside the hook -- exit 0 ready, 1 with the missing parts on
+stdout, 2 when gh cannot be asked.
+
 ## Quick reference
 
 | Task | Inline OK? | Routing |

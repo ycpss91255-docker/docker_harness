@@ -120,6 +120,7 @@ docker/
     │   ├── fix-compose-copy-line.sh         # 一次性 compose.yaml COPY 路徑修正
     │   ├── fix-dockerfile-lint-lib.sh        # 通用：對 --branch 指定的 chore 分支批次 patch downstream Dockerfile 加 `COPY .base/script/docker/lib /lint/lib`（#284 sub-libs split 後 fanout 必須跑，idempotent）
     │   ├── fix-dockerfile-copy-script.sh     # 通用：對 --branch 指定的 chore 分支批次 patch downstream Dockerfile 把 `COPY *.sh /lint/` 改成 `COPY script/*.sh /lint/`（base#330 / v0.31.0 wrapper consolidation 後 root 沒有 *.sh,active 2 個下游 fanout 必須跑,idempotent）
+    │   ├── check-ready-for-agent.sh         # Gate B of ADR-00000015:`check-ready-for-agent.sh [-R owner/repo] <issue|url>` 讀 issue(body + comments)判斷四要件是否齊備;0=ready、1=缺(缺的部分印 stdout 給 #296 消費、說明走 stderr)、2=問不到(絕不把讀不到當 ready);刻意不看 label — 「這個 label 誠不誠實」是 Gate A 的問題,「現在動工安不安全」是這裡的問題,共用 lib/ready-for-agent.sh,refs #294 / #296
     │   ├── check-claude-md-tree.sh          # CI lint：parse this file 的 .claude/ tree vs filesystem，drift 就 exit 1 (post-#127: just -f .claude/test/justfile tree-check passes CONTEXT.md as arg)
     │   ├── check-claude-md-ceiling.sh        # CI lint：assert CLAUDE.md 行數 + ^## 數在 ceiling 內 (defaults 240 / 20, env-overridable);refs #127
     │   ├── update-stale-pr.sh               # one-shot merge origin/main + normal push (NO rebase/force) for a PR whose base moved (BEHIND/CONFLICTING);auto-resolve worktree by branch via $WORKSPACE_DIR scan,refs #87/#221

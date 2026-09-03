@@ -17,7 +17,8 @@
 # (refs #294, where a second hook needed the same answer).
 #
 # Callers: .claude/hooks/enforce_gh_body_file.sh,
-#          .claude/hooks/enforce_ready_for_agent.sh
+#          .claude/hooks/enforce_ready_for_agent.sh,
+#          .claude/scripts/check-ready-for-agent.sh (ref parsing only)
 
 # fold_continuations <cmd> -- collapse backslash-newline into a space.
 # A trailing backslash is a line continuation INSIDE one command, so the
@@ -118,20 +119,17 @@ gh_repo_flag() {
   printf ''
 }
 
-# gh_issue_ref <seg> <verb> -- print "<number> <repo>" for the issue
-# `gh issue <verb>` targets; return 1 when the target cannot be read.
+# gh_issue_ref_parts <ref> -- print "<number> <repo>" for one issue
+# reference; return 1 when <ref> names no issue.
 #
-# gh accepts a bare number or a full issue URL, and a URL carries its
-# own repo -- an -R on the same line does not apply to it -- so the repo
-# half is printed here rather than left to the caller's -R reading. An
-# argument that is neither (a shell variable, a flag because the ref
-# comes later) returns 1: the caller must stay silent rather than guess
-# which issue was meant. <repo> is empty for a bare number, meaning "let
-# gh resolve it from the working directory".
-gh_issue_ref() {
-  local seg="$1" verb="$2" ref
-  [[ "${seg}" =~ gh[[:space:]]+issue[[:space:]]+${verb}[[:space:]]+([^[:space:]]+) ]] || return 1
-  ref="${BASH_REMATCH[1]}"
+# gh accepts a bare number or a full issue URL, and a URL carries its own
+# repo -- an -R elsewhere on the line does not apply to it -- so the repo
+# half is answered here rather than left to the caller. <repo> is empty
+# for a bare number, meaning "let gh resolve it from the working
+# directory". Anything else (a shell variable, a flag) returns 1: the
+# caller must decline rather than guess which issue was meant.
+gh_issue_ref_parts() {
+  local ref="$1"
   ref="${ref#[\"\']}"
   ref="${ref%[\"\']}"
   if [[ "${ref}" =~ ^https?://[^/]+/([^/]+)/([^/]+)/issues/([0-9]+) ]]; then
@@ -141,6 +139,14 @@ gh_issue_ref() {
   ref="${ref#\#}"
   [[ "${ref}" =~ ^[0-9]+$ ]] || return 1
   printf '%s ' "${ref}"
+}
+
+# gh_issue_ref <seg> <verb> -- the same answer for the issue that
+# `gh issue <verb>` targets on a command segment.
+gh_issue_ref() {
+  local seg="$1" verb="$2"
+  [[ "${seg}" =~ gh[[:space:]]+issue[[:space:]]+${verb}[[:space:]]+([^[:space:]]+) ]] || return 1
+  gh_issue_ref_parts "${BASH_REMATCH[1]}"
 }
 
 # gh_flag_values <seg> <long-flag> -- print, one per line and with any
