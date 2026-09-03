@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1167 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1171 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -2007,14 +2007,18 @@ escaping, and the read-only `--check` gate.
 | a tracked script deleted in the working tree is not a lint target | - |
 | t_lint lints the computed target list, not a shell glob | - |
 
-### .claude/test/bats/unit/enforce_ready_for_agent_spec.bats (7)
+### .claude/test/bats/unit/enforce_ready_for_agent_spec.bats (11)
 
 | Test | Scenario |
 |------|----------|
 | add-label ready-for-agent on an issue missing a part is denied, naming it | - |
+| the denial names every missing part, not just the first | - |
 | add-label ready-for-agent on a complete issue is silent | - |
 | ready-for-agent behind a second --add-label flag is still gated | - |
 | ready-for-agent inside a comma-separated --add-label is still gated | - |
 | adding a different label to the same unready issue is untouched | - |
 | removing ready-for-agent from an unready issue is untouched | - |
 | a label that merely contains ready-for-agent is not the label | - |
+| the four parts are found when they live in a comment, not the body | - |
+| parts split across the body and a comment together count | - |
+| comments that do not supply the missing part still leave it missing | - |

@@ -39,17 +39,23 @@ source "${HOOK_DIR}/../scripts/lib/gh-command.sh"
 # shellcheck disable=SC1091
 source "${HOOK_DIR}/../scripts/lib/ready-for-agent.sh"
 
-# label_list_has <csv> <label> -- 0 when the comma-separated gh label
-# value <csv> contains <label> as a whole entry. Whole entry, not
-# substring: `--add-label not-ready-for-agent` is a different label.
-label_list_has() {
-  local csv="$1" want="$2" item
-  local IFS=','
-  for item in ${csv}; do
-    item="${item#"${item%%[![:space:]]*}"}"   # ltrim
-    item="${item%"${item##*[![:space:]]}"}"   # rtrim
-    [[ "${item}" == "${want}" ]] && return 0
-  done
+# adds_label <seg> <label> -- 0 when the segment's --add-label flags
+# name <label>. gh accepts both spellings and this must answer for both:
+# repeated flags (`--add-label bug --add-label ready-for-agent`) and one
+# comma-joined value (`--add-label "bug,ready-for-agent"`).
+#
+# Whole entry, never substring: `not-ready-for-agent-yet` is a different
+# label, and over-matching is exactly the defect #255 / #276 / #283 were.
+adds_label() {
+  local seg="$1" want="$2" value item
+  while IFS= read -r value; do
+    local IFS=','
+    for item in ${value}; do
+      item="${item#"${item%%[![:space:]]*}"}"   # ltrim
+      item="${item%"${item##*[![:space:]]}"}"   # rtrim
+      [[ "${item}" == "${want}" ]] && return 0
+    done
+  done < <(gh_flag_values "${seg}" '--add-label')
   return 1
 }
 
@@ -66,7 +72,7 @@ deny() {
 }
 
 main() {
-  local input cmd seg labels repo num missing status joined
+  local input cmd seg repo num missing status joined
 
   input="$(cat)"
   cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
@@ -77,8 +83,7 @@ main() {
   [[ -z "${seg}" ]] && return 0
   [[ "$(gh_subcommand "${seg}")" == "issue edit" ]] || return 0
 
-  labels="$(gh_flag_value "${seg}" '--add-label')" || return 0
-  label_list_has "${labels}" "${READY_FOR_AGENT_LABEL}" || return 0
+  adds_label "${seg}" "${READY_FOR_AGENT_LABEL}" || return 0
 
   repo="$(gh_repo_flag "${seg}")"
 

@@ -118,31 +118,26 @@ gh_repo_flag() {
   printf ''
 }
 
-# gh_flag_value <seg> <long-flag> -- print the value of `--<flag> V`,
-# `--<flag>="V"` etc. on the segment; return 1 when the flag is absent.
-# Quoted forms are tried first so a quoted value containing spaces is
-# returned whole.
-gh_flag_value() {
-  local seg="$1" flag="$2"
-  if [[ "${seg}" =~ ${flag}[[:space:]]+\"([^\"]*)\" ]]; then
-    printf '%s' "${BASH_REMATCH[1]}"
-    return 0
-  fi
-  if [[ "${seg}" =~ ${flag}[[:space:]]+\'([^\']*)\' ]]; then
-    printf '%s' "${BASH_REMATCH[1]}"
-    return 0
-  fi
-  if [[ "${seg}" =~ ${flag}=\"([^\"]*)\" ]]; then
-    printf '%s' "${BASH_REMATCH[1]}"
-    return 0
-  fi
-  if [[ "${seg}" =~ ${flag}=\'([^\']*)\' ]]; then
-    printf '%s' "${BASH_REMATCH[1]}"
-    return 0
-  fi
-  if [[ "${seg}" =~ ${flag}[[:space:]=]+([^[:space:]]+) ]]; then
-    printf '%s' "${BASH_REMATCH[1]}"
-    return 0
-  fi
-  return 1
+# gh_flag_values <seg> <long-flag> -- print, one per line and with any
+# surrounding quotes stripped, the value of EVERY occurrence of
+# `--<flag> V` / `--<flag>=V` on the segment. Returns 1 when the flag
+# does not occur at all.
+#
+# EVERY occurrence, not the first: gh repeats value flags rather than
+# requiring one joined value (`--add-label bug --add-label
+# ready-for-agent` is the ordinary way to set a kind and a state label
+# at once), so a first-match reader answers about the wrong label and
+# the caller's rule silently does not apply.
+gh_flag_values() {
+  local flag="$2" rest="$1" value found=1
+  local re="${flag}([[:space:]]+|=)(\"[^\"]*\"|'[^']*'|[^[:space:]]+)"
+  while [[ "${rest}" =~ ${re} ]]; do
+    value="${BASH_REMATCH[2]}"
+    value="${value#[\"\']}"
+    value="${value%[\"\']}"
+    printf '%s\n' "${value}"
+    found=0
+    rest="${rest#*"${BASH_REMATCH[0]}"}"
+  done
+  return "${found}"
 }
