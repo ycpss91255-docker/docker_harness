@@ -1,7 +1,7 @@
 # Unit Tests
 
 Unit level (ISTQB): one hook or script in isolation.
-**1176 tests** across 85 specs under `.claude/test/bats/unit/`. These were
+**1182 tests** across 85 specs under `.claude/test/bats/unit/`. These were
 the former `test/smoke/` specs -- each drives a single hook with a sample
 JSON tool-input and asserts one behaviour -- which are Unit-level (a
 component in isolation), not the Smoke *type* (see [smoke.md](smoke.md)).
@@ -2007,7 +2007,7 @@ escaping, and the read-only `--check` gate.
 | a tracked script deleted in the working tree is not a lint target | - |
 | t_lint lints the computed target list, not a shell glob | - |
 
-### .claude/test/bats/unit/unpublished_worktrees_spec.bats (16)
+### .claude/test/bats/unit/unpublished_worktrees_spec.bats (22)
 
 | Test | Scenario |
 |------|----------|
@@ -2027,3 +2027,9 @@ escaping, and the read-only `--check` gate.
 | a plain directory is skipped even when a repo encloses the sweep root | git -C answers from the enclosing repo, so without the .git test every subdirectory reports |
 | watch mode reports a stalled branch once, not once per interval | re-reporting trains the reader to ignore the line |
 | watch mode reports a branch that entered the state after it started | each sweep re-reads the root, so a late worktree is found |
+| a gh failure is an error, not a repo that has no PRs | an unanswered question cannot reach the all-clear -- exit 2, and the published worktrees stay unprinted |
+| a PR older than the list window is still found, by the exact query | gh returns newest-first and --limit truncates silently, so a miss is re-asked with --head |
+| --root is honoured from a location with no git checkout above it | the default root is a fallback, so it must not be resolved before --root is read |
+| no --root and no checkout to derive one from is an error, not a crash | exit 2 naming the problem, not a bare git fatal |
+| watch mode names the second branch to occupy a recycled directory | <repo>-<n> dirs are recycled, so the dedup key is the branch and not the directory |
+| watch mode reports a branch again after it leaves the state and re-enters | once per transition, not once ever -- the seen set is rebuilt from each sweep |

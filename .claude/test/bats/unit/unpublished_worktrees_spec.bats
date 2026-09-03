@@ -16,21 +16,22 @@
 # "the unpublished branch is reported" would pass on a script that reported
 # every branch, which is the failure mode this replaces.
 #
-# WHY THE SCRIPT IS COPIED INTO A FIXTURE REPO. The script resolves its own
-# repo root from ${BASH_SOURCE[0]} to derive the DEFAULT --root, under
-# `set -e`, before any argument is used. The test container bind-mounts this
-# worktree at /work without the linked-worktree gitdir it points at, so that
-# resolution fails there for reasons that have nothing to do with the
-# behaviour under test. Copying the shipped file into a real (empty) git
-# repo gives it a resolvable location; the CONTENT under test is always the
-# working-tree file, read fresh in setup.
+# WHERE THE SCRIPT RUNS FROM. Every case that passes --root runs the shipped
+# file in place, because an explicit --root means the script never resolves
+# its own repo root and its location cannot matter. Only the default-root
+# case needs a resolvable location, and it builds the checkout it is about.
 
 load '../lib/test_helper'
 
 setup() {
   # gh stub: answers `gh pr list -R <slug> --state <state> ...` from a
   # fixture file per (repo, state). Two states are kept separately on
-  # purpose -- the difference between them is what case (a) is about.
+  # purpose -- the difference between them is what case (a) is about. The
+  # exact per-branch query (`--head <branch>`) is answered from its own
+  # fixture, so the truncatable list and the untruncatable query can
+  # disagree; that disagreement is what the window case is about.
+  # GH_STUB_FAIL makes the call fail the way an auth or rate-limit failure
+  # does, which is a different fact from a repo that has no PRs.
   GH_FIXTURES="${BATS_TEST_TMPDIR}/prs"
   mkdir -p "${GH_FIXTURES}"
   export GH_FIXTURES
@@ -39,16 +40,30 @@ setup() {
   mkdir -p "${stub_dir}"
   cat > "${stub_dir}/gh" <<'EOF'
 #!/usr/bin/env bash
-# gh stub -- print the PR head branches recorded for (-R repo, --state state).
+# gh stub -- print the PR head branches recorded for (-R repo, --state state),
+# or the count for (-R repo, --head branch).
 repo=""
 state=""
+head=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -R) repo="$2"; shift 2 ;;
     --state) state="$2"; shift 2 ;;
+    --head) head="$2"; shift 2 ;;
     *) shift ;;
   esac
 done
+if [[ -n "${GH_STUB_FAIL:-}" ]]; then
+  echo "gh: HTTP 401 Bad credentials" >&2
+  exit 1
+fi
+if [[ -n "${head}" ]]; then
+  f="${GH_FIXTURES}/${repo//\//_}.head"
+  n=0
+  [[ -f "${f}" ]] && n="$(grep -cxF -- "${head}" "${f}" || true)"
+  printf '%s\n' "${n}"
+  exit 0
+fi
 f="${GH_FIXTURES}/${repo//\//_}.${state}"
 [[ -f "${f}" ]] && cat "${f}"
 exit 0
@@ -56,12 +71,7 @@ EOF
   chmod +x "${stub_dir}/gh"
   export PATH="${stub_dir}:${PATH}"
 
-  # A resolvable home for the script (see the header note).
-  local host_repo="${BATS_TEST_TMPDIR}/hostrepo"
-  mkdir -p "${host_repo}/.claude/scripts"
-  git init -q -b main "${host_repo}"
-  cp "$(script unpublished-worktrees.sh)" "${host_repo}/.claude/scripts/"
-  SCRIPT="${host_repo}/.claude/scripts/unpublished-worktrees.sh"
+  SCRIPT="$(script unpublished-worktrees.sh)"
 
   ROOT="${BATS_TEST_TMPDIR}/worktree"
   mkdir -p "${ROOT}"
@@ -93,7 +103,9 @@ mk_wt() {
 }
 
 # gh_prs <repo-slug> <state> [branch...] -- record what the gh stub answers
-# for that repo and that --state.
+# for that repo and that --state. Anything in --state all is also answerable
+# by the exact per-branch query, because the list window is a subset of the
+# PRs that exist.
 gh_prs() {
   local slug="$1" state="$2"
   shift 2
@@ -103,6 +115,21 @@ gh_prs() {
   for b in "$@"; do
     printf '%s\n' "${b}" >> "${f}"
   done
+  if [[ "${state}" == "all" ]]; then
+    local h="${GH_FIXTURES}/${slug//\//_}.head"
+    : > "${h}"
+    for b in "$@"; do
+      printf '%s\n' "${b}" >> "${h}"
+    done
+  fi
+}
+
+# gh_pr_outside_window <repo-slug> <branch> -- a PR that exists but is not in
+# the list window. gh returns newest-first and --limit truncates silently, so
+# this is what a PR older than the window looks like from inside the script.
+gh_pr_outside_window() {
+  local slug="$1" branch="$2"
+  printf '%s\n' "${branch}" >> "${GH_FIXTURES}/${slug//\//_}.head"
 }
 
 @test "--help prints usage and exits 0" {
@@ -342,6 +369,118 @@ gh_prs() {
   late="$(grep -c '^wt-late:' "${log}" || true)"
   [[ "${first}" -eq 1 && "${late}" -eq 1 ]] || {
     echo "expected each branch once (first=${first} late=${late}):"
+    cat "${log}"
+    return 1
+  }
+}
+
+@test "a gh failure is an error, not a repo that has no PRs" {
+  # One failed call must not answer "no PR" for every worktree of the repo:
+  # the branches it would then print are the PUBLISHED ones, and the error
+  # that produced them is gone. Same rule as the unswept root -- a question
+  # that went unanswered cannot reach the all-clear.
+  mk_wt wt-published owner/repo feat/published
+  gh_prs owner/repo all feat/published
+
+  export GH_STUB_FAIL=1
+  run "${SCRIPT}" --root "${ROOT}"
+  assert_failure 2
+  assert_output --partial "cannot list PRs for owner/repo"
+  refute_output --partial "wt-published"
+}
+
+@test "a PR older than the list window is still found, by the exact query" {
+  # gh returns newest-first and --limit truncates silently, so a branch whose
+  # PR is older than the window is missing from the list with nothing saying
+  # so -- 211 of one repo's 614 PRs sit outside a 400 window. The miss is
+  # re-asked with --head, which the window cannot truncate.
+  mk_wt wt-old owner/repo feat/old
+  gh_prs owner/repo all
+  gh_pr_outside_window owner/repo feat/old
+
+  run "${SCRIPT}" --root "${ROOT}"
+  assert_success
+  assert_output ""
+}
+
+@test "--root is honoured from a location with no git checkout above it" {
+  # The default root is a FALLBACK. Resolving it before --root is read kills
+  # the script under `set -e` while computing a value it was about to throw
+  # away, and an explicit --root is exactly the case where the script's own
+  # location is allowed to be anywhere.
+  local nogit="${BATS_TEST_TMPDIR}/nogit"
+  mkdir -p "${nogit}"
+  cp "$(script unpublished-worktrees.sh)" "${nogit}/"
+  mk_wt wt-nopr owner/repo feat/nopr
+  gh_prs owner/repo all
+
+  # Precondition: nothing above the copy is a git checkout, so a default-root
+  # resolution really would fail here.
+  run git -C "${nogit}" rev-parse --show-toplevel
+  assert_failure
+
+  run "${nogit}/unpublished-worktrees.sh" --root "${ROOT}"
+  assert_success
+  assert_output --partial "wt-nopr: 1 commit(s) on feat/nopr (owner/repo), no PR"
+}
+
+@test "no --root and no checkout to derive one from is an error, not a crash" {
+  local nogit="${BATS_TEST_TMPDIR}/nogit"
+  mkdir -p "${nogit}"
+  cp "$(script unpublished-worktrees.sh)" "${nogit}/"
+
+  run "${nogit}/unpublished-worktrees.sh"
+  assert_failure 2
+  assert_output --partial "not inside a git checkout"
+}
+
+@test "watch mode names the second branch to occupy a recycled directory" {
+  # <repo>-<n> directories are handed on to the next branch by
+  # prune-merged-worktrees.sh, so a dedup key that is the DIRECTORY names the
+  # first branch to sit there and silences every one after it -- and the
+  # direction it fails is silence.
+  mk_wt wt-a owner/repo feat/a
+  gh_prs owner/repo all
+
+  local log="${BATS_TEST_TMPDIR}/watch.log"
+  timeout 6 "${SCRIPT}" --root "${ROOT}" --watch 1 > "${log}" 2>&1 &
+  local watch_pid=$!
+  sleep 3
+  rm -rf "${ROOT}/wt-a"
+  mk_wt wt-a owner/repo feat/recycled
+  wait "${watch_pid}" || true
+
+  local first recycled
+  first="$(grep -c 'on feat/a (' "${log}" || true)"
+  recycled="$(grep -c 'on feat/recycled (' "${log}" || true)"
+  [[ "${first}" -eq 1 && "${recycled}" -eq 1 ]] || {
+    echo "expected each branch once (first=${first} recycled=${recycled}):"
+    cat "${log}"
+    return 1
+  }
+}
+
+@test "watch mode reports a branch again after it leaves the state and re-enters" {
+  # Once per TRANSITION, not once ever. A branch someone starts typing in
+  # again has left the state; when it goes quiet and clean a second time that
+  # is a second transition, and a seen-set that only ever grows answers it
+  # with the silence this script exists to break.
+  mk_wt wt-x owner/repo feat/x
+  gh_prs owner/repo all
+
+  local log="${BATS_TEST_TMPDIR}/watch.log"
+  timeout 8 "${SCRIPT}" --root "${ROOT}" --watch 1 > "${log}" 2>&1 &
+  local watch_pid=$!
+  sleep 2
+  echo scratch > "${ROOT}/wt-x/uncommitted.txt"
+  sleep 3
+  rm -f "${ROOT}/wt-x/uncommitted.txt"
+  wait "${watch_pid}" || true
+
+  local n
+  n="$(grep -c '^wt-x:' "${log}" || true)"
+  [[ "${n}" -eq 2 ]] || {
+    echo "expected two transitions reported, got ${n}:"
     cat "${log}"
     return 1
   }
