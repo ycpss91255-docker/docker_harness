@@ -1,6 +1,6 @@
 # Integration Tests
 
-Integration level (ISTQB): several hooks / components together. **11 tests**
+Integration level (ISTQB): several hooks / components together. **15 tests**
 under `.claude/test/bats/integration/`.
 
 ### .claude/test/bats/integration/chain_spec.bats (3)
@@ -22,3 +22,12 @@ under `.claude/test/bats/integration/`.
 | --dry-run reports the manual verdict without touching the tree | manual verdict, whole-tree classification, nothing written |
 | prose differing only in a digit is refused, not silently kept | mask-equal but generator-preserved: exits 2, markers intact, nothing pushed |
 | --dry-run refuses a digit-only prose conflict and writes nothing | dry-run verdict matches the live refusal; nothing written |
+
+### .claude/test/bats/integration/ready_for_agent_gates_spec.bats (4)
+
+| Test | Scenario |
+|------|----------|
+| both gates refuse the same under-specified issue | - |
+| both gates accept the same complete issue | - |
+| both gates accept parts that arrived as a grill comment | - |
+| only Gate A depends on the label being defined in the repo | - |

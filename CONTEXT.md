@@ -120,6 +120,7 @@ docker/
     │   ├── fix-compose-copy-line.sh         # 一次性 compose.yaml COPY 路徑修正
     │   ├── fix-dockerfile-lint-lib.sh        # 通用：對 --branch 指定的 chore 分支批次 patch downstream Dockerfile 加 `COPY .base/script/docker/lib /lint/lib`（#284 sub-libs split 後 fanout 必須跑，idempotent）
     │   ├── fix-dockerfile-copy-script.sh     # 通用：對 --branch 指定的 chore 分支批次 patch downstream Dockerfile 把 `COPY *.sh /lint/` 改成 `COPY script/*.sh /lint/`（base#330 / v0.31.0 wrapper consolidation 後 root 沒有 *.sh,active 2 個下游 fanout 必須跑,idempotent）
+    │   ├── check-ready-for-agent.sh         # Gate B of ADR-00000015:`check-ready-for-agent.sh [-R owner/repo] <issue|url>` 讀 issue(body + comments)判斷四要件是否齊備;0=ready、1=缺(缺的部分印 stdout 給 #296 消費、說明走 stderr)、2=問不到(絕不把讀不到當 ready);刻意不看 label — 「這個 label 誠不誠實」是 Gate A 的問題,「現在動工安不安全」是這裡的問題,共用 lib/ready-for-agent.sh,refs #294 / #296
     │   ├── check-claude-md-tree.sh          # CI lint：parse this file 的 .claude/ tree vs filesystem，drift 就 exit 1 (post-#127: just -f .claude/test/justfile tree-check passes CONTEXT.md as arg)
     │   ├── check-claude-md-ceiling.sh        # CI lint：assert CLAUDE.md 行數 + ^## 數在 ceiling 內 (defaults 240 / 20, env-overridable);refs #127
     │   ├── update-stale-pr.sh               # one-shot merge origin/main + normal push (NO rebase/force) for a PR whose base moved (BEHIND/CONFLICTING);auto-resolve worktree by branch via $WORKSPACE_DIR scan;衝突只自動解一類:digit run 遮蔽後兩側相同的 regenerated hunk,且檔案要在 sync-doc-test-counts.sh --list-outputs 內,再加一道證明(兩份 scratch copy 各留一側 → 各跑一次 generator → 兩棵樹必須 byte-identical,否則那行是 generator 不會覆寫的 prose),其餘整棵樹拒絕 exit 2,refs #87/#221/#287
@@ -153,7 +154,9 @@ docker/
     │       ├── log.lnav-format.json           # lnav format file for the JSON logger output
     │       ├── roster.tsv                      # THE 一份 org repo 名冊(取代先前散在 4 支 script + pr.md 的複本):欄位 repo/path/fanout(active|parked|n-a)/mutation/settings/check/note;fanout 欄同時餵 batch-base-upgrade(開 PR)與 check-template-versions(驗證),所以兩邊不可能再看不同集合,refs #272
     │       ├── roster.sh                       # roster.tsv 的唯一 reader:roster_fanout_paths/_repos <active|parked|all>、roster_mutation_paths/_repos、roster_settings_repos、roster_required_check <repo>、roster_file;純讀不改,refs #272
-    │       └── ci-required-jobs.sh             # 從 repo 自己的 workflow 推導「CI 到底要求什麼」的純讀函式庫:ci_required_jobs(ci-rollup needs,flow/block 兩種 YAML seq)、ci_ci_sh_targets / ci_check_targets(docker_harness 兩邊 target 集合)、ci_actionlint_image / ci_actionlint_ignores(pin + 抑制規則);ci-and-stamp.sh 用它把 marker 的宣稱釘在 workflow 上而非手抄表,refs #272
+    │       ├── ci-required-jobs.sh             # 從 repo 自己的 workflow 推導「CI 到底要求什麼」的純讀函式庫:ci_required_jobs(ci-rollup needs,flow/block 兩種 YAML seq)、ci_ci_sh_targets / ci_check_targets(docker_harness 兩邊 target 集合)、ci_actionlint_image / ci_actionlint_ignores(pin + 抑制規則);ci-and-stamp.sh 用它把 marker 的宣稱釘在 workflow 上而非手抄表,refs #272
+    │       ├── gh-command.sh                   # 「這條 command 到底跑的是哪個程式」的共用 parser(strip_heredocs / fold_continuations / gh_segment / gh_subcommand / gh_repo_flag / gh_flag_value):heredoc body 與引號內字串是資料不是語法,先切出 command word 真的是 `gh` 的那一段再判斷 flag;從 enforce_gh_body_file.sh 抽出,#255/#276/#283 同型 bug 的唯一解析點(CONTEXT.md §15),refs #294
+    │       └── ready-for-agent.sh              # `ready-for-agent` 四要件(Seams / First slice / Gate / Bound)readiness 檢查的唯一實作,Gate A(enforce_ready_for_agent.sh 貼 label)與 Gate B(check-ready-for-agent.sh 開工前)共用:rfa_missing_parts / rfa_label_defined / rfa_issue_text(body + comments,因為 grill 結論寫在 comment)/ rfa_check;label 未定義或 gh 問不到一律靜默,refs ADR-00000015 / #294
     ├── memory/               # Claude Code per-project memory（auto-loaded via symlink）
     │   ├── MEMORY.md         # 入口索引(被 Claude Code 自動讀進 system prompt 開頭)
     │   ├── feedback_*.md     # 個別 feedback / workflow rule（每檔有 name + description + type frontmatter）
@@ -174,6 +177,7 @@ docker/
     │   ├── remind_no_heredoc_redirect.sh # cat <<EOF > file 時提醒用 Write 工具
     │   ├── remind_no_chinese_in_git_artifacts.sh # git commit / gh PR / issue title|body|comment 前 BLOCK CJK 與全形字符
     │   ├── enforce_gh_body_file.sh     # gh issue/pr create/edit/comment/close/review 前 BLOCK 違反 body-file 規律的 8 種 pattern(配合 [[gh-artifact-format]] skill,refs #64)
+    │   ├── enforce_ready_for_agent.sh  # Gate A of ADR-00000015:`gh issue edit N --add-label ready-for-agent` 前讀 issue(body + comments),四要件(Seams / First slice / Gate / Bound)缺任何一項就 BLOCK 並點名缺的;判斷走 lib/gh-command.sh(引號/heredoc 裡的字串不算 invocation)、readiness 走 lib/ready-for-agent.sh(與 Gate B 同一份);repo 沒定義該 label 或 gh 問不到就靜默,refs #294
     │   ├── remind_test_tools_smoke_sync.sh # Dockerfile.test-tools 改動但同層 release-test-tools.yaml 未同步時提醒
     │   ├── auto_allow_rm_in_workspace.sh # rm <workspace+/tmp 內 path> 自動 allow（避開 Bash(rm:*) ask yes-fatigue）
     │   ├── auto_allow_touch_ack.sh       # touch $TMPDIR/claude-checkpoint-*.ack 自動 allow（/tmp checkpoint 協定一鍵 ack,refs ADR-00000002 / #117）

@@ -52,6 +52,15 @@
 
 set -uo pipefail
 
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The "which command is this, actually" parser -- gh_segment /
+# strip_heredocs / fold_continuations / gh_subcommand. Shared with
+# enforce_ready_for_agent.sh rather than copied, because #255, #276 and
+# #283 were three reports of one defect in exactly this code and a second
+# copy is where the fourth report comes from (refs #294).
+# shellcheck disable=SC1091
+source "${HOOK_DIR}/../scripts/lib/gh-command.sh"
+
 readonly SHORT_LIMIT=80
 
 extract_body() {
@@ -158,77 +167,6 @@ has_cat_substitution() {
   [[ "${cmd}" =~ --(body|comment)[[:space:]]+\"?\$\([[:space:]]*cat[[:space:]] ]]
 }
 
-detect_subcmd() {
-  local cmd="$1"
-  if [[ "${cmd}" =~ gh[[:space:]]+(issue|pr)[[:space:]]+([a-z]+) ]]; then
-    printf '%s %s' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
-  fi
-}
-
-# gh_segment <cmd> -- the segment of <cmd> whose command word is `gh`:
-# split <cmd> on the shell separators (&&, ||, |, ;) and return the first
-# piece whose first token is `gh`. ALL flag detection (--body / --comment /
-# --body-file / --label, the cat / stdin parser-fallback checks, the
-# subcommand parse) must scope to this segment, else a flag belonging to a
-# different program in a chained command (a trailing `echo "... --body ..."`,
-# `python3 -c`, `git log -S`) or a `gh ...` merely mentioned inside a quoted
-# argument of another command false-triggers the verdict. Generalizes the
-# #219 close-only slice to every rule (refs #255). Naive w.r.t. quotes (a
-# separator inside a quoted body truncates the segment) -- the goal is
-# cross-command isolation, not a full shell parser; the truncation only
-# affects the flag VALUE, never the presence of the gh subcommand + flag.
-#
-# A newline separates two commands, so it IS a boundary -- EXCEPT after a
-# trailing backslash, which is a line continuation inside ONE command.
-# fold_continuations() collapses those first, else a multi-line invocation
-# is cut at line 1 and every flag below it (a --body-file, a --label) is
-# invisible to every rule -- a false deny on a valid command (refs #283).
-fold_continuations() {
-  printf '%s' "${1//\\$'\n'/ }"
-}
-
-# strip_heredocs <cmd> -- drop every heredoc BODY (and its terminator),
-# keeping the line that opens it. Heredoc content is data the command
-# writes somewhere, not commands being run: a body line that happens to
-# start with `gh` is prose, and reading it as the invocation is the same
-# data-as-syntax mistake as #255 (refs #283). `<<<` herestrings are not
-# heredocs and are left alone.
-strip_heredocs() {
-  local line trimmed out="" delim="" in_body=0
-  while IFS= read -r line; do
-    if (( in_body )); then
-      trimmed="${line#"${line%%[![:space:]]*}"}"
-      [[ "${trimmed}" == "${delim}" ]] && in_body=0
-      continue
-    fi
-    out+="${line}"$'\n'
-    if [[ "${line}" =~ (^|[^<])\<\<-?[[:space:]]*[\"\']?([A-Za-z_][A-Za-z0-9_]*) ]]; then
-      delim="${BASH_REMATCH[2]}"
-      in_body=1
-    fi
-  done <<< "$1"
-  printf '%s' "${out}"
-}
-
-gh_segment() {
-  local cmd
-  cmd="$(strip_heredocs "$1")"
-  cmd="$(fold_continuations "${cmd}")"
-  local seg
-  cmd="${cmd//&&/$'\n'}"
-  cmd="${cmd//||/$'\n'}"
-  cmd="${cmd//|/$'\n'}"
-  cmd="${cmd//;/$'\n'}"
-  while IFS= read -r seg; do
-    seg="${seg#"${seg%%[![:space:]]*}"}"   # ltrim leading whitespace
-    if [[ "${seg}" =~ ^gh[[:space:]] ]]; then
-      printf '%s' "${seg}"
-      return 0
-    fi
-  done <<< "${cmd}"
-  return 1
-}
-
 deny() {
   local reason="$1"
   jq -n --arg m "${reason}" '{
@@ -268,7 +206,7 @@ main() {
     return 0
   fi
 
-  subcmd="$(detect_subcmd "${seg}")"
+  subcmd="$(gh_subcommand "${seg}")"
 
   case "${subcmd}" in
     "issue create"|"pr create")

@@ -6,6 +6,31 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **`ready-for-agent` now means something, at both ends (closes #294).**
+  ADR-00000015 defines the label as an assertion that four things are
+  present in the issue -- **Seams**, **First slice**, **Gate**, **Bound** --
+  and nothing checked it, which is why it had been applied twice since it
+  was created and meant nothing. Two gates now do, and the ADR records them
+  as different questions rather than the same check twice.
+  `enforce_ready_for_agent.sh` is the first: a PreToolUse hook that reads
+  the issue behind `gh issue edit N --add-label ready-for-agent` and denies
+  when any part is absent, naming the ones that are.
+  `check-ready-for-agent.sh` is the second: the same question, callable,
+  for the fix pipeline to ask before it opens a worktree regardless of what
+  labels the issue wears (#296 consumes it). Both answer through one
+  implementation, `lib/ready-for-agent.sh` -- two copies of the parts list
+  would drift.
+  They read the issue's **comments as well as its body**: the body stays
+  the original spec and a grill writes its conclusions back as a comment,
+  so a body-only check would have failed every grilled issue against its
+  own gate. The heading shape authors must write is documented in
+  `gh-artifact-format` section 7.
+  A repo whose label inventory has no `ready-for-agent` sees no gate at
+  all, and a gh that cannot be reached leaves the label edit alone -- a
+  gate firing where the vocabulary is not adopted is pure friction (#278's
+  own reasoning), and neither gate may block on a transient failure.
+
 ### Changed
 - **`update-stale-pr.sh` recomputes the one conflict shape that is always
   mechanical (closes #287).** Landing a batch against `strict` branch
@@ -40,6 +65,18 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   be byte-identical. `--dry-run` on a worktree that is already mid-merge
   prints the same classification, runs the same proof, and writes nothing,
   so it cannot advertise a tree the live path will refuse.
+- **command parsing moved into `lib/gh-command.sh` (refs #255 / #276 /
+  #283).** Those three reports were one defect -- a hook reading data as
+  syntax -- and the rule that came out of them (CONTEXT.md section 15) is
+  that a hook must establish what the command IS before deciding what it
+  contains. `enforce_gh_body_file.sh` held the only implementation of that
+  rule; the new gate needed the same answer, and a second copy is how the
+  next report of the same defect gets written. `gh_segment`,
+  `strip_heredocs` and `fold_continuations` now live in one library, joined
+  by `gh_issue_ref_parts` (a bare number or an issue URL, which carries its
+  own repo) and `gh_flag_values` (every occurrence of a repeated flag, not
+  the first -- `--add-label bug --add-label ready-for-agent` is the ordinary
+  way to set a kind and a state label at once).
 - **the hooks stopped knowing about `make` and `justfile.ci` (closes #280).**
   The make -> just migration finished a while ago: no repo root in the
   workspace carries a `Makefile.ci` or a `justfile.ci`, and every repo has a
