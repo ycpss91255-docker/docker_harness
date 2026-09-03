@@ -28,8 +28,11 @@ upstream           1
 question           1
 ```
 
-Never used at all: `accessibility`, `duplicate`, `good first issue`,
-`help wanted`, `invalid`, `wontfix`.
+Never used at all: `duplicate`, `good first issue`, `help wanted`,
+`invalid`, `wontfix`. With `question` -- the single use in the table
+above -- those are the six GitHub defaults every one of the 24 repos
+carries. `accessibility` is not among them: it is a newer GitHub
+default, these repos predate it, and it exists in **zero** org repos.
 
 The inventory itself had drifted badly. `base` carried 15 labels,
 `docker_harness` 10, and `template`, `realsense_ros2`, `multi_run` and
@@ -42,8 +45,8 @@ are the emptiest.
 
 `gh-artifact-format` meanwhile documented a "stock label inventory"
 including `question` / `wontfix` / `invalid` / `duplicate` /
-`good first issue` / `help wanted`, none of which any issue has ever
-carried, and noted that cross-repo alignment was out of scope for #91.
+`good first issue` / `help wanted`, which carry one issue between them,
+and noted that cross-repo alignment was out of scope for #91.
 
 ## Decision
 
@@ -119,14 +122,24 @@ makes the author hesitate over which to apply.
 
 `upstream` is dropped: one use.
 
-The six never-used GitHub defaults (`accessibility`, `duplicate`,
-`good first issue`, `help wanted`, `invalid`, `wontfix`) are **left in
-place and left unmanaged**. Deleting them means touching 24 repos and
-GitHub recreates its defaults for new ones anyway; ignoring them costs
-nothing. `good first issue` and `help wanted` presuppose external
-contributors this org does not have; `accessibility` presupposes a user
-interface; the close-decision labels are covered by GitHub's own close
-reasons (`not planned`), which #212 was closed with.
+The six GitHub defaults every repo carries (`duplicate`,
+`good first issue`, `help wanted`, `invalid`, `question`, `wontfix`)
+are **left in place and left unmanaged**. Deleting them means touching
+24 repos and GitHub recreates its defaults for new ones anyway;
+ignoring them costs nothing. `good first issue` and `help wanted`
+presuppose external contributors this org does not have; `question` has
+one use in ~500 issues; the close-decision labels are covered by
+GitHub's own close reasons (`not planned`), which #212 was closed with.
+
+That is a statement about the **repository** label surface. The
+org-level **default-label list** is a different surface: it seeds newly
+created repositories only, and changing it neither adds, edits nor
+deletes a label in any repo that already exists. Removing an entry
+there therefore costs nothing and fixes the other half -- new repos
+starting dirty. The six were accordingly removed from the org default
+list, which now holds exactly the five managed labels
+(ycpss91255-docker/.github#26), while they stay in place and unmanaged
+in every repo that already carries them.
 
 `dependencies` and `github_actions` are created by Dependabot where it
 is enabled, not by us. Managing them would make the drift check demand
@@ -151,8 +164,8 @@ kind of source of truth rather than two.
 ## Consequences
 
 - `gh-artifact-format` section 6 must be rewritten: its stock inventory
-  lists six labels nothing uses, and its note that cross-repo alignment
-  is out of scope is now false.
+  lists six labels this vocabulary does not manage, and its note that
+  cross-repo alignment is out of scope is now false.
 - `/new-repo` must point at the sync script instead of carrying manual
   label steps, and must say that creating a repo from `template` does
   not bring settings with it.
@@ -169,7 +182,8 @@ kind of source of truth rather than two.
   axis makes redundant, and drops `ready-for-agent`, whose low count
   reflects that nothing enforces it yet -- the very thing this decision
   changes.
-- **Adopt GitHub's full default set including `accessibility`.**
+- **Adopt GitHub's full default set, including `accessibility`,**
+  which none of the 24 repos currently carries.
   Rejected: "it is a platform default" is not a reason for a
   Dockerfile-and-shell org. GitHub's documentation recommends no labels
   beyond the defaults, so there is no external authority to defer to
