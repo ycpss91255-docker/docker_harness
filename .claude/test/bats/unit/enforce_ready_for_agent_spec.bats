@@ -212,3 +212,62 @@ uninstall_gh() {
   assert_silent
 }
 
+# Slice 5 -- where the vocabulary is not adopted, and where gh cannot be
+# asked, the gate says nothing. A gate firing where the label does not
+# exist is pure friction (#278's own reasoning), and a label edit must
+# never hang on a transient gh failure.
+
+@test "a repo that does not define ready-for-agent is silent" {
+  seed_labels 'bug' 'enhancement' 'documentation'
+  seed_issue "$(md '## Seams' 'x')"
+  run "$(hook enforce_ready_for_agent.sh)" <<< '{"tool_input":{"command":"gh issue edit 42 --add-label ready-for-agent"}}'
+  assert_silent
+}
+
+@test "a repo that does define ready-for-agent is gated" {
+  seed_labels 'bug' 'ready-for-agent'
+  seed_issue "$(md '## Seams' 'x')"
+  run "$(hook enforce_ready_for_agent.sh)" <<< '{"tool_input":{"command":"gh issue edit 42 --add-label ready-for-agent"}}'
+  assert_permission_decision "deny"
+}
+
+@test "gh that cannot answer leaves the edit alone" {
+  seed_issue "$(md '## Seams' 'x')"
+  uninstall_gh
+  run "$(hook enforce_ready_for_agent.sh)" <<< '{"tool_input":{"command":"gh issue edit 42 --add-label ready-for-agent"}}'
+  assert_silent
+}
+
+# Slice 6 -- the parsing trap. #255, #276 and #283 were one defect:
+# reading data as syntax. The gate must establish that the command RUNS
+# gh before deciding what it contains.
+
+@test "an issue body quoting the labelling command does not trigger the gate" {
+  seed_issue "$(md '## Seams' 'x')"
+  run "$(hook enforce_ready_for_agent.sh)" <<< '{"tool_input":{"command":"echo \"then run gh issue edit 42 --add-label ready-for-agent\" >> /tmp/notes.md"}}'
+  assert_silent
+}
+
+@test "the labelling command inside a heredoc body is prose, not an invocation" {
+  seed_issue "$(md '## Seams' 'x')"
+  run "$(hook enforce_ready_for_agent.sh)" <<< '{"tool_input":{"command":"cat > /tmp/x.md <<EOF\ngh issue edit 42 --add-label ready-for-agent\nEOF"}}'
+  assert_silent
+}
+
+@test "a real labelling command chained after another still fires" {
+  seed_issue "$(md '## Seams' 'x')"
+  run "$(hook enforce_ready_for_agent.sh)" <<< '{"tool_input":{"command":"git status && gh issue edit 42 --add-label ready-for-agent"}}'
+  assert_permission_decision "deny"
+}
+
+@test "a labelling command folded over a line continuation still fires" {
+  seed_issue "$(md '## Seams' 'x')"
+  run "$(hook enforce_ready_for_agent.sh)" <<< '{"tool_input":{"command":"gh issue edit 42 \\\n  --add-label ready-for-agent"}}'
+  assert_permission_decision "deny"
+}
+
+@test "a gh subcommand that is not issue edit is silent" {
+  seed_issue "$(md '## Seams' 'x')"
+  run "$(hook enforce_ready_for_agent.sh)" <<< '{"tool_input":{"command":"gh issue view 42 --json labels"}}'
+  assert_silent
+}
