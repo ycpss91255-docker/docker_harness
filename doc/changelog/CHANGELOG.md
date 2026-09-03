@@ -10,8 +10,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`ready-for-agent` now means something, at both ends (closes #294).**
   ADR-00000015 defines the label as an assertion that four things are
   present in the issue -- **Seams**, **First slice**, **Gate**, **Bound** --
-  and nothing checked it, which is why it had been applied twice since it
-  was created and meant nothing. Two gates now do, and the ADR records them
+  and nothing checked it, which is why the four repos defining it gave it
+  four different descriptions across its 49 uses. Two gates now do, and the ADR records them
   as different questions rather than the same check twice.
   `enforce_ready_for_agent.sh` is the first: a PreToolUse hook that reads
   the issue behind `gh issue edit N --add-label ready-for-agent` and denies

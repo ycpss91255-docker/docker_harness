@@ -111,8 +111,15 @@ issue-scope-change-in-comments rule), and the label goes on.
 These are two different questions -- "is the label honest" and "is this
 safe to start" -- not the same check twice. Only the first would let a
 hand-applied label through to an agent; only the second would let the
-label decay back into decoration, which is what already happened (2 uses
-since it was created).
+label decay back into decoration.
+
+The decay is not disuse -- measured across all 24 repos on 2026-09-03,
+`ready-for-agent` carries **49 issues**, so an earlier five-repo sample
+reading "2 uses" understated it badly. It decayed in *meaning*: the four
+repos that define the label give it four different descriptions ("Spec is
+fully specified...", "Triaged and ready for an AFK agent...", "Ready for
+an autonomous agent..." twice). A label that gates unattended work meant
+four things at once, which is the sharper version of the same argument.
 
 ### What is deliberately not managed
 
