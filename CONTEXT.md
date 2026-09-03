@@ -122,7 +122,7 @@ docker/
     │   ├── fix-dockerfile-copy-script.sh     # 通用：對 --branch 指定的 chore 分支批次 patch downstream Dockerfile 把 `COPY *.sh /lint/` 改成 `COPY script/*.sh /lint/`（base#330 / v0.31.0 wrapper consolidation 後 root 沒有 *.sh,active 2 個下游 fanout 必須跑,idempotent）
     │   ├── check-claude-md-tree.sh          # CI lint：parse this file 的 .claude/ tree vs filesystem，drift 就 exit 1 (post-#127: just -f .claude/test/justfile tree-check passes CONTEXT.md as arg)
     │   ├── check-claude-md-ceiling.sh        # CI lint：assert CLAUDE.md 行數 + ^## 數在 ceiling 內 (defaults 240 / 20, env-overridable);refs #127
-    │   ├── update-stale-pr.sh               # one-shot merge origin/main + normal push (NO rebase/force) for a PR whose base moved (BEHIND/CONFLICTING);auto-resolve worktree by branch via $WORKSPACE_DIR scan,refs #87/#221
+    │   ├── update-stale-pr.sh               # one-shot merge origin/main + normal push (NO rebase/force) for a PR whose base moved (BEHIND/CONFLICTING);auto-resolve worktree by branch via $WORKSPACE_DIR scan;衝突只自動解一類:digit run 遮蔽後兩側相同的 regenerated hunk,且檔案要在 sync-doc-test-counts.sh --list-outputs 內,其餘整棵樹拒絕 exit 2,refs #87/#221/#287
     │   ├── auto-merge-on-green.sh           # auto-merge-on-green skill 的腳本:arm gh pr merge --auto + poll mergeStateStatus(MERGED/BEHIND→update-branch/DIRTY/FAIL/grace),refs #211
     │   ├── serial-merge.sh                  # 同 repo 多 PR 依序落地:逐一 delegate auto-merge-on-green.sh(只 arm 隊首→≤1 armed→CI O(N²)→O(N)),skip-and-continue + summary,refs #235
     │   ├── prune-merged-worktrees.sh        # 批次清掉「branch 有 MERGED PR」的 worktree + local branch(squash-merge 讓 --is-ancestor 失效,故問 gh);每個 path 自己解析所屬 repo(rev-parse --git-common-dir)後用 git -C <repo> 操作→cwd-independent,--dry-run 走同一套 resolution/validation 只跳過 mutation,refs #260
@@ -144,7 +144,7 @@ docker/
     │   ├── new-adr.sh                         # /adr 的實作:auto-number 8 位數補零,從 doc/adr/[0-9]*.md 掃 max+1,渲染 5-section 模板 (Date/Status/Context/Decision/Alternatives/Consequences),refs #97
     │   ├── check-log-helper-usage.sh           # CI lint：scan .claude/scripts/*.sh 偵測 bare printf|echo（usage() 內 + log-allow:script/start..end allowlist marker 外）為違反 lib/log.sh adoption,refs #148 M5
     │   ├── _instinct_parser.py               # instinct-query.sh 用的 stdlib-only YAML parser helper (避免 PyYAML dep 在 Alpine test image 缺失)
-    │   ├── sync-doc-test-counts.sh           # doc/test/*.md generator：per-spec `### <path> (N)` heading、per-test catalogue rows、per-level `**N tests**` 與 TEST.md 索引全部從 spec tree 推導；`--check` 用同一條 code path 產生 scratch copy 再 diff（ci.sh doc-count-check / system spec 的 gate),取代手抄目錄,refs #265
+    │   ├── sync-doc-test-counts.sh           # doc/test/*.md generator：per-spec `### <path> (N)` heading、per-test catalogue rows、per-level `**N tests**` 與 TEST.md 索引全部從 spec tree 推導；`--check` 用同一條 code path 產生 scratch copy 再 diff（ci.sh doc-count-check / system spec 的 gate),取代手抄目錄;`--list-outputs` 印出它會改寫的 root-relative 路徑(與 _sync_all 同一份列舉),讓 update-stale-pr.sh 用問的而非自備清單,refs #265/#287
     │   ├── sync-org-repo-settings.sh         # idempotent org-wide repo settings sync (fork PR approval / merge defaults / branch protection); supports --dry-run + --repo <name>; private repos skip fork-PR + protection per API constraints
     │   └── lib/
     │       ├── checkpoint.sh                  # /tmp checkpoint protocol helper — write_checkpoint + is_acked,Tier 2 E2 hook 共享 deny/ack 契約,refs ADR-00000002 / #117

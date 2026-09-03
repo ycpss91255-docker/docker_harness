@@ -45,7 +45,9 @@ handles correctly.
   current branch matches the PR's head ref. Ambiguous matches
   (>1) are treated as "not found"; pass `--worktree` to
   disambiguate.
-- `--dry-run` -- print planned actions; no fetch / merge / push.
+- `--dry-run` -- print planned actions; no fetch / merge / push. If a
+  merge is already in progress, classify its conflicts and print the
+  verdict instead, writing nothing.
 
 ## Exit codes
 
@@ -53,7 +55,7 @@ handles correctly.
 |---|---|
 | `0` | Merge-updated + pushed (or `--dry-run` preview). |
 | `1` | `git fetch` / `git merge` failed for a non-conflict reason, or `git push` failed. |
-| `2` | Merge hit conflicts; manual resolution required. The script prints the conflicted file list + the exact recovery steps. |
+| `2` | Merge hit conflicts that are not pure count drift; manual resolution required. The script prints the per-file classification, why the tree was refused, the conflicted file list and the exact recovery steps. |
 | `3` | Pre-condition failure (PR not found, PR not OPEN, worktree not found). |
 
 ## Typical session
@@ -84,21 +86,56 @@ Monitor(
 Stop the previous Monitor (if any) before the new one so the
 notifications do not mix between heads.
 
-## Conflict resolution (exit code 2)
+## Conflict resolution
 
-When the merge hits conflicts, the script does **not** attempt
-automatic resolution. The known recurring patterns in this org
-are documented for the human resolver:
+Exactly one conflict class is resolved automatically, and nothing else
+(issue #287).
 
-1. **`doc/test/TEST.md` total counts** -- the `Total: **N tests**
-   (...)` header gets bumped by both the PR and the just-merged
-   commit. Resolution: take the incoming total and add the PR's
-   delta on top.
-2. **`doc/changelog/CHANGELOG.md` `[Unreleased]` ordering** --
-   when a release PR promotes `[Unreleased]` -> `[vX.Y.Z]` and
-   the PR adds its own entry, put the PR's `### Added` /
-   `### Fixed` lines back under a fresh `[Unreleased]` block;
-   leave the promoted `[vX.Y.Z]` below.
+A conflict hunk is **regenerated** when its two sides are identical once
+every digit run is masked -- the shape you get when both branches added
+tests and both rewrote the same derived total:
+
+```
+<<<<<<< HEAD
+Template self-tests: **3111 tests** total (2964 unit + 147 integration).
+=======
+Template self-tests: **3093 tests** total (2946 unit + 147 integration).
+>>>>>>> origin/main
+```
+
+Neither figure is right after the merge. The right one is what
+`.claude/scripts/sync-doc-test-counts.sh` computes from the merged tree,
+so the script drops the markers, re-runs the generator, stages the
+result and commits -- then pushes as usual. It prints the file, the hunk
+count and the before / after figures, so the landed number is visibly
+recomputed rather than chosen.
+
+Two guards bound it, and both refuse the WHOLE tree rather than part of
+it:
+
+- **Every hunk must be regenerated.** One prose hunk anywhere and
+  nothing is resolved. Taking `--ours` / `--theirs` wholesale on these
+  files has twice swallowed hand-written prose from an adjacent hunk;
+  that is the failure being designed out.
+- **Every conflicted file must be one the generator writes.** The set
+  comes from `sync-doc-test-counts.sh --list-outputs`, asked at run
+  time -- never a list kept in the script. A numeric-looking conflict in
+  a file nothing recomputes is a real conflict.
+
+`--dry-run` on a worktree that is already mid-merge prints the same
+classification and stops, which is the fastest way to see WHY a tree was
+refused.
+
+### When it exits 2 (manual)
+
+Recurring patterns worth knowing:
+
+1. **`doc/changelog/CHANGELOG.md` `[Unreleased]` ordering** -- when a
+   release PR promotes `[Unreleased]` -> `[vX.Y.Z]` and the PR adds its
+   own entry, put the PR's `### Added` / `### Fixed` lines back under a
+   fresh `[Unreleased]` block; leave the promoted `[vX.Y.Z]` below.
+2. **Catalogue rows beside the counts** -- resolve section by section,
+   never with `--ours` / `--theirs` on the whole file.
 
 After fixing each conflict:
 
@@ -125,6 +162,9 @@ this: `git rebase` / `git pull --rebase` are denied, and
 ## See also
 
 - `.claude/scripts/update-stale-pr.sh --help`
+- `.claude/scripts/sync-doc-test-counts.sh --list-outputs` -- the
+  generator's own answer to "which paths do you own", and the only
+  source of the auto-resolution allowlist.
 - `.claude/hooks/enforce_merge_update_not_rebase.sh` -- the
   PreToolUse hook that denies rebase / open-PR force-push.
 - `.claude/skills/wait-pr-ci/SKILL.md` -- the polling sibling; its
