@@ -59,7 +59,16 @@ readonly REPO_ROOT="${TEST_DIR%/.claude/test}"
 
 t_build() {
   # Build context = repo root; Dockerfile COPY paths stay relative to it.
-  docker build -f "${TEST_DIR}/Dockerfile" -t "${IMAGE}" "${REPO_ROOT}"
+  #
+  # APK_MIRROR is forwarded only when the caller set it, so the image's own
+  # default stays the single place the upstream host is named. Passing it
+  # unconditionally would put an empty --build-arg in front of that default
+  # on every machine that does not need one.
+  local _args=()
+  if [ -n "${APK_MIRROR:-}" ]; then
+    _args=(--build-arg "APK_MIRROR=${APK_MIRROR}")
+  fi
+  docker build "${_args[@]}" -f "${TEST_DIR}/Dockerfile" -t "${IMAGE}" "${REPO_ROOT}"
 }
 
 t_test() {
