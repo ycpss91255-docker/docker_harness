@@ -53,8 +53,14 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   interval, because re-reporting a stalled branch trains the reader to
   ignore the line, which is the same silence this exists to break. Exits 0
   with no output when everything is published; every line of stdout is one
-  branch that needs an operator. On its first real run it found two
-  `docker_harness` branches stranded with no PR, idle 3.1 and 7.9 days.
+  branch that needs an operator; and a sweep root that does not exist is
+  exit 2 on stderr rather than that same all-clear, because "nothing is
+  unpublished" and "I swept nothing" have to be tellable apart from outside.
+  The default root is the directory the checkout sits in when that checkout
+  is a **linked worktree** -- which is what every checkout that runs this is
+  -- and `../worktree` relative to the repo root otherwise. On its first
+  real run it found two `docker_harness` branches stranded with no PR, idle
+  3.1 and 7.9 days.
 
 ### Changed
 - **the hooks stopped knowing about `make` and `justfile.ci` (closes #280).**

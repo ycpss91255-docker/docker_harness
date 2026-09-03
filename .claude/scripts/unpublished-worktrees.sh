@@ -24,7 +24,10 @@
 # means someone is still typing, whoever they are.
 #
 # Exits 0 with no output when everything is published. Every line of stdout
-# is one branch that needs an operator.
+# is one branch that needs an operator. A sweep root that does not exist is
+# exit 2 on stderr, never the all-clear: "nothing is unpublished" and "I
+# swept nothing" have to be told apart from outside, or the silence this
+# script exists to break is the thing it answers with.
 set -euo pipefail
 
 _usage() {
@@ -32,10 +35,13 @@ _usage() {
 usage: unpublished-worktrees.sh [--root DIR] [--quiet-minutes N]
                                 [--watch SECONDS]
 
-  --root           directory holding the worktrees (default: ../worktree
-                   relative to the repo root). One root holds worktrees of
-                   SEVERAL repos, so each is resolved against its own
-                   origin -- there is no --repo flag to get wrong.
+  --root           directory holding the worktrees (default: the directory
+                   this checkout sits in when it is a linked worktree, and
+                   ../worktree relative to the repo root otherwise). A root
+                   that does not exist is an error, not an empty sweep. One
+                   root holds worktrees of SEVERAL repos, so each is
+                   resolved against its own origin -- there is no --repo
+                   flag to get wrong.
   --quiet-minutes  a branch must have been idle this long before it is
                    reported (default 15)
   --watch          poll forever at this interval, printing each branch once
@@ -60,7 +66,25 @@ done
 
 _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 _repo_root="$(git -C "${_here}" rev-parse --show-toplevel)"
-: "${_ROOT:=${_repo_root}/../worktree}"
+
+# A LINKED worktree already sits in the root being swept
+# (<root>/<repo>-<n>), so ../worktree relative to it is one level too deep
+# and names a path that does not exist. Every checkout of this repo on the
+# machines that run this script is a linked one, so that is the case the
+# default has to get right, not the exception.
+if [[ "$(git -C "${_repo_root}" rev-parse --git-dir)" \
+      != "$(git -C "${_repo_root}" rev-parse --git-common-dir)" ]]; then
+    : "${_ROOT:=$(dirname -- "${_repo_root}")}"
+else
+    : "${_ROOT:=${_repo_root}/../worktree}"
+fi
+
+# Silence is this script's all-clear, so a root it cannot read must not be
+# able to produce one.
+if [[ ! -d "${_ROOT}" ]]; then
+    printf 'no such worktree root: %s\n' "${_ROOT}" >&2
+    exit 2
+fi
 
 # A worktree's repo comes from its OWN origin. One root holds worktrees of
 # several repos side by side (base-957 next to docker_harness-290), so a
