@@ -1,10 +1,10 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1160 tests** across
-78 specs under `.claude/test/bats/unit/`. These were the former
-`test/smoke/` specs -- each drives a single hook with a sample JSON
-tool-input and asserts one behaviour -- which are Unit-level (a component
-in isolation), not the Smoke *type* (see [smoke.md](smoke.md)).
+Unit level (ISTQB): one hook or script in isolation.
+**1173 tests** across 85 specs under `.claude/test/bats/unit/`. These were
+the former `test/smoke/` specs -- each drives a single hook with a sample
+JSON tool-input and asserts one behaviour -- which are Unit-level (a
+component in isolation), not the Smoke *type* (see [smoke.md](smoke.md)).
 
 Every `.bats` file targets a single hook (or a script under
 `.claude/scripts/`). Each test pipes a sample JSON tool-input on
@@ -2006,3 +2006,21 @@ escaping, and the read-only `--check` gate.
 | a tracked non-shell file is not a lint target | - |
 | a tracked script deleted in the working tree is not a lint target | - |
 | t_lint lints the computed target list, not a shell glob | - |
+
+### .claude/test/bats/unit/unpublished_worktrees_spec.bats (13)
+
+| Test | Scenario |
+|------|----------|
+| --help prints usage and exits 0 | usage text names the flags |
+| an unknown argument exits 2 and names itself | there is no --repo flag to get wrong |
+| a merged, open or closed PR all silence the branch; only no-PR is reported | the predicate is not ahead-of-main -- --squash makes every landed branch look ahead |
+| everything published means exit 0 with no output at all | silence is the all-clear |
+| each worktree is answered against its OWN origin, not one shared repo | one root, two repos, each branch name a PR in the OTHER repo |
+| a branch that committed inside the quiet period is not reported | still being worked on |
+| --quiet-minutes 0 reports the branch the default window withheld | the knob is wired to the cutoff |
+| a dirty working tree is not reported, however long it has been idle | someone is still typing |
+| a branch with no commits ahead of origin/main is not reported | nothing to publish |
+| the PR match is exact: fix/9 is not answered by a PR for fix/99 | grep -qxF, not a substring |
+| a worktree on main and a non-repo directory are both skipped | neither can hold a stranded branch |
+| watch mode reports a stalled branch once, not once per interval | re-reporting trains the reader to ignore the line |
+| watch mode reports a branch that entered the state after it started | each sweep re-reads the root, so a late worktree is found |
