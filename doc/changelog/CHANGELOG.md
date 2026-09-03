@@ -32,6 +32,42 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   own reasoning), and neither gate may block on a transient failure.
 
 ### Changed
+- **the label docs describe the org that exists, not the one before
+  ADR-00000015 (closes #295).** `gh-artifact-format` section 6 documented a
+  "stock label inventory in every org repo" -- `question`, `wontfix`,
+  `invalid`, `duplicate`, `good first issue`, `help wanted`, which carry one
+  issue between them -- and said the `base`-only labels were "not yet rolled
+  out org-wide" with cross-repo alignment "out of scope for #91". All of
+  that is false since `labels.yaml`, `script/sync-labels.sh` and the weekly
+  drift cron landed in `ycpss91255-docker/.github` (#25) and the org default
+  labels were reduced to the same five (#26). The section is now the five
+  managed labels on two axes, sourced from `labels.yaml` word for word.
+  The title-prefix mapping table stays -- hook rule 9 still enforces it --
+  but what it left implicit is now stated: four of the six prefixes
+  (`feat`, `refactor`, `chore`, `track`) map to `enhancement`, which is why
+  ADR-00000015 defines that label by exclusion rather than as GitHub's "new
+  feature requests". Sections 6 and 7 read as one pair: 6 says which labels
+  exist, 7 says what the only one with a precondition costs to apply.
+- **`/new-repo` names the labels step and the reason its checklist gets
+  skipped (closes #295).** A GitHub template repository copies the file
+  tree and nothing else -- never labels, topics, branch protection or
+  settings -- so a repo created "from template" looks right and is not.
+  `sam_manager`, `omniverse_web_viewer` and `github_runner` were all created
+  after the checklist existed and all three still diverge from the five
+  managed labels. Post-setup is now stated as mandatory, and carries a
+  labels step pointing at `script/sync-labels.sh` rather than at
+  `gh label create`.
+- **ADR-00000015 listed a label that exists in no org repo (closes #295).**
+  Its six never-used GitHub defaults were taken from GitHub's current
+  documentation instead of from the live inventory, so the list included
+  `accessibility` -- a newer default that **zero** of the 24 repos carry --
+  and omitted `question`, which all 24 carry and which has the single use
+  already shown in the ADR's own measurement table. The ADR also read as
+  leaving the six untouched on both label surfaces. Those are different
+  surfaces: the org **default-label list** seeds newly created repositories
+  only and changing it touches no existing repo, so the six were removed
+  from it (ycpss91255-docker/.github#26) while they stay in place and
+  unmanaged in every repository that already carries them.
 - **`update-stale-pr.sh` recomputes the one conflict shape that is always
   mechanical (closes #287).** Landing a batch against `strict` branch
   protection means every branch merges the base into itself first, and in
