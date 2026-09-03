@@ -55,7 +55,7 @@ handles correctly.
 |---|---|
 | `0` | Merge-updated + pushed (or `--dry-run` preview). |
 | `1` | `git fetch` / `git merge` failed for a non-conflict reason, or `git push` failed. |
-| `2` | Merge hit conflicts that are not pure count drift; manual resolution required. The script prints the per-file classification, why the tree was refused, the conflicted file list and the exact recovery steps. |
+| `2` | Merge hit conflicts that are not provably pure count drift; manual resolution required. The script prints the per-file classification, the proof verdict, why the tree was refused, the conflicted file list and the exact recovery steps. |
 | `3` | Pre-condition failure (PR not found, PR not OPEN, worktree not found). |
 
 ## Typical session
@@ -110,20 +110,31 @@ result and commits -- then pushes as usual. It prints the file, the hunk
 count and the before / after figures, so the landed number is visibly
 recomputed rather than chosen.
 
-Two guards bound it, and both refuse the WHOLE tree rather than part of
-it:
+Three guards bound it, and all three refuse the WHOLE tree rather than
+part of it:
 
-- **Every hunk must be regenerated.** One prose hunk anywhere and
-  nothing is resolved. Taking `--ours` / `--theirs` wholesale on these
-  files has twice swallowed hand-written prose from an adjacent hunk;
-  that is the failure being designed out.
+- **Every hunk must mask equal.** One prose hunk anywhere and nothing is
+  resolved. Taking `--ours` / `--theirs` wholesale on these files has
+  twice swallowed hand-written prose from an adjacent hunk; that is the
+  failure being designed out.
 - **Every conflicted file must be one the generator writes.** The set
   comes from `sync-doc-test-counts.sh --list-outputs`, asked at run
   time -- never a list kept in the script. A numeric-looking conflict in
   a file nothing recomputes is a real conflict.
+- **The generator must land the same tree from either side.** Masking is
+  a filter, not the answer: a hand-written line reading `refs #265`
+  against `refs #287`, or "covers 3 of the supported hosts" against 7,
+  masks equal too -- and the generator preserves prose verbatim by
+  design, so nothing would overwrite it. Before resolving anything the
+  script resolves the tree twice in scratch copies, once keeping each
+  side, runs the generator over both and requires the results to be
+  byte-identical. Equal means the choice could not reach the landed
+  tree. Different names the file where it would have, and the tree is
+  refused.
 
 `--dry-run` on a worktree that is already mid-merge prints the same
-classification and stops, which is the fastest way to see WHY a tree was
+classification AND runs the same proof, so it can never advertise a tree
+the live path will refuse. It is the fastest way to see WHY a tree was
 refused.
 
 ### When it exits 2 (manual)

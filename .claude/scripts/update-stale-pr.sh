@@ -17,12 +17,14 @@
 #      ${WORKSPACE_DIR:-pwd}/worktree/* for a checkout on head branch).
 #   3. `git -C <wt> fetch origin <base>` then
 #      `git -C <wt> merge origin/<base>` into the PR branch.
-#   4. On conflict: classify every hunk. If EVERY hunk in EVERY conflicted
-#      file is REGENERATED (the two sides identical once digit runs are
-#      masked) and every conflicted file is in the generator's own
-#      `--list-outputs` set, drop the markers, re-run the generator, stage
-#      and commit -- the landed figure is recomputed from the merged tree,
-#      not chosen from either side (refs #287). Anything else: print
+#   4. On conflict: classify every hunk, then PROVE the classification.
+#      Shape first -- every hunk in every conflicted file REGENERATED (the
+#      two sides identical once digit runs are masked), every conflicted
+#      file in the generator's own `--list-outputs` set. Then the proof:
+#      resolve the tree twice in scratch copies, once keeping each side,
+#      run the generator over both, and require the two results to be
+#      byte-identical. Only then is the landed figure recomputed from the
+#      merged tree rather than chosen (refs #287). Anything else: print
 #      conflicted files + suggested next steps, exit 2, tree untouched.
 #   5. `git -C <wt> push` -- a NORMAL push (no --force, no rebase).
 #   6. Print fresh `wait-pr-ci.sh` command to re-arm Monitor.
@@ -66,9 +68,11 @@ Mechanism:
 
   Conflicts are auto-resolved for exactly one class and nothing else: a
   hunk whose two sides are identical once every digit run is masked, in a
-  file the repo's own doc generator names via --list-outputs. Those are
-  resolved, regenerated and committed; every other conflict still exits 2
-  with the merge untouched (refs #287).
+  file the repo's own doc generator names via --list-outputs, AND where
+  running that generator over both resolutions produces the same tree --
+  which is what makes the landed value a recomputation and not a choice.
+  Those are resolved, regenerated and committed; every other conflict
+  still exits 2 with the merge untouched (refs #287).
 
 Environment:
   STALE_PR_REGENERATOR  Worktree-relative path of the doc generator
@@ -122,16 +126,32 @@ locate_worktree() {
 #
 # So exactly one class is automated and nothing else:
 #
-#   REGENERATED  the two sides are identical once every digit run is masked.
-#                Either side may be kept, because the value is about to be
-#                overwritten by the generator.
+#   REGENERATED  the two sides are identical once every digit run is masked,
+#                AND the generator lands the same tree whichever side is
+#                kept. The mask is a filter, not the answer: it says the two
+#                sides differ in nothing but numbers, which is equally true
+#                of a hand-written line reading `refs #265` against `refs
+#                #287`, or `covers 3 of the supported hosts` against 7. The
+#                generator's stated contract is that a row whose test still
+#                exists KEEPS ITS DESCRIPTION VERBATIM -- preserving prose is
+#                the whole reason it is worth generating the catalogues -- so
+#                on those lines nothing is about to be overwritten and
+#                keeping a side means dropping the other side's committed
+#                edit. Whether the generator writes a given line is not
+#                something this script can read off the text, so it does not
+#                try: it resolves the tree twice in scratch copies, once per
+#                side, runs the generator over both, and requires the results
+#                to be byte-identical (_rp_verify). Equal means the choice
+#                could not reach the landed tree, which is exactly the claim
+#                the `[recomputed by ...]` annotation makes.
 #
 # Everything else -- prose, a hunk that only LOOKS numeric in a file the
-# generator does not write, markers that do not parse -- is a real conflict
-# and still exits 2 with the untouched merge in place. The rule is
-# all-or-nothing across every conflicted file: a tree with one real conflict
-# gets nothing auto-resolved, so a reviewer never has to work out which
-# hunks a tool touched and which it left.
+# generator does not write, a mask-equal hunk the generator turns out not to
+# rewrite, markers that do not parse -- is a real conflict and still exits 2
+# with the untouched merge in place. The rule is all-or-nothing across every
+# conflicted file: a tree with one real conflict gets nothing auto-resolved,
+# so a reviewer never has to work out which hunks a tool touched and which it
+# left.
 
 # Where the generator lives, relative to the worktree root. Override with
 # STALE_PR_REGENERATOR for a repo that keeps its generator elsewhere.
@@ -241,11 +261,13 @@ _rp_close_hunk() {
 # binary, delete/modify). Refusing is always safe: the caller still holds
 # the untouched conflict.
 #
-# With <resolved-out>, writes the marker-free content there, keeping OURS.
-# Either side is correct for this class; ours keeps the merge commit's diff
-# smallest.
+# With <resolved-out>, writes the marker-free content there, keeping <side>
+# ('ours' by default, 'theirs' for the mirror run _rp_verify needs). Which
+# side lands is not a free choice until _rp_verify has shown the generator
+# erases the difference; ours is the default only because it keeps the merge
+# commit's diff smallest.
 _rp_scan_file() {
-  local _file="$1" _out="${2:-}"
+  local _file="$1" _out="${2:-}" _side="${3:-ours}"
   local _state=0 _line _ours='' _theirs='' _buf=''
   _RP_HUNKS=0; _RP_REGEN=0; _RP_REAL=0
   _RP_FIG_OURS=(); _RP_FIG_THEIRS=()
@@ -272,7 +294,7 @@ _rp_scan_file() {
       3)
         if [[ "${_line}" =~ ^\>{7}([[:space:]]|$) ]]; then
           _rp_close_hunk "${_ours}" "${_theirs}"
-          _buf+="${_ours}"
+          if [[ "${_side}" == theirs ]]; then _buf+="${_theirs}"; else _buf+="${_ours}"; fi
           _state=0
           continue
         fi
@@ -296,11 +318,13 @@ _RP_OWNED=()
 _RP_TOTAL_HUNKS=0
 _RP_REASON=''
 
-# _rp_classify <worktree> -- classify every conflicted file, printing one
-# line each. 0 when EVERY conflicted file is owned by the generator AND
-# every one of its hunks is regenerated; 1 otherwise, with _RP_REASON set to
-# the first thing that disqualified the tree. Writes nothing, so --dry-run
-# and the live path can share it verbatim.
+# _rp_classify <worktree> -- the SHAPE half of the decision: classify every
+# conflicted file, printing one line each. 0 when EVERY conflicted file is
+# owned by the generator AND every one of its hunks masks equal; 1
+# otherwise, with _RP_REASON set to the first thing that disqualified the
+# tree. Shape is necessary and not sufficient -- a hand-written line
+# differing only in a digit passes it -- so a 0 here still has to survive
+# _rp_verify. Writes nothing, so --dry-run and the live path share it.
 _rp_classify() {
   local _wt="$1" _f _o _owned_raw _rc=0 _is_owned
   _RP_PLAN=(); _RP_PLAN_HUNKS=(); _RP_OWNED=(); _RP_TOTAL_HUNKS=0; _RP_REASON=''
@@ -352,11 +376,117 @@ _rp_classify() {
   return "${_rc}"
 }
 
+# _rp_copy_tree <src> <dst> -- copy everything but `.git` into <dst>, which
+# must exist. The scratch tree only has to be something the generator can be
+# rooted at; excluding the object store keeps the copy to the working set.
+_rp_copy_tree() {
+  local _src="$1" _dst="$2" _e
+  for _e in "${_src}"/* "${_src}"/.[!.]*; do
+    [[ -e "${_e}" ]] || continue
+    [[ "${_e##*/}" == '.git' ]] && continue
+    cp -a -- "${_e}" "${_dst}/" || return 1
+  done
+  return 0
+}
+
+# _rp_tree_digest <root> -- `cksum` over every regular file, sorted. Compared
+# whole it answers "are these two trees the same"; diffed, each differing
+# line names a file that differs.
+_rp_tree_digest() {
+  local _root="$1"
+  ( cd -- "${_root}" && find . -type f -exec cksum {} + | LC_ALL=C sort )
+}
+
+# _rp_verify <worktree> -- the proof behind the `[recomputed by ...]` label.
+#
+# Mask-equality says the two sides differ in nothing but numbers. It does
+# NOT say the generator writes that line, and for a hand-written line it
+# does not: the generator preserves prose verbatim on purpose. Keeping a
+# side there discards the other side's committed edit under an annotation
+# claiming the value was recomputed.
+#
+# There is no reading of the text that settles which lines the generator
+# owns -- so this asks the generator instead. It resolves the planned files
+# twice in two scratch copies of the merged tree, once keeping each side,
+# runs the generator over both, and compares the results byte for byte.
+# Identical means the kept side could not have reached the landed tree, and
+# only then is the auto-resolution a recomputation. Different names the file
+# where the choice would have survived, and the whole tree is refused.
+#
+# Nothing under <worktree> is touched, so --dry-run runs the same proof as
+# the live path and the two verdicts cannot disagree.
+#
+# 0 when proven; 1 otherwise, with _RP_REASON set.
+_rp_verify() {
+  local _wt="$1" _gen _rc=0 _side _dir _f _i
+  local _dirs=() _digests=() _first
+  _gen="$(_rp_regenerator "${_wt}")"
+  if [[ -z "${_gen}" ]]; then
+    _RP_REASON='no generator to prove the resolution with'
+    return 1
+  fi
+
+  for _side in ours theirs; do
+    if ! _dir="$(mktemp -d)"; then
+      _RP_REASON='could not create a scratch tree to prove the resolution in'
+      _rc=1
+      break
+    fi
+    _dirs+=("${_dir}")
+    if ! _rp_copy_tree "${_wt}" "${_dir}"; then
+      _RP_REASON='could not copy the merged tree into a scratch tree'
+      _rc=1
+      break
+    fi
+    for (( _i = 0; _i < ${#_RP_PLAN[@]}; _i++ )); do
+      _f="${_RP_PLAN[_i]}"
+      if ! _rp_scan_file "${_wt}/${_f}" "${_dir}/${_f}" "${_side}"; then
+        _RP_REASON="re-reading ${_f} did not reproduce the classification"
+        _rc=1
+        break
+      fi
+    done
+    (( _rc )) && break
+    if ! "${_gen}" "${_dir}" > /dev/null 2>&1; then
+      _RP_REASON="the generator failed on the ${_side}-resolved merge tree; nothing can be proven recomputed"
+      _rc=1
+      break
+    fi
+    _digests+=("$(_rp_tree_digest "${_dir}")")
+  done
+
+  if (( _rc == 0 )) && [[ "${_digests[0]}" != "${_digests[1]}" ]]; then
+    _first="$(diff <(printf '%s\n' "${_digests[0]}") <(printf '%s\n' "${_digests[1]}") \
+      | sed -n 's/^[<>] [0-9]* [0-9]* \.\///p' | head -n 1)"
+    _RP_REASON="the generator's output depends on which side is kept (${_first:-a generated file}), so that hunk is a hand-written line the mask cannot tell from a figure -- keeping either side would drop the other side's edit"
+    _rc=1
+  fi
+
+  (( ${#_dirs[@]} )) && rm -rf -- "${_dirs[@]}"
+  return "${_rc}"
+}
+
+# _rp_decide <worktree> -- classify, then prove. The single answer both
+# --dry-run and the live path ask for, so the flag can never advertise a
+# tree the live path will refuse.
+_rp_decide() {
+  local _wt="$1"
+  _rp_classify "${_wt}" || return 1
+  if ! _rp_verify "${_wt}"; then
+    printf '  proof: %s\n' "${_RP_REASON}"
+    return 1
+  fi
+  printf '  proof: the generator lands the same tree from either side; the figures below are recomputed, not chosen\n'
+  return 0
+}
+
 # _rp_resolve <worktree> -- drop the markers in every planned file, re-run
 # the generator over the merged tree, stage the result, and commit the
 # merge. Prints file / hunk count / before / after per hunk, so a reader can
 # see the landed number is one the generator computed and not one of the two
-# on offer. Returns 1 without committing if anything goes wrong.
+# on offer -- a claim _rp_verify has already proven by the time this runs,
+# which is why keeping OURS below is safe. Returns 1 without committing if
+# anything goes wrong.
 _rp_resolve() {
   local _wt="$1" _f _gen _i _j _ri _o _t _after _tmp
   local _records=()
@@ -511,7 +641,7 @@ main() {
   if (( dry_run )); then
     if [[ -n "$(git -C "${worktree}" diff --name-only --diff-filter=U 2>/dev/null)" ]]; then
       printf '[dry-run] a merge is already in progress; classifying its conflicts:\n'
-      if _rp_classify "${worktree}"; then
+      if _rp_decide "${worktree}"; then
         printf '[dry-run] verdict: auto-resolvable -- %d regenerated hunk(s) in %d file(s)\n' \
           "${_RP_TOTAL_HUNKS}" "${#_RP_PLAN[@]}"
       else
@@ -534,7 +664,7 @@ main() {
   if ! git -C "${worktree}" merge "origin/${base}" 2>&1; then
     if [[ -n "$(git -C "${worktree}" diff --name-only --diff-filter=U 2>/dev/null)" ]]; then
       printf '\nmerge hit conflicts; classifying each hunk:\n'
-      if _rp_classify "${worktree}"; then
+      if _rp_decide "${worktree}"; then
         if ! _rp_resolve "${worktree}"; then
           err ""
           err "auto-resolution failed part-way; the merge is still in progress."
