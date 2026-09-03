@@ -73,16 +73,25 @@
 # wrap. Reflow the sentence rather than un-deriving the figure.
 #
 # Usage:
-#   sync-doc-test-counts.sh [--check] [<repo-root>]
+#   sync-doc-test-counts.sh [--check|--list-outputs] [<repo-root>]
 #
 # Options:
-#   --check     Read-only. Regenerate into a scratch copy and diff it
-#               against the committed docs; exit 1 (printing the diff) if
-#               they differ. This is the CI / gate mode.
-#   -h, --help  Show this help.
+#   --check         Read-only. Regenerate into a scratch copy and diff it
+#                   against the committed docs; exit 1 (printing the diff)
+#                   if they differ. This is the CI / gate mode.
+#   --list-outputs  Read-only. Print, one per line and root-relative, every
+#                   file a sync pass may rewrite -- this generator's OUTPUT
+#                   SET. It exists so a caller can ASK which paths are
+#                   derived instead of keeping its own copy of the answer:
+#                   update-stale-pr.sh auto-resolves a merge conflict only
+#                   in a file this list names, and a second, hand-kept list
+#                   would eventually claim a file the generator does not
+#                   own -- which is precisely the case where taking either
+#                   side silently loses someone's writing (refs #287).
+#   -h, --help      Show this help.
 #
 # Exit codes:
-#   0  docs regenerated (default mode), or already in sync (--check)
+#   0  docs regenerated (default mode), in sync (--check), or list printed
 #   1  drift detected (--check only)
 #   2  usage / repo-root error
 #
@@ -418,19 +427,38 @@ _sync_index() {
   fi
 }
 
+# _doc_files <docdir> -- the catalogue files a sync pass rewrites, absolute,
+# in glob order. THE single enumeration of the output set: both _sync_all
+# and --list-outputs read it, so the answer a caller is given can never be a
+# different set from the one that actually gets written.
+_doc_files() {
+  local _docdir="$1" _doc
+  for _doc in "${_docdir}"/*.md; do
+    [[ -f "${_doc}" ]] && printf '%s\n' "${_doc}"
+  done
+  return 0
+}
+
+# _list_outputs <root> -- _doc_files, made root-relative.
+_list_outputs() {
+  local _root="$1" _doc
+  while IFS= read -r _doc; do
+    printf '%s\n' "${_doc#"${_root}"/}"
+  done < <(_doc_files "${_root}/doc/test")
+}
+
 # _sync_all <root> [docdir] -- regenerate every doc under <docdir> (default
 # <root>/doc/test). The docdir seam is what lets --check share this exact
 # code path instead of re-implementing the comparison.
 _sync_all() {
   local _root="$1" _docdir="${2:-$1/doc/test}" _doc _dir
-  for _doc in "${_docdir}"/*.md; do
-    [[ -f "${_doc}" ]] || continue
+  while IFS= read -r _doc; do
     _append_missing_sections "${_root}" "${_doc}"
     _sync_doc "${_root}" "${_doc}"
     _dir="$(_spec_dir "${_root}" "$(basename -- "${_doc}")")"
     [[ -n "${_dir}" ]] || continue
     _sync_level_total "${_root}" "${_doc}" "${_dir}"
-  done
+  done < <(_doc_files "${_docdir}")
   _sync_index "${_root}" "${_docdir}"
 }
 
@@ -455,6 +483,7 @@ main() {
   while (( $# )); do
     case "$1" in
       --check) _mode=check ;;
+      --list-outputs) _mode=list ;;
       -h|--help) usage; exit 0 ;;
       -*) printf 'unknown option: %s\n' "$1" >&2; usage; exit 2 ;;
       *) _root="$1" ;;
@@ -470,6 +499,10 @@ main() {
   fi
   _root="$(cd -- "${_root}" && pwd)"
 
+  if [[ "${_mode}" == list ]]; then
+    _list_outputs "${_root}"
+    return 0
+  fi
   if [[ "${_mode}" == check ]]; then
     if ! _check "${_root}"; then
       exit 1
