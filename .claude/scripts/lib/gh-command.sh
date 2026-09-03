@@ -118,6 +118,31 @@ gh_repo_flag() {
   printf ''
 }
 
+# gh_issue_ref <seg> <verb> -- print "<number> <repo>" for the issue
+# `gh issue <verb>` targets; return 1 when the target cannot be read.
+#
+# gh accepts a bare number or a full issue URL, and a URL carries its
+# own repo -- an -R on the same line does not apply to it -- so the repo
+# half is printed here rather than left to the caller's -R reading. An
+# argument that is neither (a shell variable, a flag because the ref
+# comes later) returns 1: the caller must stay silent rather than guess
+# which issue was meant. <repo> is empty for a bare number, meaning "let
+# gh resolve it from the working directory".
+gh_issue_ref() {
+  local seg="$1" verb="$2" ref
+  [[ "${seg}" =~ gh[[:space:]]+issue[[:space:]]+${verb}[[:space:]]+([^[:space:]]+) ]] || return 1
+  ref="${BASH_REMATCH[1]}"
+  ref="${ref#[\"\']}"
+  ref="${ref%[\"\']}"
+  if [[ "${ref}" =~ ^https?://[^/]+/([^/]+)/([^/]+)/issues/([0-9]+) ]]; then
+    printf '%s %s/%s' "${BASH_REMATCH[3]}" "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+    return 0
+  fi
+  ref="${ref#\#}"
+  [[ "${ref}" =~ ^[0-9]+$ ]] || return 1
+  printf '%s ' "${ref}"
+}
+
 # gh_flag_values <seg> <long-flag> -- print, one per line and with any
 # surrounding quotes stripped, the value of EVERY occurrence of
 # `--<flag> V` / `--<flag>=V` on the segment. Returns 1 when the flag

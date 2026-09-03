@@ -26,7 +26,8 @@
 #     where the vocabulary is not adopted is pure friction (#278)
 #   - gh cannot answer (not installed, network, auth): never block a
 #     label edit on a transient failure
-#   - the issue argument is not a plain number (a URL / `-` / a variable)
+#   - the issue argument names no readable issue (a shell variable, a
+#     flag): guessing which issue was meant is worse than not answering
 #
 # Refs: #294, ADR-00000015 (what the label asserts), ADR-00000014 (the
 #       dispatch contract the four parts feed).
@@ -72,7 +73,7 @@ deny() {
 }
 
 main() {
-  local input cmd seg repo num missing status joined
+  local input cmd seg ref repo num missing status joined
 
   input="$(cat)"
   cmd="$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)"
@@ -85,13 +86,21 @@ main() {
 
   adds_label "${seg}" "${READY_FOR_AGENT_LABEL}" || return 0
 
-  repo="$(gh_repo_flag "${seg}")"
+  # Resolve the target BEFORE the label lookup: a URL ref names its own
+  # repo and overrides any -R on the line, so the inventory must be read
+  # from the repo the edit will actually land in.
+  ref="$(gh_issue_ref "${seg}" 'edit')" || return 0
+  num="${ref%% *}"
+  # A bare number comes back with its repo half empty, which command
+  # substitution then strips -- so test for the separator, never for an
+  # empty tail (`${ref#* }` on a separator-less string returns the whole
+  # string, i.e. the number as the repo).
+  repo=""
+  [[ "${ref}" == *' '* ]] && repo="${ref#* }"
+  [[ -z "${repo}" ]] && repo="$(gh_repo_flag "${seg}")"
 
   # Not adopted here, or gh cannot say -- stay out of the way.
   rfa_label_defined "${repo}" || return 0
-
-  [[ "${seg}" =~ gh[[:space:]]+issue[[:space:]]+edit[[:space:]]+([0-9]+) ]] || return 0
-  num="${BASH_REMATCH[1]}"
 
   missing="$(rfa_check "${num}" "${repo}")"
   status=$?
