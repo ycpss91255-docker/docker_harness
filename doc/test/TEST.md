@@ -53,7 +53,7 @@ spec produces a matching doc diff. Full contract: the script's header.
 
 `just -f .claude/test/justfile lint` runs `shellcheck` on every top-level
 `.sh` in `.claude/hooks/` and `.claude/scripts/`
-(43 hooks + 39 helper scripts); `... hadolint` lints
+(44 hooks + 39 helper scripts); `... hadolint` lints
 `.claude/test/Dockerfile`. The full gate
 `... check` also runs the repo-integrity audits (tree / ceiling /
 log-helper) that the System specs mirror. CI runs the same
