@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1183 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1192 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -2034,3 +2034,17 @@ escaping, and the read-only `--check` gate.
 | a real labelling command chained after another still fires | - |
 | a labelling command folded over a line continuation still fires | - |
 | a gh subcommand that is not issue edit is silent | - |
+
+### .claude/test/bats/unit/check_ready_for_agent_spec.bats (9)
+
+| Test | Scenario |
+|------|----------|
+| an issue missing a part exits 1 and names the missing part | - |
+| a complete issue exits 0 | - |
+| the verdict does not depend on the label being defined | - |
+| an unready issue that already carries the label still exits 1 | - |
+| parts living in a comment are found | - |
+| an issue URL is accepted as the target | - |
+| a gh that cannot answer exits 2, never a false ready | - |
+| no issue argument exits 2 with usage | - |
+| --help exits 0 with usage | - |
