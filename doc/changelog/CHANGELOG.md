@@ -47,20 +47,27 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   predicate too: the report is gated on no commit for `--quiet-minutes`
   (default 15) and on a clean working tree. Each worktree resolves its repo
   from its **own** origin -- one root holds worktrees of several repos side
-  by side, so there is no `--repo` flag to get wrong -- and the PR match is
-  exact-line, so `fix/9` is not answered by a PR for `fix/99`. `--watch`
-  polls forever, reporting each branch once per transition rather than every
-  interval, because re-reporting a stalled branch trains the reader to
-  ignore the line, which is the same silence this exists to break. Exits 0
-  with no output when everything is published; every line of stdout is one
-  branch that needs an operator; and a sweep root that does not exist is
-  exit 2 on stderr rather than that same all-clear, because "nothing is
-  unpublished" and "I swept nothing" have to be tellable apart from outside.
-  The default root is the directory the checkout sits in when that checkout
-  is a **linked worktree** -- which is what every checkout that runs this is
-  -- and `../worktree` relative to the repo root otherwise. On its first
-  real run it found two `docker_harness` branches stranded with no PR, idle
-  3.1 and 7.9 days.
+  by side, so there is no `--repo` flag to get wrong. The PR match is
+  exact-line, so `fix/9` is not answered by a PR for `fix/99`, and the
+  per-repo list it matches against is a **cache, not the answer**: gh returns
+  newest-first and `--limit` truncates silently, so every miss is re-asked
+  with `--head`, which the window cannot truncate. `--watch` polls forever,
+  reporting each branch once per **transition** rather than every interval,
+  because re-reporting a stalled branch trains the reader to ignore the line,
+  which is the same silence this exists to break -- keyed on repo + branch,
+  since `<repo>-<n>` directories are recycled, and with the seen set rebuilt
+  from each sweep, since "once ever" is that silence too. Exits 0 with no
+  output when everything is published; every line of stdout is one branch
+  that needs an operator; and anything leaving part of the sweep
+  **unanswered** is exit 2 on stderr rather than that same all-clear -- a
+  root that does not exist, no checkout to derive a default root from, a PR
+  list `gh` would not return -- because "nothing is unpublished", "I swept
+  nothing" and "I could not tell" have to be tellable apart from outside. The
+  default root is the directory the checkout sits in when that checkout is a
+  **linked worktree** -- which is what every checkout that runs this is --
+  and `../worktree` relative to the repo root otherwise, resolved only when
+  no `--root` was given. On its first real run it found two `docker_harness`
+  branches stranded with no PR, idle 3.1 and 7.9 days.
 
 ### Changed
 - **the hooks stopped knowing about `make` and `justfile.ci` (closes #280).**

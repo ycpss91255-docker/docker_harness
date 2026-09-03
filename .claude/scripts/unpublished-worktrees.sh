@@ -24,9 +24,11 @@
 # means someone is still typing, whoever they are.
 #
 # Exits 0 with no output when everything is published. Every line of stdout
-# is one branch that needs an operator. A sweep root that does not exist is
-# exit 2 on stderr, never the all-clear: "nothing is unpublished" and "I
-# swept nothing" have to be told apart from outside, or the silence this
+# is one branch that needs an operator. Anything that leaves part of the
+# sweep UNANSWERED is exit 2 on stderr, never the all-clear: a root that
+# does not exist, a default root that cannot be resolved, a repo whose PR
+# list gh would not return. "Nothing is unpublished", "I swept nothing" and
+# "I could not tell" have to be told apart from outside, or the silence this
 # script exists to break is the thing it answers with.
 set -euo pipefail
 
@@ -53,6 +55,13 @@ USAGE
 _ROOT=""
 _QUIET_MIN=15
 _WATCH=0
+# Watch mode needs an identity for a report that the printed line does not
+# carry; see the watch loop.
+_KEYED=0
+# Set whenever some part of the sweep could not be answered. Silence is the
+# all-clear, so it must not be reachable from a question that went
+# unanswered.
+_UNANSWERED=0
 
 while [[ $# -gt 0 ]]; do
     case "${1}" in
@@ -64,19 +73,28 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-_here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-_repo_root="$(git -C "${_here}" rev-parse --show-toplevel)"
-
+# Only when no --root was given. Resolving this unconditionally kills the
+# script under `set -e` while computing a default it was about to discard --
+# an explicit --root is precisely the case where the script's own location
+# is allowed to be anywhere, including outside a git checkout.
+#
 # A LINKED worktree already sits in the root being swept
 # (<root>/<repo>-<n>), so ../worktree relative to it is one level too deep
 # and names a path that does not exist. Every checkout of this repo on the
 # machines that run this script is a linked one, so that is the case the
 # default has to get right, not the exception.
-if [[ "$(git -C "${_repo_root}" rev-parse --git-dir)" \
-      != "$(git -C "${_repo_root}" rev-parse --git-common-dir)" ]]; then
-    : "${_ROOT:=$(dirname -- "${_repo_root}")}"
-else
-    : "${_ROOT:=${_repo_root}/../worktree}"
+if [[ -z "${_ROOT}" ]]; then
+    _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+    if ! _repo_root="$(git -C "${_here}" rev-parse --show-toplevel 2>/dev/null)"; then
+        printf 'no --root given and %s is not inside a git checkout\n' "${_here}" >&2
+        exit 2
+    fi
+    if [[ "$(git -C "${_repo_root}" rev-parse --git-dir)" \
+          != "$(git -C "${_repo_root}" rev-parse --git-common-dir)" ]]; then
+        _ROOT="$(dirname -- "${_repo_root}")"
+    else
+        _ROOT="${_repo_root}/../worktree"
+    fi
 fi
 
 # Silence is this script's all-clear, so a root it cannot read must not be
@@ -99,19 +117,79 @@ _repo_of() {
 # One gh call per REPO per sweep, memoised, not one per worktree.
 # --state all is required: an open PR published the work just as much as a
 # merged one did, and a closed one recorded the decision not to.
+#
+# This list is a CACHE, not the answer. gh returns newest-first and --limit
+# truncates it silently, so a branch missing from the window may simply have
+# an older PR: this org has 614 PRs in one repo, of which a 400 window
+# misses 211. The limit is therefore sized to keep the exact per-branch
+# query below rare, and correctness does not rest on it.
+readonly _PR_WINDOW=1000
 declare -A _PR_CACHE=()
-_pr_branches() {
-    local _repo="${1}"
-    if [[ -z "${_PR_CACHE[${_repo}]+set}" ]]; then
-        _PR_CACHE["${_repo}"]="$(gh pr list -R "${_repo}" --state all --limit 400 \
-            --json headRefName --jq '.[].headRefName' 2>/dev/null || true)"
+declare -A _PR_UNANSWERABLE=()
+
+# _load_prs <repo> -- fill the per-sweep cache for <repo>; non-zero when gh
+# would not answer. The cache is written HERE, in the caller's shell, and
+# not from inside a command substitution: a function whose result is read
+# with $(...) runs in a subshell, so every assignment it makes is discarded
+# and "memoised" would mean one gh call per WORKTREE.
+_load_prs() {
+    local _repo="${1}" _out
+    [[ -z "${_PR_UNANSWERABLE[${_repo}]:-}" ]] || return 1
+    [[ -z "${_PR_CACHE[${_repo}]+set}" ]] || return 0
+    if ! _out="$(gh pr list -R "${_repo}" --state all --limit "${_PR_WINDOW}" \
+        --json headRefName --jq '.[].headRefName' 2>&1)"; then
+        # A failed query is not "this repo has no PRs". Answering it that
+        # way prints every published worktree of the repo as stranded, with
+        # the error swallowed.
+        _PR_UNANSWERABLE["${_repo}"]=1
+        printf 'cannot list PRs for %s: %s\n' "${_repo}" "${_out//$'\n'/ }" >&2
+        return 1
     fi
-    printf '%s\n' "${_PR_CACHE[${_repo}]}"
+    _PR_CACHE["${_repo}"]="${_out}"
+}
+
+# _has_pr <repo> <branch> -- 0 = a PR exists in some state, 1 = none does,
+# 2 = the question could not be answered. Only 1 is a report; 2 must not
+# become one, because "no PR" and "nobody told me" are different facts.
+#
+# A miss in the cached window is re-asked exactly, with --head, which the
+# window cannot truncate. Misses are rare by construction: they are the
+# lines this script prints.
+_has_pr() {
+    local _repo="${1}" _branch="${2}" _out
+    if ! _load_prs "${_repo}"; then
+        _UNANSWERED=1
+        return 2
+    fi
+    # An exact-line match: `fix/9` must not be answered by `fix/99`.
+    if grep -qxF -- "${_branch}" <<<"${_PR_CACHE[${_repo}]}"; then
+        return 0
+    fi
+    if ! _out="$(gh pr list -R "${_repo}" --head "${_branch}" --state all \
+        --limit 1 --json number --jq 'length' 2>&1)"; then
+        printf 'cannot list PRs for %s (%s): %s\n' \
+            "${_repo}" "${_branch}" "${_out//$'\n'/ }" >&2
+        _UNANSWERED=1
+        return 2
+    fi
+    [[ "${_out}" == "0" ]] || return 0
+    return 1
+}
+
+# _emit <key> <line> -- one report. The key is a stable identity for watch
+# mode's dedup and is never part of the data product; see the watch loop.
+_emit() {
+    if [[ "${_KEYED}" -eq 1 ]]; then
+        printf '%s\t%s\n' "${1}" "${2}"
+    else
+        printf '%s\n' "${2}"
+    fi
 }
 
 _sweep() {
-    local _now _cut _d _b _repo _ahead _last _dirty
+    local _now _cut _d _b _repo _ahead _last _dirty _pr _report
     _PR_CACHE=()
+    _PR_UNANSWERABLE=()
     _now="$(date +%s)"
     _cut=$(( _now - _QUIET_MIN * 60 ))
 
@@ -123,12 +201,8 @@ _sweep() {
         _repo="$(_repo_of "${_d}")"
         [[ -n "${_repo}" ]] || continue
 
-        # Published? Then whatever is on disk has a record. An exact-line
-        # match: `fix/9` must not be answered by `fix/99`.
-        if _pr_branches "${_repo}" | grep -qxF -- "${_b}"; then
-            continue
-        fi
-
+        # The local guards run FIRST because they are free, and because they
+        # decide most worktrees: only what survives them costs a gh call.
         _ahead="$(git -C "${_d}" rev-list --count origin/main..HEAD 2>/dev/null || echo 0)"
         [[ "${_ahead}" -gt 0 ]] || continue
 
@@ -138,30 +212,49 @@ _sweep() {
         _last="$(git -C "${_d}" log -1 --format=%ct 2>/dev/null || echo "${_now}")"
         [[ "${_last}" -le "${_cut}" ]] || continue
 
-        printf '%s: %s commit(s) on %s (%s), no PR, idle %sm -- %s\n' \
+        # Published? Then whatever is on disk has a record.
+        _pr=0
+        _has_pr "${_repo}" "${_b}" || _pr=$?
+        [[ "${_pr}" -eq 1 ]] || continue
+
+        # The key is repo + BRANCH. Worktree directories are recycled --
+        # <repo>-<n> is handed to whatever branch takes it next -- so a
+        # directory names the first branch to sit there and nothing after.
+        _report="$(printf '%s: %s commit(s) on %s (%s), no PR, idle %sm -- %s' \
             "$(basename "${_d}")" "${_ahead}" "${_b}" "${_repo}" \
             "$(( (_now - _last) / 60 ))" \
-            "$(git -C "${_d}" log -1 --format=%s)"
+            "$(git -C "${_d}" log -1 --format=%s)")"
+        _emit "${_repo}#${_b}" "${_report}"
     done
 }
 
 if [[ "${_WATCH}" -le 0 ]]; then
     _sweep
+    [[ "${_UNANSWERED}" -eq 0 ]] || exit 2
     exit 0
 fi
 
-# Watch mode reports each branch ONCE per transition. Re-reporting the same
-# stalled branch every interval would train the reader to ignore the line,
-# which is the same silence this script exists to break.
+# Watch mode reports each branch ONCE PER TRANSITION into the unpublished
+# state. Re-reporting the same stalled branch every interval would train the
+# reader to ignore the line, which is the same silence this script exists to
+# break -- but "once ever" is that silence too, so the seen set is rebuilt
+# from each sweep rather than accumulated: a branch that leaves the state
+# and enters it again is a new transition and is named again.
+_KEYED=1
 declare -A _seen=()
+declare -A _current=()
 while true; do
-    while IFS= read -r _line; do
+    _current=()
+    while IFS=$'\t' read -r _key _line; do
         [[ -n "${_line}" ]] || continue
-        _key="${_line%%:*}"
+        _current["${_key}"]=1
         if [[ -z "${_seen[${_key}]:-}" ]]; then
-            _seen["${_key}"]=1
             printf '%s\n' "${_line}"
         fi
     done < <(_sweep)
+    _seen=()
+    for _key in "${!_current[@]}"; do
+        _seen["${_key}"]=1
+    done
     sleep "${_WATCH}"
 done
