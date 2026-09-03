@@ -100,6 +100,7 @@ readonly _BASE_ATTESTED=(
 # would get the gate bypassed rather than obeyed.
 readonly _BASE_EXCLUDED=(
   "classify=CI-only path classifier computing the other jobs' if: gates; no repo-content verdict exists to reproduce locally"
+  "compute-shards=emits the partition the coverage matrix fans out over; the mirror runs that suite unsharded, so no partition is computed and there is nothing here to reproduce (the partitioner's own logic IS covered, by the shard-balance specs)"
   "coverage=kcov shard matrix; these specs DO run here, their kcov instrumentation does not (8-12 min) -- run just test coverage before a release or a shell-heavy PR"
   "coverage-gate=merges the coverage job's shard artifacts, which this run does not produce; COVERAGE_MIN is not modelled at all"
   "acceptance=native amd64 + arm64 runner matrix scaffolding a synthesized downstream repo; there is no local arm64 runner"
