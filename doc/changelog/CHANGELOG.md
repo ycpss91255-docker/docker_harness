@@ -32,6 +32,39 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   own reasoning), and neither gate may block on a transient failure.
 
 ### Changed
+- **`update-stale-pr.sh` recomputes the one conflict shape that is always
+  mechanical (closes #287).** Landing a batch against `strict` branch
+  protection means every branch merges the base into itself first, and in
+  the last cycle roughly fifteen of them conflicted on exactly the same
+  thing: the derived test-count figures in `doc/test/`. Both sides added
+  tests, so both rewrote the same total, and neither number is right
+  afterwards -- the right one is what the generator computes from the merged
+  tree. The script now classifies each conflict hunk and calls it
+  **regenerated** when the two sides are identical once every digit run is
+  masked AND the generator lands the same tree whichever side is kept. If
+  every hunk in every conflicted file qualifies, it drops the markers,
+  re-runs `sync-doc-test-counts.sh`, stages, commits and pushes, printing the
+  file, hunk count and before / after figures so the landed number is
+  visibly recomputed rather than picked. Anything else -- a prose hunk,
+  markers that do not parse -- still exits 2 with the merge untouched, and
+  the refusal is whole-tree: one real conflict and nothing is resolved, so a
+  reviewer never has to work out which hunks a tool touched. The set of
+  files eligible for this is asked of the generator at run time via a new
+  `sync-doc-test-counts.sh --list-outputs`, sharing the enumeration
+  `_sync_all` writes through; a numeric-looking conflict in a file nothing
+  recomputes is a real conflict, because taking either side there silently
+  drops a figure a person typed. The same reasoning applies INSIDE an owned
+  file, which is why the digit mask is not the last word: the generator
+  preserves hand-written prose verbatim by design, so a line reading
+  `refs #265` against `refs #287` -- or "covers 3 of the supported hosts"
+  against 7 -- masks equal while nothing is going to overwrite it, and
+  keeping a side there would drop the other side's committed edit under an
+  annotation claiming the value was recomputed. So the shape is proven
+  before it is trusted: the tree is resolved twice in scratch copies, once
+  keeping each side, the generator runs over both, and the two results must
+  be byte-identical. `--dry-run` on a worktree that is already mid-merge
+  prints the same classification, runs the same proof, and writes nothing,
+  so it cannot advertise a tree the live path will refuse.
 - **command parsing moved into `lib/gh-command.sh` (refs #255 / #276 /
   #283).** Those three reports were one defect -- a hook reading data as
   syntax -- and the rule that came out of them (CONTEXT.md section 15) is
