@@ -180,11 +180,18 @@ Two notes on usage:
 
 ## 6. Labels (issue create)
 
-Every `gh issue create` must pass `--label <name>` (enforced by hook
-rule 9). PRs are exempt -- they inherit labels from the issue they
-close via `Closes #N`.
+**Five managed labels, on two orthogonal axes. Nothing else is
+managed.** ADR-00000015 carries the reasoning and the measurements
+behind the set; this section is the operating instruction.
 
-Map the title type prefix to a stock GitHub label:
+Every `gh issue create` must pass `--label <name>` (hook rule 9). The
+hook check is lexical -- it requires a non-empty `--label`; picking the
+right one is on you. PRs are exempt: they inherit labels from the issue
+they close via `Closes #N`.
+
+### Axis 1 -- kind (exactly one, required at create)
+
+Derive it mechanically from the title type prefix (section 1):
 
 | Title type | Label |
 |---|---|
@@ -195,30 +202,72 @@ Map the title type prefix to a stock GitHub label:
 | `fix(*)` | `bug` |
 | `docs(*)` | `documentation` |
 
-Multiple labels are allowed and encouraged when applicable:
-`--label "bug" --label "help wanted"`. Stock label inventory in every
-org repo:
+Four of the six prefixes land on `enhancement`. That is why
+ADR-00000015 defines the label **by exclusion** -- "work that is
+neither a defect fix nor documentation" -- instead of as GitHub's "new
+feature requests": most of what carries it is refactors, chores and
+tracking issues, not features. The finer distinction is already in the
+title prefix, so splitting the label would buy nothing.
 
-- `bug` / `enhancement` / `documentation` -- primary type axis (use one).
-- `question` -- for issues that are really questions, not work items.
-- `wontfix` / `invalid` / `duplicate` -- close-decision labels (apply
-  on close, not on open).
-- `good first issue` / `help wanted` -- visibility / recruitment.
+| Label | Description (canonical, from `labels.yaml`) |
+|---|---|
+| `bug` | A defect in shipped behaviour |
+| `documentation` | Documentation only, no behaviour change |
+| `enhancement` | Work that is neither a defect fix nor documentation |
 
-The `base` repo additionally has `backlog` / `dependencies` /
-`github_actions`. Those are not yet rolled out org-wide. Cross-repo
-label inventory alignment is out of scope for #91 and tracked
-separately.
+### Axis 2 -- state (at most one, optional)
 
-Empty `--label ""` / `--label=` does not satisfy the rule. The hook is
-lexical -- if the label name does not exist on the target repo, `gh`
-itself errors out with a clear message; no API call from the hook.
+| Label | Description (canonical, from `labels.yaml`) |
+|---|---|
+| `backlog` | Deliberately not scheduled |
+| `ready-for-agent` | Spec is complete: seams, first slice, gate, bound |
+
+The axes are independent: a `bug` may be `ready-for-agent`, an
+`enhancement` may be `backlog`. Carrying **neither** state label means
+the scheduling question has not been answered yet -- which is why
+`triage` is not in the set: it said the same thing a second time.
+
+`backlog` is fine at create time
+(`--label enhancement --label backlog`). `ready-for-agent` normally
+arrives later, via `gh issue edit N --add-label ready-for-agent` -- and
+that is precisely the command section 7's gate reads, denying it until
+the four headings are present. Section 6 says which labels exist;
+section 7 says what the one label with a precondition costs.
+
+### Where the five come from
+
+`ycpss91255-docker/.github` holds `labels.yaml` as the org source of
+truth, plus `script/sync-labels.sh` (`--apply` backfills a repo,
+`--dry-run` reports drift) and a weekly drift cron
+(ycpss91255-docker/.github#25). The same five strings are also the
+org-level default labels, so a repo created now starts with them and
+nothing else (ycpss91255-docker/.github#26). Never edit a managed label
+in the GitHub UI -- the next sync reverts it; edit `labels.yaml`, get
+review, then sync.
+
+Backfill of the existing repos is still in flight, so a repo may not
+carry `backlog` / `ready-for-agent` yet. If the name does not exist on
+the target repo, `gh` itself errors out with a clear message (the hook
+makes no API call); run `script/sync-labels.sh --apply --repo <name>`
+from a `.github` checkout rather than inventing a substitute.
+
+Anything else on a repo is unmanaged and not part of the vocabulary:
+GitHub's six never-used defaults (`duplicate`, `good first issue`,
+`help wanted`, `invalid`, `question`, `wontfix`) are left wherever they
+already exist, and `dependencies` / `github_actions` belong to
+Dependabot. Do not reach for them -- close decisions are carried by
+GitHub's own close reasons (`gh issue close --reason "not planned"`),
+not by a label.
+
+Empty `--label ""` / `--label=` does not satisfy rule 9.
 
 ## 7. `ready-for-agent` -- the four headings
 
-`ready-for-agent` is not a feeling. Per ADR-00000015 it asserts that
-four things are present in the issue, and `enforce_ready_for_agent.sh`
-BLOCKS `gh issue edit N --add-label ready-for-agent` until they are.
+Of the five managed labels in section 6, `ready-for-agent` is the only
+one that costs something to apply -- it is not a feeling. Per
+ADR-00000015 it asserts that four things are present in the issue, and
+`enforce_ready_for_agent.sh` BLOCKS
+`gh issue edit N --add-label ready-for-agent` until they are.
 
 Write them under these headings, exactly:
 
