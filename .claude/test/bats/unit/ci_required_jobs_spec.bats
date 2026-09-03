@@ -48,11 +48,11 @@ marker() { echo "${REPO}/.claude/state/local-ci-pass/$(git -C "${REPO}" rev-pars
 # The point of the guard under test is that ci-and-stamp reads them out of
 # the workflow rather than out of a table like this one; the list is here
 # only to build the fixture and to assert the parser agrees with it.
-readonly ROLLUP_NEEDS='actionlint, classify, shellcheck, doc-counts, lint-static, hadolint, bats-fragile, bats-integration, coverage, coverage-gate, acceptance, system, worker-selftest'
+readonly ROLLUP_NEEDS='actionlint, classify, compute-shards, shellcheck, doc-counts, lint-static, hadolint, bats-fragile, bats-integration, coverage, coverage-gate, acceptance, system, worker-selftest'
 
 # seed_base_repo -- make ${REPO} look like a `base` checkout: root justfile,
 # no .base/ subtree, and a self-test.yaml whose ci-rollup carries the real
-# 13-job needs list plus the pinned actionlint invocation.
+# 14-job needs list plus the pinned actionlint invocation.
 seed_base_repo() {
   echo 'test:' > "${REPO}/justfile"
   mkdir -p "${REPO}/.github/workflows"
@@ -80,14 +80,19 @@ seed_base_repo() {
   run bash -c "source '${SCRIPTS_DIR}/lib/ci-required-jobs.sh'; \
                ci_required_jobs '${REPO}/.github/workflows/self-test.yaml'"
   assert_success
+  # The count is DERIVED from the fixture's own needs list rather than
+  # written next to it. A literal here is the same roster defect this spec
+  # exists to catch, one level up: adding a job to ROLLUP_NEEDS would leave
+  # the number stale, and the failure would name the count instead of the
+  # job -- which is what happened when compute-shards arrived.
+  local -a expected
+  IFS=',' read -r -a expected <<< "${ROLLUP_NEEDS}"
   local job
-  for job in actionlint classify shellcheck doc-counts lint-static hadolint \
-             bats-fragile bats-integration coverage coverage-gate acceptance \
-             system worker-selftest; do
-    assert_line "${job}"
+  for job in "${expected[@]}"; do
+    assert_line "${job// /}"
   done
-  [ "${#lines[@]}" -eq 13 ] \
-    || fail "expected 13 required jobs, got ${#lines[@]}: ${output}"
+  [ "${#lines[@]}" -eq "${#expected[@]}" ] \
+    || fail "expected ${#expected[@]} required jobs, got ${#lines[@]}: ${output}"
 }
 
 @test "ci_required_jobs is silent + non-zero when the workflow has no rollup" {
@@ -110,9 +115,9 @@ seed_base_repo() {
 
   local body job
   body="$(cat "$(marker)")"
-  for job in actionlint classify shellcheck doc-counts lint-static hadolint \
-             bats-fragile bats-integration coverage coverage-gate acceptance \
-             system worker-selftest; do
+  for job in actionlint classify compute-shards shellcheck doc-counts \
+             lint-static hadolint bats-fragile bats-integration coverage \
+             coverage-gate acceptance system worker-selftest; do
     [[ "${body}" == *"${job}"* ]] \
       || fail "marker does not account for required job '${job}':
 ${body}"
@@ -132,7 +137,7 @@ ${body}"
     || fail "marker states no exclusions, so it still reads as 'GH CI will pass':
 ${body}"
   local job
-  for job in coverage coverage-gate acceptance system worker-selftest; do
+  for job in compute-shards coverage coverage-gate acceptance system worker-selftest; do
     grep -qE "^excluded[[:space:]]+${job}[[:space:]]+\S" <<< "${body}" \
       || fail "excluded job '${job}' carries no reason in the marker:
 ${body}"
