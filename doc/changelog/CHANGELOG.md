@@ -24,8 +24,13 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   branch did change? Anything else is out of scope, and an out-of-scope
   finding is filed as an issue and cross-referenced from the PR body
   **before** the branch is published, so the deferral is recorded and
-  recoverable. Losing a finding is the failure a follow-up issue prevents;
-  never landing is the failure nothing prevents. The accounting phase sits
+  recoverable, and the same finding deferred again in a later round is not
+  filed twice. Losing a finding is the failure a follow-up issue prevents;
+  never landing is the failure nothing prevents -- so the loop **ends on a
+  review, never on a fix**: the budget bounds the fixes, and the review after
+  the last one decides the verdict, because stopping on a fix reads the
+  verdict from a review taken before that fix ran and refuses to land a
+  branch with nothing open. The accounting phase sits
   outside the loop and runs unconditionally: a run ending with in-scope
   findings open, or holding unpushed commits, names the branch, the HEAD sha
   and what is open -- a workflow script has no filesystem access, so "did

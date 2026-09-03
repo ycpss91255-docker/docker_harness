@@ -47,8 +47,9 @@ const INTENT = `
 <what this branch set out to change, and what it deliberately did not>
 `
 
-// Hard bound. Not a target — a bound. See "Why the budget is a failure",
-// below.
+// Hard bound. Not a target — a bound. It bounds the FIXES; the loop spends
+// one more review than that, because the review after the last fix is what
+// decides the verdict.
 const MAX_ROUNDS = 3
 // -----------------------------------------------------------------------
 
@@ -164,11 +165,20 @@ Git artifacts are plain English; a hook blocks CJK. No AI attribution lines.
 `
 
 const followUps = []
-let round = 0
+const seenFollowUps = new Set()
+let reviews = 0
+let fixes = 0
 let openInScope = []
 
-while (round < MAX_ROUNDS) {
-  round += 1
+// The loop always ends on a REVIEW, never on a fix. MAX_ROUNDS bounds the
+// fixes; the review that follows the last one is what decides the verdict.
+// Ending on a fix discards it — the verdict would be read from a review
+// taken before that fix ran, so a final round which closed every finding
+// still reports landable:false over a branch with nothing open. That is the
+// "never landing" failure this template exists to remove, reintroduced by
+// the budget meant to bound it.
+while (true) {
+  reviews += 1
 
   const review = await agent(
     `${CONTEXT}
@@ -182,15 +192,26 @@ ${SCOPE_RULE}
 Report every finding you are confident in, each with its scope and which
 question decided it. Report the gate outcome whether or not you found
 anything.`,
-    { label: `review:r${round}`, phase: 'Review', schema: REVIEW_SCHEMA },
+    { label: `review:r${reviews}`, phase: 'Review', schema: REVIEW_SCHEMA },
   )
 
   const found = review?.findings ?? []
-  followUps.push(...found.filter((f) => f.scope === 'out'))
+  for (const f of found.filter((f) => f.scope === 'out')) {
+    // The same out-of-scope finding comes back every round, because nothing
+    // closed it — that is what out-of-scope means. Accumulated blind, one
+    // deferred defect becomes one filed issue per round, and the caller is
+    // told to file every entry here before opening the PR.
+    const key = `${f.file}:${f.line}:${f.claim}`
+    if (seenFollowUps.has(key)) continue
+    seenFollowUps.add(key)
+    followUps.push(f)
+  }
   openInScope = found.filter((f) => f.scope === 'in')
 
-  log(`round ${round}: ${openInScope.length} in-scope, ${found.length - openInScope.length} deferred`)
+  log(`review ${reviews}: ${openInScope.length} in-scope, ${found.length - openInScope.length} deferred`)
   if (!openInScope.length) break
+  if (fixes >= MAX_ROUNDS) break
+  fixes += 1
 
   const brief = openInScope
     .map((f, i) => `FINDING ${i + 1} (${f.severity}) — ${f.file}:${f.line}\n${f.claim}\n\nEvidence: ${f.evidence}`)
@@ -213,10 +234,19 @@ Split commits red -> green: the failing test is its own commit, the
 implementation that makes it pass is the next. Run the gate after every green.
 
 ${brief}`,
-    { label: `fix:r${round}`, phase: 'Fix', schema: FIX_SCHEMA },
+    { label: `fix:r${fixes}`, phase: 'Fix', schema: FIX_SCHEMA },
   )
 
-  log(`round ${round}: ${fix?.gateOutcome ?? 'gate not reported'}`)
+  // Both halves of the fix's report are read. A round that closed nothing
+  // and said why is the fact the next review most needs, and a schema field
+  // nothing reads is a field the agent learns not to fill.
+  // `||`, not `??`: an empty string is what these fields carry when the
+  // round closed nothing or committed nothing, and that is the case worth
+  // naming, not blanking.
+  log(`fix ${fixes}: closed — ${fix?.closed || 'nothing reported'}`)
+  if (fix?.stillOpen) log(`fix ${fixes}: still open — ${fix.stillOpen}`)
+  log(`fix ${fixes}: commits — ${fix?.commits || 'none'}`)
+  log(`fix ${fixes}: ${fix?.gateOutcome || 'gate not reported'}`)
 }
 
 // UNCONDITIONAL. Not inside the loop, not behind an `if`. Every path out of
@@ -238,10 +268,12 @@ push. Run and report verbatim:
   { label: 'account', phase: 'Account', schema: ACCOUNT_SCHEMA },
 )
 
+// openInScope is always a REVIEWED verdict: the loop leaves only after a
+// review, so this is what is open now, not what was open before the last fix.
 const exhausted = openInScope.length > 0
 
 if (exhausted) {
-  log(`BUDGET EXHAUSTED after ${MAX_ROUNDS} rounds — ${openInScope.length} in-scope finding(s) still open on ${BRANCH} at ${account?.headSha}`)
+  log(`BUDGET EXHAUSTED after ${fixes} fix round(s) — ${openInScope.length} in-scope finding(s) still open on ${BRANCH} at ${account?.headSha}`)
 }
 if (account?.unpushedCommits && account.unpushedCommits !== 'none') {
   log(`UNPUBLISHED WORK on ${BRANCH}: ${account.unpushedCommits}`)
@@ -254,7 +286,8 @@ return {
   landable: !exhausted,
   branch: BRANCH,
   headSha: account?.headSha,
-  roundsUsed: round,
+  reviewRounds: reviews,
+  fixRounds: fixes,
   openInScope,
   // File these as issues and cross-reference them from the PR body BEFORE
   // opening the PR. That obligation is what makes the "out" default safe.

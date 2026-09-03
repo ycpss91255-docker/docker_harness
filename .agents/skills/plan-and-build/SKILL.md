@@ -128,6 +128,12 @@ default loses the branch itself, behind a bar the next round raises again.
 Losing a finding is the failure a follow-up issue prevents; never landing is
 the failure nothing prevents. Q1 is what stops the default being abused.
 
+**The loop ends on a review, never on a fix.** The budget bounds the *fixes*;
+the review after the last one is what decides the verdict. Stop on a fix and
+that fix is discarded -- the verdict was read from a review taken before it
+ran, so a final round that closed every finding still refuses to land, which
+is the failure the budget was meant to bound reappearing inside it.
+
 **Budget exhaustion is a reported failure, and accounting is unconditional.** A
 run that ends with in-scope findings still open names the branch, the HEAD sha
 and the open findings. A run that ends holding unpushed commits reports them
