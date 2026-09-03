@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1160 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1161 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -2006,3 +2006,9 @@ escaping, and the read-only `--check` gate.
 | a tracked non-shell file is not a lint target | - |
 | a tracked script deleted in the working tree is not a lint target | - |
 | t_lint lints the computed target list, not a shell glob | - |
+
+### .claude/test/bats/unit/enforce_ready_for_agent_spec.bats (1)
+
+| Test | Scenario |
+|------|----------|
+| add-label ready-for-agent on an issue missing a part is denied, naming it | - |
