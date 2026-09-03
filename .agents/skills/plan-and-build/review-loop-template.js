@@ -34,7 +34,12 @@ const WORKTREE = '<absolute path to the worktree>'
 const REPO = '<owner/repo that worktree belongs to>'
 const ISSUE = '<issue number this implements>'
 const BRANCH = '<branch name in that worktree>'
-const GATE = 'just test'
+// Derived from WORKTREE, like workflow-template.js does it: the Account
+// agent runs this verbatim alongside absolute-path git commands, and a bare
+// `just test` resolves in no checkout of this repo -- just walks upward and
+// finds no justfile, so the gate reports "error: no justfile found" and the
+// run reads as broken tooling rather than as a branch that failed.
+const GATE = `just -f ${WORKTREE}/.claude/test/justfile check`
 
 // The change under review, in one paragraph. The reviewer needs this to
 // classify scope; without it every defect in the file reads as in-scope.
