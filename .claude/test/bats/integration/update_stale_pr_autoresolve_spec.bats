@@ -205,6 +205,39 @@ assert_nothing_resolved() {
   assert_output --partial "**11 tests**"
 }
 
+@test "a numeric conflict outside the generator's output set exits 2" {
+  # doc/metrics.md masks equal on both sides -- by the hunk test alone it is
+  # indistinguishable from a count-drift hunk. Nothing recomputes it, so
+  # taking either side would silently drop a figure someone typed. The
+  # question the script has to ask is not "does this look derived" but
+  # "does the generator say it writes this file".
+  mk_repo unit
+  git -C "${WT}" checkout -q "${BRANCH}"
+  printf 'Builds this week: 20.\n' > "${WT}/doc/metrics.md"
+  git -C "${WT}" add -- doc/metrics.md
+  git -C "${WT}" commit -q -m 'branch: metrics'
+  git -C "${WT}" push -q origin "${BRANCH}"
+  git -C "${WT}" checkout -q main
+  printf 'Builds this week: 30.\n' > "${WT}/doc/metrics.md"
+  git -C "${WT}" add -- doc/metrics.md
+  git -C "${WT}" commit -q -m 'main: metrics'
+  git -C "${WT}" push -q origin main
+  git -C "${WT}" checkout -q "${BRANCH}"
+  stub_gh "${BRANCH}" main
+
+  local head_before tip_before
+  head_before="$(git -C "${WT}" rev-parse HEAD)"
+  tip_before="$(git -C "${ORIGIN}" rev-parse "${BRANCH}")"
+
+  run "$(script update-stale-pr.sh)" 42 --repo a/b --worktree "${WT}"
+  assert_failure 2
+  assert_output --partial "doc/metrics.md: owned=no"
+  assert_output --partial "not auto-resolvable"
+  assert_output --partial "output set"
+
+  assert_nothing_resolved "${head_before}" "${tip_before}"
+}
+
 @test "one prose conflict among many count conflicts resolves nothing, exits 2" {
   # Four levels, so the merge carries a count conflict in each level
   # catalogue plus two more in the index -- then one hand-written line in
