@@ -394,6 +394,23 @@ _rp_resolve() {
     done
   done
 
+  # Every path still unmerged must be one this run just resolved. `git add`
+  # on an unmerged path MARKS IT RESOLVED at whatever the file happens to
+  # contain -- markers and all -- so staging first and checking afterwards
+  # is a check that can never fire. Ask before staging, not after.
+  local _u _known
+  while IFS= read -r _u; do
+    [[ -n "${_u}" ]] || continue
+    _known=0
+    for _f in "${_RP_PLAN[@]}"; do
+      [[ "${_u}" == "${_f}" ]] && { _known=1; break; }
+    done
+    if (( ! _known )); then
+      err "${_u} is still unmerged and was not auto-resolved; refusing to commit."
+      return 1
+    fi
+  done < <(git -C "${_wt}" diff --name-only --diff-filter=U 2>/dev/null)
+
   # Stage the resolved conflicts AND every other file the generator owns:
   # a merge can leave an owned doc unconflicted but stale, and committing a
   # tree the generator would immediately change again is the drift this is
