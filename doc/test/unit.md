@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1171 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1175 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -2007,7 +2007,7 @@ escaping, and the read-only `--check` gate.
 | a tracked script deleted in the working tree is not a lint target | - |
 | t_lint lints the computed target list, not a shell glob | - |
 
-### .claude/test/bats/unit/enforce_ready_for_agent_spec.bats (11)
+### .claude/test/bats/unit/enforce_ready_for_agent_spec.bats (15)
 
 | Test | Scenario |
 |------|----------|
@@ -2022,3 +2022,7 @@ escaping, and the read-only `--check` gate.
 | the four parts are found when they live in a comment, not the body | - |
 | parts split across the body and a comment together count | - |
 | comments that do not supply the missing part still leave it missing | - |
+| the gate reads the repo and number out of an issue URL | - |
+| a complete issue named by URL still takes the label | - |
+| an explicit -R repo is used for the lookup | - |
+| an issue argument that is neither a number nor a URL is silent | - |
