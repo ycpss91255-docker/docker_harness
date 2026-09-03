@@ -90,6 +90,31 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   having checked nothing. It now exits 2 and names the roster.
 
 ### Added
+- **ADR-00000015: the org label vocabulary is five labels on two axes.**
+  Labels decide what an issue is, whether it is scheduled, and -- per
+  ADR-00000014 -- whether an agent may implement it unattended, so they are
+  foundational and were undefined. Measured across ~500 issues in five repos:
+  `enhancement` 336, `bug` 126, `documentation` 34, `backlog` 19, `triage` 13,
+  `ready-for-agent` 2, `upstream` 1, `question` 1, and six GitHub defaults with
+  zero uses. The inventory had also drifted -- `base` carried 15 labels while
+  `template`, `realsense_ros2`, `multi_run` and `sam_manager` carried no custom
+  labels at all, because a GitHub template repository copies only the file
+  tree, never labels, topics, branch protection or settings, so every repo made
+  "from template" skipped the `/new-repo` checklist silently. The decision
+  keeps a kind axis (`bug` / `documentation` / `enhancement`, exactly one,
+  already required by hook rule 9) and a state axis (`backlog` /
+  `ready-for-agent`, at most one, orthogonal to kind); defines `enhancement` by
+  exclusion to match how it is actually used rather than GitHub's "new feature
+  requests"; defines `ready-for-agent` as the assertion that four things are
+  present -- seams, first slice, gate command, cycle bound -- which also gives
+  `grilling` a completion condition; gates that label on both application and
+  pipeline start, as two different questions; drops `triage` (redundant with
+  the absence of `ready-for-agent`) and `upstream` (one use); and leaves the
+  six unused GitHub defaults in place but unmanaged. Distribution uses GitHub's
+  native org-level default labels for new repos plus a `labels.yaml` /
+  `sync-labels.sh` / drift-cron trio mirroring the proven `topics.yaml`
+  arrangement, because the native feature applies only at repository creation
+  and cannot cover backfill or later edits.
 - **`release-bump.sh`: a canonical primitive for the release bump, not just
   the tag (refs #272).** `release.md` step 2 was prose telling a human to make
   three mechanical edits -- set `.version`, promote `## [Unreleased]` to
