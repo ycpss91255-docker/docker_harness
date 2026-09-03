@@ -59,9 +59,15 @@ to Workflow-spawned agents.
 
 ## Dispatching the implementer
 
-Start from [`workflow-template.js`](workflow-template.js) in this directory --
-fill its CONFIG block and pass it as `Workflow({script: ...})`. It already
-encodes the contract below; the template lives here rather than in a new
+Two templates live in this directory; fill the CONFIG block and pass the result
+as `Workflow({script: ...})`.
+
+| Template | Use when |
+|---|---|
+| [`workflow-template.js`](workflow-template.js) | One implementer drives a planned slice-chain to green |
+| [`review-loop-template.js`](review-loop-template.js) | Fix and review alternate over an existing branch, and the run decides whether it may be published -- see [The review loop](#the-review-loop) |
+
+Both encode the contract below; they live here rather than in a new
 `.claude/workflows/` directory, which would add a CONTEXT.md obligation with
 no lint behind it (`check-claude-md-tree.sh` audits `commands/` / `scripts/` /
 `hooks/` only).
@@ -90,6 +96,49 @@ implementer posts a handoff comment on the issue and **stops** -- it does not
 retry silently. `just ... check` proves the tests pass; it cannot prove the
 implementation is right, so an unbounded loop converges on plausible-looking
 green, not on correct.
+
+## The review loop
+
+When a run alternates fix and review over an existing branch rather than
+driving one implementer to green, use
+[`review-loop-template.js`](review-loop-template.js) instead. It is the same
+handoff contract with three additions, and all three are load-bearing.
+
+**A land gate that can only refuse has no fixed point.** Writing the land
+phase as `if (review.closed)` gives it exactly one direction. It cannot decide
+that a round's findings are not about the branch under review, so reviewers
+open new findings faster than they close the round's own, the budget runs out,
+and the script exits with the branch complete and unpublished. That is what
+produced three finished branches sitting unpushed for hours while the
+open-issue count was the only number moving (base#1003).
+
+**Scope is decided before a finding can gate, by two questions with a
+default.** Same shape as PRD invariant 11.
+
+| | Question | Verdict |
+|---|---|---|
+| Q1 | Did this branch introduce it -- a defect in a line it wrote, or a false claim in its own commit message or PR body? | **In scope.** Never deferrable. |
+| Q2 | Is it the unfixed sibling of a shape this branch did change -- the mirrored scaffold, the commented copy, the other physical line of the same statement? | **In scope.** Half a shape fixed is a new defect. |
+| -- | Anything else: a pre-existing defect noticed while reading, the same class at an untouched site, a follow-up this change makes visible, a neighbouring module | **Out of scope**, and this is where an uncertain call goes. |
+
+**Why the default is "out".** Nothing is lost by it, because an out-of-scope
+finding is filed as an issue and cross-referenced from the PR body *before* the
+branch is published. The deferral is recorded and recoverable. The opposite
+default loses the branch itself, behind a bar the next round raises again.
+Losing a finding is the failure a follow-up issue prevents; never landing is
+the failure nothing prevents. Q1 is what stops the default being abused.
+
+**Budget exhaustion is a reported failure, and accounting is unconditional.** A
+run that ends with in-scope findings still open names the branch, the HEAD sha
+and the open findings. A run that ends holding unpushed commits reports them
+whatever the reason -- so the accounting phase sits *outside* the loop, on
+every path out of the script.
+
+That last point is not stylistic. A workflow script has no filesystem access,
+so "did this run leave work behind" cannot be inferred from control flow; it
+has to be read off the worktree by an agent. Skip that read on any path and
+the run exits identically to one that had nothing to do -- which is worse than
+an error, because it looks like completion.
 
 ## Landing the work
 
