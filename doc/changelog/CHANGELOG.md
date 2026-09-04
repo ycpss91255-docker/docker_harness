@@ -96,6 +96,33 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and `../worktree` relative to the repo root otherwise, resolved only when
   no `--root` was given. On its first real run it found two `docker_harness`
   branches stranded with no PR, idle 3.1 and 7.9 days.
+- **`check-base-delivery.sh` -- an audit of whether `.base` files ARRIVED,
+  not just which release a repo is pinned to (refs #927).**
+  `check-template-versions.sh` fetches `.base/.version` and stops, so the org
+  could always answer "which release is this repo on" and never "did that
+  release's files land". Every file `init.sh` installs reaches a consumer
+  only through an upgrade's resync, so a repo that cannot upgrade carries
+  none of them while its version marker still reads clean -- which is how the
+  base-version monitor workflow (PR #778) sat at zero adoption, unreported,
+  from the day it merged.
+  A sibling rather than a flag on the versions check: different probe (one
+  repository-tree read per repo), different denominator, different verdict,
+  and folding it in would make every release verification pay for an audit it
+  did not ask for. The reuse that matters is `lib/roster.sh`, which both call.
+  The expected-path list is **asked for, never copied**: it comes from base's
+  own `init.sh --list-installed-paths`, so a base release that installs
+  something new is audited for it with no edit here. Consumers are
+  **discovered** (a repo carrying `.base/.version`) rather than read off the
+  roster's `fanout` column, so a stale column surfaces as a disagreement
+  instead of a silent skip -- the first real run found three repos marked
+  `n-a` that do carry `.base`.
+  Output leads with per-file gap counts, worst first, then the per-repo
+  detail, then one greppable `VERDICT` line; exit 1 on any gap, exit 2 on an
+  empty selection or an empty manifest, because an audit that checked nothing
+  is a failed audit and not a clean one.
+  Three seams (`BASE_INIT`, `DELIVERY_PROBE`, `DELIVERY_VERSION_PROBE`) make
+  everything except the two network adapters testable offline.
+  Left deliberately manual for now; see the issue for the scheduling call.
 
 ### Changed
 - **the label docs describe the org that exists, not the one before

@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1298 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1315 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -12,10 +12,9 @@ stdin and asserts one of three behaviours:
 
 - **FIRE** — emits JSON with `.systemMessage` (reminder hooks like
   `remind_*.sh` / `check_*.sh`). Use `assert_message_contains`.
-- **ALLOW / DENY** — emits JSON with
-  `.hookSpecificOutput.permissionDecision` (hooks that decide
-  programmatically: `auto_allow_touch_ack.sh`,
-  `enforce_rm_outside_git_tree.sh`). Use `assert_permission_decision`.
+- **ALLOW** — emits JSON with `.hookSpecificOutput.permissionDecision`
+  (programmatic auto-allow hooks like
+  `auto_allow_rm_in_workspace.sh`). Use `assert_permission_decision`.
 - **SILENT** — exits 0 with no stdout (no action taken). Use
   `assert_silent`.
 
@@ -1963,6 +1962,80 @@ escaping, and the read-only `--check` gate.
 | refuses when there is no Unreleased section to promote | - |
 | derives the slug from the remote, so a renamed repo self-corrects | - |
 
+### .claude/test/bats/unit/check_base_delivery_spec.bats (17)
+
+| Test | Scenario |
+|------|----------|
+| --help prints usage and exits 0 | - |
+| unknown arg exits 2 | - |
+| an empty selection is a failed audit, not a passed one | - |
+| the expected paths come from the manifest command, not a local copy | - |
+| a manifest command that prints nothing aborts rather than pass every repo | - |
+| a repo missing an installed file is reported and exits 1 | - |
+| a repo carrying every installed file exits 0 | - |
+| the headline counts how many consumers lack each file, worst first | - |
+| the verdict names the worst gap so a scan cannot miss it | - |
+| a repo with no .base subtree is not counted as a delivery failure | - |
+| the .base version each repo is pinned to is reported alongside the gaps | - |
+| a repo the probe cannot read is reported as UNREADABLE and fails the audit | - |
+| --scope narrows to one fanout state | - |
+| --only narrows to named repos, accepting a roster path or a bare name | - |
+| --skip drops named repos | - |
+| --list-repos prints the effective selection without probing anything | - |
+| --manifest reads the expected paths from a file instead of running init.sh | - |
+
+### .claude/test/bats/unit/check_ready_for_agent_spec.bats (9)
+
+| Test | Scenario |
+|------|----------|
+| an issue missing a part exits 1 and names the missing part | - |
+| a complete issue exits 0 | - |
+| the verdict does not depend on the label being defined | - |
+| an unready issue that already carries the label still exits 1 | - |
+| parts living in a comment are found | - |
+| an issue URL is accepted as the target | - |
+| a gh that cannot answer exits 2, never a false ready | - |
+| no issue argument exits 2 with usage | - |
+| --help exits 0 with usage | - |
+
+### .claude/test/bats/unit/ci_sh_lint_targets_spec.bats (5)
+
+| Test | Scenario |
+|------|----------|
+| lint targets are the tracked hook, script and lib shell scripts | - |
+| an untracked script is not a lint target | - |
+| a tracked non-shell file is not a lint target | - |
+| a tracked script deleted in the working tree is not a lint target | - |
+| t_lint lints the computed target list, not a shell glob | - |
+
+### .claude/test/bats/unit/enforce_ready_for_agent_spec.bats (23)
+
+| Test | Scenario |
+|------|----------|
+| add-label ready-for-agent on an issue missing a part is denied, naming it | - |
+| the denial names every missing part, not just the first | - |
+| add-label ready-for-agent on a complete issue is silent | - |
+| ready-for-agent behind a second --add-label flag is still gated | - |
+| ready-for-agent inside a comma-separated --add-label is still gated | - |
+| adding a different label to the same unready issue is untouched | - |
+| removing ready-for-agent from an unready issue is untouched | - |
+| a label that merely contains ready-for-agent is not the label | - |
+| the four parts are found when they live in a comment, not the body | - |
+| parts split across the body and a comment together count | - |
+| comments that do not supply the missing part still leave it missing | - |
+| the gate reads the repo and number out of an issue URL | - |
+| a complete issue named by URL still takes the label | - |
+| an explicit -R repo is used for the lookup | - |
+| an issue argument that is neither a number nor a URL is silent | - |
+| a repo that does not define ready-for-agent is silent | - |
+| a repo that does define ready-for-agent is gated | - |
+| gh that cannot answer leaves the edit alone | - |
+| an issue body quoting the labelling command does not trigger the gate | - |
+| the labelling command inside a heredoc body is prose, not an invocation | - |
+| a real labelling command chained after another still fires | - |
+| a labelling command folded over a line continuation still fires | - |
+| a gh subcommand that is not issue edit is silent | - |
+
 ### .claude/test/bats/unit/enforce_scripts_tracked_before_pr_spec.bats (8)
 
 | Test | Scenario |
@@ -1976,15 +2049,32 @@ escaping, and the read-only `--check` gate.
 | silent on a non-PR-open gh command with an untracked .sh present | - |
 | silent when cwd is not a git repo | - |
 
-### .claude/test/bats/unit/ci_sh_lint_targets_spec.bats (5)
+### .claude/test/bats/unit/unpublished_worktrees_spec.bats (22)
 
 | Test | Scenario |
 |------|----------|
-| lint targets are the tracked hook, script and lib shell scripts | - |
-| an untracked script is not a lint target | - |
-| a tracked non-shell file is not a lint target | - |
-| a tracked script deleted in the working tree is not a lint target | - |
-| t_lint lints the computed target list, not a shell glob | - |
+| --help prints usage and exits 0 | - |
+| an unknown argument exits 2 and names itself | - |
+| a sweep root that does not exist is an error, not the all-clear | - |
+| the default root is read off the main worktree, not the linked one | - |
+| a merged, open or closed PR all silence the branch; only no-PR is reported | - |
+| everything published means exit 0 with no output at all | - |
+| each worktree is answered against its OWN origin, not one shared repo | - |
+| a branch that committed inside the quiet period is not reported | - |
+| --quiet-minutes 0 reports the branch the default window withheld | - |
+| a dirty working tree is not reported, however long it has been idle | - |
+| a branch with no commits ahead of origin/main is not reported | - |
+| the PR match is exact: fix/9 is not answered by a PR for fix/99 | - |
+| a worktree parked on main is skipped even when it is ahead | - |
+| a plain directory is skipped even when a repo encloses the sweep root | - |
+| watch mode reports a stalled branch once, not once per interval | - |
+| watch mode reports a branch that entered the state after it started | - |
+| a gh failure is an error, not a repo that has no PRs | - |
+| a PR older than the list window is still found, by the exact query | - |
+| --root is honoured from a location with no git checkout above it | - |
+| no --root and no checkout to derive one from is an error, not a crash | - |
+| watch mode names the second branch to occupy a recycled directory | - |
+| watch mode reports a branch again after it leaves the state and re-enters | - |
 
 ### .claude/test/bats/unit/auto_allow_rm_outside_git_tree_spec.bats (102)
 
@@ -2092,72 +2182,3 @@ escaping, and the read-only `--check` gate.
 | a command that redefines IFS is not one whose word splitting is known | - |
 | an IFS assignment inside a bash -c payload counts too | - |
 | the same command without the IFS assignment is still allowed | - |
-
-### .claude/test/bats/unit/check_ready_for_agent_spec.bats (9)
-
-| Test | Scenario |
-|------|----------|
-| an issue missing a part exits 1 and names the missing part | - |
-| a complete issue exits 0 | - |
-| the verdict does not depend on the label being defined | - |
-| an unready issue that already carries the label still exits 1 | - |
-| parts living in a comment are found | - |
-| an issue URL is accepted as the target | - |
-| a gh that cannot answer exits 2, never a false ready | - |
-| no issue argument exits 2 with usage | - |
-| --help exits 0 with usage | - |
-
-### .claude/test/bats/unit/enforce_ready_for_agent_spec.bats (23)
-
-| Test | Scenario |
-|------|----------|
-| add-label ready-for-agent on an issue missing a part is denied, naming it | - |
-| the denial names every missing part, not just the first | - |
-| add-label ready-for-agent on a complete issue is silent | - |
-| ready-for-agent behind a second --add-label flag is still gated | - |
-| ready-for-agent inside a comma-separated --add-label is still gated | - |
-| adding a different label to the same unready issue is untouched | - |
-| removing ready-for-agent from an unready issue is untouched | - |
-| a label that merely contains ready-for-agent is not the label | - |
-| the four parts are found when they live in a comment, not the body | - |
-| parts split across the body and a comment together count | - |
-| comments that do not supply the missing part still leave it missing | - |
-| the gate reads the repo and number out of an issue URL | - |
-| a complete issue named by URL still takes the label | - |
-| an explicit -R repo is used for the lookup | - |
-| an issue argument that is neither a number nor a URL is silent | - |
-| a repo that does not define ready-for-agent is silent | - |
-| a repo that does define ready-for-agent is gated | - |
-| gh that cannot answer leaves the edit alone | - |
-| an issue body quoting the labelling command does not trigger the gate | - |
-| the labelling command inside a heredoc body is prose, not an invocation | - |
-| a real labelling command chained after another still fires | - |
-| a labelling command folded over a line continuation still fires | - |
-| a gh subcommand that is not issue edit is silent | - |
-
-### .claude/test/bats/unit/unpublished_worktrees_spec.bats (22)
-
-| Test | Scenario |
-|------|----------|
-| --help prints usage and exits 0 | - |
-| an unknown argument exits 2 and names itself | - |
-| a sweep root that does not exist is an error, not the all-clear | - |
-| the default root is read off the main worktree, not the linked one | - |
-| a merged, open or closed PR all silence the branch; only no-PR is reported | - |
-| everything published means exit 0 with no output at all | - |
-| each worktree is answered against its OWN origin, not one shared repo | - |
-| a branch that committed inside the quiet period is not reported | - |
-| --quiet-minutes 0 reports the branch the default window withheld | - |
-| a dirty working tree is not reported, however long it has been idle | - |
-| a branch with no commits ahead of origin/main is not reported | - |
-| the PR match is exact: fix/9 is not answered by a PR for fix/99 | - |
-| a worktree parked on main is skipped even when it is ahead | - |
-| a plain directory is skipped even when a repo encloses the sweep root | - |
-| watch mode reports a stalled branch once, not once per interval | - |
-| watch mode reports a branch that entered the state after it started | - |
-| a gh failure is an error, not a repo that has no PRs | - |
-| a PR older than the list window is still found, by the exact query | - |
-| --root is honoured from a location with no git checkout above it | - |
-| no --root and no checkout to derive one from is an error, not a crash | - |
-| watch mode names the second branch to occupy a recycled directory | - |
-| watch mode reports a branch again after it leaves the state and re-enters | - |
