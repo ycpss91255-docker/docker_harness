@@ -1,10 +1,10 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1192 tests** across
-78 specs under `.claude/test/bats/unit/`. These were the former
-`test/smoke/` specs -- each drives a single hook with a sample JSON
-tool-input and asserts one behaviour -- which are Unit-level (a component
-in isolation), not the Smoke *type* (see [smoke.md](smoke.md)).
+Unit level (ISTQB): one hook or script in isolation.
+**1214 tests** across 87 specs under `.claude/test/bats/unit/`. These were
+the former `test/smoke/` specs -- each drives a single hook with a sample
+JSON tool-input and asserts one behaviour -- which are Unit-level (a
+component in isolation), not the Smoke *type* (see [smoke.md](smoke.md)).
 
 Every `.bats` file targets a single hook (or a script under
 `.claude/scripts/`). Each test pipes a sample JSON tool-input on
@@ -2007,6 +2007,47 @@ escaping, and the read-only `--check` gate.
 | a tracked script deleted in the working tree is not a lint target | - |
 | t_lint lints the computed target list, not a shell glob | - |
 
+### .claude/test/bats/unit/unpublished_worktrees_spec.bats (22)
+
+| Test | Scenario |
+|------|----------|
+| --help prints usage and exits 0 | usage text names the flags |
+| an unknown argument exits 2 and names itself | there is no --repo flag to get wrong |
+| a sweep root that does not exist is an error, not the all-clear | exit 2 on stderr, so an unswept root cannot read as everything published |
+| the default root is read off the main worktree, not the linked one | a linked worktree already sits in the root, so ../worktree from it is one level too deep |
+| a merged, open or closed PR all silence the branch; only no-PR is reported | the predicate is not ahead-of-main -- --squash makes every landed branch look ahead |
+| everything published means exit 0 with no output at all | silence is the all-clear |
+| each worktree is answered against its OWN origin, not one shared repo | one root, two repos, each branch name a PR in the OTHER repo |
+| a branch that committed inside the quiet period is not reported | still being worked on |
+| --quiet-minutes 0 reports the branch the default window withheld | the knob is wired to the cutoff |
+| a dirty working tree is not reported, however long it has been idle | someone is still typing |
+| a branch with no commits ahead of origin/main is not reported | nothing to publish |
+| the PR match is exact: fix/9 is not answered by a PR for fix/99 | grep -qxF, not a substring |
+| a worktree parked on main is skipped even when it is ahead | every other guard passes, so only the branch-name test can hold the line back |
+| a plain directory is skipped even when a repo encloses the sweep root | git -C answers from the enclosing repo, so without the .git test every subdirectory reports |
+| watch mode reports a stalled branch once, not once per interval | re-reporting trains the reader to ignore the line |
+| watch mode reports a branch that entered the state after it started | each sweep re-reads the root, so a late worktree is found |
+| a gh failure is an error, not a repo that has no PRs | an unanswered question cannot reach the all-clear -- exit 2, and the published worktrees stay unprinted |
+| a PR older than the list window is still found, by the exact query | gh returns newest-first and --limit truncates silently, so a miss is re-asked with --head |
+| --root is honoured from a location with no git checkout above it | the default root is a fallback, so it must not be resolved before --root is read |
+| no --root and no checkout to derive one from is an error, not a crash | exit 2 naming the problem, not a bare git fatal |
+| watch mode names the second branch to occupy a recycled directory | <repo>-<n> dirs are recycled, so the dedup key is the branch and not the directory |
+| watch mode reports a branch again after it leaves the state and re-enters | once per transition, not once ever -- the seen set is rebuilt from each sweep |
+
+### .claude/test/bats/unit/check_ready_for_agent_spec.bats (9)
+
+| Test | Scenario |
+|------|----------|
+| an issue missing a part exits 1 and names the missing part | - |
+| a complete issue exits 0 | - |
+| the verdict does not depend on the label being defined | - |
+| an unready issue that already carries the label still exits 1 | - |
+| parts living in a comment are found | - |
+| an issue URL is accepted as the target | - |
+| a gh that cannot answer exits 2, never a false ready | - |
+| no issue argument exits 2 with usage | - |
+| --help exits 0 with usage | - |
+
 ### .claude/test/bats/unit/enforce_ready_for_agent_spec.bats (23)
 
 | Test | Scenario |
@@ -2034,17 +2075,3 @@ escaping, and the read-only `--check` gate.
 | a real labelling command chained after another still fires | - |
 | a labelling command folded over a line continuation still fires | - |
 | a gh subcommand that is not issue edit is silent | - |
-
-### .claude/test/bats/unit/check_ready_for_agent_spec.bats (9)
-
-| Test | Scenario |
-|------|----------|
-| an issue missing a part exits 1 and names the missing part | - |
-| a complete issue exits 0 | - |
-| the verdict does not depend on the label being defined | - |
-| an unready issue that already carries the label still exits 1 | - |
-| parts living in a comment are found | - |
-| an issue URL is accepted as the target | - |
-| a gh that cannot answer exits 2, never a false ready | - |
-| no issue argument exits 2 with usage | - |
-| --help exits 0 with usage | - |

@@ -30,6 +30,72 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   all, and a gh that cannot be reached leaves the label edit alone -- a
   gate firing where the vocabulary is not adopted is pure friction (#278's
   own reasoning), and neither gate may block on a transient failure.
+- **a review loop with a fixed point, and an accounting of what it leaves
+  behind (refs base#1003).** Three branches held finished, committed,
+  test-green work for hours with nothing published -- 210 lines on one, 427
+  on another, three metric lints on a third -- while the same review rounds
+  filed nine new issues, so the open-issue count was the only number moving.
+  The land phase sat behind `if (verify.closed)`: a gate that can refuse,
+  but cannot decide that a round's findings are not about the branch under
+  review. Reviewers open new findings faster than a round closes its own,
+  the budget runs out, and the script exits with the branch complete and
+  unpublished. The new `review-loop-template.js` (sibling of
+  `workflow-template.js`, under `.agents/skills/plan-and-build/`) decides
+  **scope before a finding can gate**, by two questions with a default: did
+  this branch introduce it -- a defect in a line it wrote, or a false claim
+  in its own commit message -- and is it the unfixed sibling of a shape this
+  branch did change? Anything else is out of scope, and an out-of-scope
+  finding is filed as an issue and cross-referenced from the PR body
+  **before** the branch is published, so the deferral is recorded and
+  recoverable, and the same finding deferred again in a later round is not
+  filed twice. Losing a finding is the failure a follow-up issue prevents;
+  never landing is the failure nothing prevents -- so the loop **ends on a
+  review, never on a fix**: the budget bounds the fixes, and the review after
+  the last one decides the verdict, because stopping on a fix reads the
+  verdict from a review taken before that fix ran and refuses to land a
+  branch with nothing open. The accounting phase sits
+  outside the loop and runs unconditionally: a run ending with in-scope
+  findings open, or holding unpushed commits, names the branch, the HEAD sha
+  and what is open -- a workflow script has no filesystem access, so "did
+  this run leave work behind" has to be read off the worktree on every path
+  out rather than inferred from control flow. Affects anyone handing
+  implementation to a Workflow agent under `plan-and-build`.
+- **`unpublished-worktrees.sh` -- name every worktree holding work that will
+  reach nobody (refs base#1003).** Reads the stranded-branch condition off
+  the worktrees themselves rather than off any run's exit, so a branch left
+  behind by a script that never had the accounting phase is still found.
+  **The predicate is not "ahead of origin/main":** PRs here land with
+  `--squash`, so a merged branch's commits are never ancestors of main and
+  every landed worktree reads as unpublished -- 47 of them when this was
+  written, of which 4 were real. A branch holds unpublished work when it has
+  commits ahead of main **and no PR exists for it in any state**: an open PR
+  is a review in progress, a merged one is done, a closed one was decided,
+  and no PR is the only case where the work reached nobody. Two further
+  refusals, because a branch under active development satisfies that
+  predicate too: the report is gated on no commit for `--quiet-minutes`
+  (default 15) and on a clean working tree. Each worktree resolves its repo
+  from its **own** origin -- one root holds worktrees of several repos side
+  by side, so there is no `--repo` flag to get wrong. The PR match is
+  exact-line, so `fix/9` is not answered by a PR for `fix/99`, and the
+  per-repo list it matches against is a **cache, not the answer**: gh returns
+  newest-first and `--limit` truncates silently, so every miss is re-asked
+  with `--head`, which the window cannot truncate. `--watch` polls forever,
+  reporting each branch once per **transition** rather than every interval,
+  because re-reporting a stalled branch trains the reader to ignore the line,
+  which is the same silence this exists to break -- keyed on repo + branch,
+  since `<repo>-<n>` directories are recycled, and with the seen set rebuilt
+  from each sweep, since "once ever" is that silence too. Exits 0 with no
+  output when everything is published; every line of stdout is one branch
+  that needs an operator; and anything leaving part of the sweep
+  **unanswered** is exit 2 on stderr rather than that same all-clear -- a
+  root that does not exist, no checkout to derive a default root from, a PR
+  list `gh` would not return -- because "nothing is unpublished", "I swept
+  nothing" and "I could not tell" have to be tellable apart from outside. The
+  default root is the directory the checkout sits in when that checkout is a
+  **linked worktree** -- which is what every checkout that runs this is --
+  and `../worktree` relative to the repo root otherwise, resolved only when
+  no `--root` was given. On its first real run it found two `docker_harness`
+  branches stranded with no PR, idle 3.1 and 7.9 days.
 
 ### Changed
 - **the label docs describe the org that exists, not the one before
