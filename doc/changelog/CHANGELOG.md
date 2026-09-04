@@ -6,7 +6,179 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **`ready-for-agent` now means something, at both ends (closes #294).**
+  ADR-00000015 defines the label as an assertion that four things are
+  present in the issue -- **Seams**, **First slice**, **Gate**, **Bound** --
+  and nothing checked it, which is why the four repos defining it gave it
+  four different descriptions across its 49 uses. Two gates now do, and the ADR records them
+  as different questions rather than the same check twice.
+  `enforce_ready_for_agent.sh` is the first: a PreToolUse hook that reads
+  the issue behind `gh issue edit N --add-label ready-for-agent` and denies
+  when any part is absent, naming the ones that are.
+  `check-ready-for-agent.sh` is the second: the same question, callable,
+  for the fix pipeline to ask before it opens a worktree regardless of what
+  labels the issue wears (#296 consumes it). Both answer through one
+  implementation, `lib/ready-for-agent.sh` -- two copies of the parts list
+  would drift.
+  They read the issue's **comments as well as its body**: the body stays
+  the original spec and a grill writes its conclusions back as a comment,
+  so a body-only check would have failed every grilled issue against its
+  own gate. The heading shape authors must write is documented in
+  `gh-artifact-format` section 7.
+  A repo whose label inventory has no `ready-for-agent` sees no gate at
+  all, and a gh that cannot be reached leaves the label edit alone -- a
+  gate firing where the vocabulary is not adopted is pure friction (#278's
+  own reasoning), and neither gate may block on a transient failure.
+- **a review loop with a fixed point, and an accounting of what it leaves
+  behind (refs base#1003).** Three branches held finished, committed,
+  test-green work for hours with nothing published -- 210 lines on one, 427
+  on another, three metric lints on a third -- while the same review rounds
+  filed nine new issues, so the open-issue count was the only number moving.
+  The land phase sat behind `if (verify.closed)`: a gate that can refuse,
+  but cannot decide that a round's findings are not about the branch under
+  review. Reviewers open new findings faster than a round closes its own,
+  the budget runs out, and the script exits with the branch complete and
+  unpublished. The new `review-loop-template.js` (sibling of
+  `workflow-template.js`, under `.agents/skills/plan-and-build/`) decides
+  **scope before a finding can gate**, by two questions with a default: did
+  this branch introduce it -- a defect in a line it wrote, or a false claim
+  in its own commit message -- and is it the unfixed sibling of a shape this
+  branch did change? Anything else is out of scope, and an out-of-scope
+  finding is filed as an issue and cross-referenced from the PR body
+  **before** the branch is published, so the deferral is recorded and
+  recoverable, and the same finding deferred again in a later round is not
+  filed twice. Losing a finding is the failure a follow-up issue prevents;
+  never landing is the failure nothing prevents -- so the loop **ends on a
+  review, never on a fix**: the budget bounds the fixes, and the review after
+  the last one decides the verdict, because stopping on a fix reads the
+  verdict from a review taken before that fix ran and refuses to land a
+  branch with nothing open. The accounting phase sits
+  outside the loop and runs unconditionally: a run ending with in-scope
+  findings open, or holding unpushed commits, names the branch, the HEAD sha
+  and what is open -- a workflow script has no filesystem access, so "did
+  this run leave work behind" has to be read off the worktree on every path
+  out rather than inferred from control flow. Affects anyone handing
+  implementation to a Workflow agent under `plan-and-build`.
+- **`unpublished-worktrees.sh` -- name every worktree holding work that will
+  reach nobody (refs base#1003).** Reads the stranded-branch condition off
+  the worktrees themselves rather than off any run's exit, so a branch left
+  behind by a script that never had the accounting phase is still found.
+  **The predicate is not "ahead of origin/main":** PRs here land with
+  `--squash`, so a merged branch's commits are never ancestors of main and
+  every landed worktree reads as unpublished -- 47 of them when this was
+  written, of which 4 were real. A branch holds unpublished work when it has
+  commits ahead of main **and no PR exists for it in any state**: an open PR
+  is a review in progress, a merged one is done, a closed one was decided,
+  and no PR is the only case where the work reached nobody. Two further
+  refusals, because a branch under active development satisfies that
+  predicate too: the report is gated on no commit for `--quiet-minutes`
+  (default 15) and on a clean working tree. Each worktree resolves its repo
+  from its **own** origin -- one root holds worktrees of several repos side
+  by side, so there is no `--repo` flag to get wrong. The PR match is
+  exact-line, so `fix/9` is not answered by a PR for `fix/99`, and the
+  per-repo list it matches against is a **cache, not the answer**: gh returns
+  newest-first and `--limit` truncates silently, so every miss is re-asked
+  with `--head`, which the window cannot truncate. `--watch` polls forever,
+  reporting each branch once per **transition** rather than every interval,
+  because re-reporting a stalled branch trains the reader to ignore the line,
+  which is the same silence this exists to break -- keyed on repo + branch,
+  since `<repo>-<n>` directories are recycled, and with the seen set rebuilt
+  from each sweep, since "once ever" is that silence too. Exits 0 with no
+  output when everything is published; every line of stdout is one branch
+  that needs an operator; and anything leaving part of the sweep
+  **unanswered** is exit 2 on stderr rather than that same all-clear -- a
+  root that does not exist, no checkout to derive a default root from, a PR
+  list `gh` would not return -- because "nothing is unpublished", "I swept
+  nothing" and "I could not tell" have to be tellable apart from outside. The
+  default root is the directory the checkout sits in when that checkout is a
+  **linked worktree** -- which is what every checkout that runs this is --
+  and `../worktree` relative to the repo root otherwise, resolved only when
+  no `--root` was given. On its first real run it found two `docker_harness`
+  branches stranded with no PR, idle 3.1 and 7.9 days.
+
 ### Changed
+- **the label docs describe the org that exists, not the one before
+  ADR-00000015 (closes #295).** `gh-artifact-format` section 6 documented a
+  "stock label inventory in every org repo" -- `question`, `wontfix`,
+  `invalid`, `duplicate`, `good first issue`, `help wanted`, which carry one
+  issue between them -- and said the `base`-only labels were "not yet rolled
+  out org-wide" with cross-repo alignment "out of scope for #91". All of
+  that is false since `labels.yaml`, `script/sync-labels.sh` and the weekly
+  drift cron landed in `ycpss91255-docker/.github` (#25) and the org default
+  labels were reduced to the same five (#26). The section is now the five
+  managed labels on two axes, sourced from `labels.yaml` word for word.
+  The title-prefix mapping table stays -- hook rule 9 still enforces it --
+  but what it left implicit is now stated: four of the six prefixes
+  (`feat`, `refactor`, `chore`, `track`) map to `enhancement`, which is why
+  ADR-00000015 defines that label by exclusion rather than as GitHub's "new
+  feature requests". Sections 6 and 7 read as one pair: 6 says which labels
+  exist, 7 says what the only one with a precondition costs to apply.
+- **`/new-repo` names the labels step and the reason its checklist gets
+  skipped (closes #295).** A GitHub template repository copies the file
+  tree and nothing else -- never labels, topics, branch protection or
+  settings -- so a repo created "from template" looks right and is not.
+  `sam_manager`, `omniverse_web_viewer` and `github_runner` were all created
+  after the checklist existed and all three still diverge from the five
+  managed labels. Post-setup is now stated as mandatory, and carries a
+  labels step pointing at `script/sync-labels.sh` rather than at
+  `gh label create`.
+- **ADR-00000015 listed a label that exists in no org repo (closes #295).**
+  Its six never-used GitHub defaults were taken from GitHub's current
+  documentation instead of from the live inventory, so the list included
+  `accessibility` -- a newer default that **zero** of the 24 repos carry --
+  and omitted `question`, which all 24 carry and which has the single use
+  already shown in the ADR's own measurement table. The ADR also read as
+  leaving the six untouched on both label surfaces. Those are different
+  surfaces: the org **default-label list** seeds newly created repositories
+  only and changing it touches no existing repo, so the six were removed
+  from it (ycpss91255-docker/.github#26) while they stay in place and
+  unmanaged in every repository that already carries them.
+- **`update-stale-pr.sh` recomputes the one conflict shape that is always
+  mechanical (closes #287).** Landing a batch against `strict` branch
+  protection means every branch merges the base into itself first, and in
+  the last cycle roughly fifteen of them conflicted on exactly the same
+  thing: the derived test-count figures in `doc/test/`. Both sides added
+  tests, so both rewrote the same total, and neither number is right
+  afterwards -- the right one is what the generator computes from the merged
+  tree. The script now classifies each conflict hunk and calls it
+  **regenerated** when the two sides are identical once every digit run is
+  masked AND the generator lands the same tree whichever side is kept. If
+  every hunk in every conflicted file qualifies, it drops the markers,
+  re-runs `sync-doc-test-counts.sh`, stages, commits and pushes, printing the
+  file, hunk count and before / after figures so the landed number is
+  visibly recomputed rather than picked. Anything else -- a prose hunk,
+  markers that do not parse -- still exits 2 with the merge untouched, and
+  the refusal is whole-tree: one real conflict and nothing is resolved, so a
+  reviewer never has to work out which hunks a tool touched. The set of
+  files eligible for this is asked of the generator at run time via a new
+  `sync-doc-test-counts.sh --list-outputs`, sharing the enumeration
+  `_sync_all` writes through; a numeric-looking conflict in a file nothing
+  recomputes is a real conflict, because taking either side there silently
+  drops a figure a person typed. The same reasoning applies INSIDE an owned
+  file, which is why the digit mask is not the last word: the generator
+  preserves hand-written prose verbatim by design, so a line reading
+  `refs #265` against `refs #287` -- or "covers 3 of the supported hosts"
+  against 7 -- masks equal while nothing is going to overwrite it, and
+  keeping a side there would drop the other side's committed edit under an
+  annotation claiming the value was recomputed. So the shape is proven
+  before it is trusted: the tree is resolved twice in scratch copies, once
+  keeping each side, the generator runs over both, and the two results must
+  be byte-identical. `--dry-run` on a worktree that is already mid-merge
+  prints the same classification, runs the same proof, and writes nothing,
+  so it cannot advertise a tree the live path will refuse.
+- **command parsing moved into `lib/gh-command.sh` (refs #255 / #276 /
+  #283).** Those three reports were one defect -- a hook reading data as
+  syntax -- and the rule that came out of them (CONTEXT.md section 15) is
+  that a hook must establish what the command IS before deciding what it
+  contains. `enforce_gh_body_file.sh` held the only implementation of that
+  rule; the new gate needed the same answer, and a second copy is how the
+  next report of the same defect gets written. `gh_segment`,
+  `strip_heredocs` and `fold_continuations` now live in one library, joined
+  by `gh_issue_ref_parts` (a bare number or an issue URL, which carries its
+  own repo) and `gh_flag_values` (every occurrence of a repeated flag, not
+  the first -- `--add-label bug --add-label ready-for-agent` is the ordinary
+  way to set a kind and a state label at once).
 - **rm safety went back into the permission ask; the hook only removes
   prompts now (closes #290, ADR-00000015).** One property was at stake --
   *a deletion that would remove any part of any git working tree needs a
@@ -168,6 +340,31 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   having checked nothing. It now exits 2 and names the roster.
 
 ### Added
+- **ADR-00000015: the org label vocabulary is five labels on two axes.**
+  Labels decide what an issue is, whether it is scheduled, and -- per
+  ADR-00000014 -- whether an agent may implement it unattended, so they are
+  foundational and were undefined. Measured across ~500 issues in five repos:
+  `enhancement` 336, `bug` 126, `documentation` 34, `backlog` 19, `triage` 13,
+  `ready-for-agent` 2, `upstream` 1, `question` 1, and six GitHub defaults with
+  zero uses. The inventory had also drifted -- `base` carried 15 labels while
+  `template`, `realsense_ros2`, `multi_run` and `sam_manager` carried no custom
+  labels at all, because a GitHub template repository copies only the file
+  tree, never labels, topics, branch protection or settings, so every repo made
+  "from template" skipped the `/new-repo` checklist silently. The decision
+  keeps a kind axis (`bug` / `documentation` / `enhancement`, exactly one,
+  already required by hook rule 9) and a state axis (`backlog` /
+  `ready-for-agent`, at most one, orthogonal to kind); defines `enhancement` by
+  exclusion to match how it is actually used rather than GitHub's "new feature
+  requests"; defines `ready-for-agent` as the assertion that four things are
+  present -- seams, first slice, gate command, cycle bound -- which also gives
+  `grilling` a completion condition; gates that label on both application and
+  pipeline start, as two different questions; drops `triage` (redundant with
+  the absence of `ready-for-agent`) and `upstream` (one use); and leaves the
+  six unused GitHub defaults in place but unmanaged. Distribution uses GitHub's
+  native org-level default labels for new repos plus a `labels.yaml` /
+  `sync-labels.sh` / drift-cron trio mirroring the proven `topics.yaml`
+  arrangement, because the native feature applies only at repository creation
+  and cannot cover backfill or later edits.
 - **`release-bump.sh`: a canonical primitive for the release bump, not just
   the tag (refs #272).** `release.md` step 2 was prose telling a human to make
   three mechanical edits -- set `.version`, promote `## [Unreleased]` to
