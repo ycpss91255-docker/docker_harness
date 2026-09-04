@@ -380,3 +380,48 @@ stub_gh_fail() {
   run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh issue create --title T --label bug && echo 'remember --body-file /tmp/x.md'\"}}"
   assert_permission_decision "deny"
 }
+
+# #283 defect 1: a backslash-continued newline is a continuation INSIDE one
+# command, not a segment boundary. Flags on later lines belong to the same
+# gh invocation and must be seen by every rule.
+
+@test "#283: backslash-continued gh issue create with --body-file on a later line allowed" {
+  local bf="${TMP}/body.md"; printf 'body\n' > "${bf}"
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh issue create --title T \\\\\n  --label bug \\\\\n  --body-file ${bf}\"}}"
+  assert_silent
+}
+
+@test "#283: backslash-continued gh issue create with inline --body still denied" {
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh issue create --title T \\\\\n  --label bug \\\\\n  --body 'inline body'\"}}"
+  assert_permission_decision "deny"
+}
+
+# #283 defect 1, second surface: heredoc BODY content is data written to a
+# file, not a command being run. A body line that happens to start with gh
+# must not be mistaken for the invocation -- while a genuine gh command on
+# its own line after the heredoc still is one.
+
+@test "#283: heredoc body containing a gh-leading line does not drive the verdict" {
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"cat > ${TMP}/x.md <<EOF\ngh issue create --title T\nEOF\"}}"
+  assert_silent
+}
+
+# #283: folding continuations must NOT make a plain newline stop being a
+# boundary -- two genuine gh commands on separate lines stay independent,
+# so a flag on the second never satisfies (or trips) a rule on the first.
+
+@test "#283: --body-file on a second gh command line does not satisfy the first" {
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh issue create --title T --label bug\ngh pr view 9 --body-file /tmp/x.md\"}}"
+  assert_permission_decision "deny"
+}
+
+@test "#283: a complete gh issue create followed by another gh command is silent" {
+  local bf="${TMP}/body.md"; printf 'body\n' > "${bf}"
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"gh issue create --title T --label bug --body-file ${bf}\ngh pr view 9\"}}"
+  assert_silent
+}
+
+@test "#283: a real gh issue create after a heredoc block is still denied" {
+  run "$(hook enforce_gh_body_file.sh)" <<< "{\"tool_input\":{\"command\":\"cat > ${TMP}/x.md <<EOF\nissue notes\nEOF\ngh issue create --title T --label bug\"}}"
+  assert_permission_decision "deny"
+}

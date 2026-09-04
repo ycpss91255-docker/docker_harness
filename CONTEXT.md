@@ -121,9 +121,10 @@ docker/
     │   ├── fix-compose-copy-line.sh         # 一次性 compose.yaml COPY 路徑修正
     │   ├── fix-dockerfile-lint-lib.sh        # 通用：對 --branch 指定的 chore 分支批次 patch downstream Dockerfile 加 `COPY .base/script/docker/lib /lint/lib`（#284 sub-libs split 後 fanout 必須跑，idempotent）
     │   ├── fix-dockerfile-copy-script.sh     # 通用：對 --branch 指定的 chore 分支批次 patch downstream Dockerfile 把 `COPY *.sh /lint/` 改成 `COPY script/*.sh /lint/`（base#330 / v0.31.0 wrapper consolidation 後 root 沒有 *.sh,active 2 個下游 fanout 必須跑,idempotent）
+    │   ├── check-ready-for-agent.sh         # Gate B of ADR-00000015:`check-ready-for-agent.sh [-R owner/repo] <issue|url>` 讀 issue(body + comments)判斷四要件是否齊備;0=ready、1=缺(缺的部分印 stdout 給 #296 消費、說明走 stderr)、2=問不到(絕不把讀不到當 ready);刻意不看 label — 「這個 label 誠不誠實」是 Gate A 的問題,「現在動工安不安全」是這裡的問題,共用 lib/ready-for-agent.sh,refs #294 / #296
     │   ├── check-claude-md-tree.sh          # CI lint：parse this file 的 .claude/ tree vs filesystem，drift 就 exit 1 (post-#127: just -f .claude/test/justfile tree-check passes CONTEXT.md as arg)
     │   ├── check-claude-md-ceiling.sh        # CI lint：assert CLAUDE.md 行數 + ^## 數在 ceiling 內 (defaults 240 / 20, env-overridable);refs #127
-    │   ├── update-stale-pr.sh               # one-shot merge origin/main + normal push (NO rebase/force) for a PR whose base moved (BEHIND/CONFLICTING);auto-resolve worktree by branch via $WORKSPACE_DIR scan,refs #87/#221
+    │   ├── update-stale-pr.sh               # one-shot merge origin/main + normal push (NO rebase/force) for a PR whose base moved (BEHIND/CONFLICTING);auto-resolve worktree by branch via $WORKSPACE_DIR scan;衝突只自動解一類:digit run 遮蔽後兩側相同的 regenerated hunk,且檔案要在 sync-doc-test-counts.sh --list-outputs 內,再加一道證明(兩份 scratch copy 各留一側 → 各跑一次 generator → 兩棵樹必須 byte-identical,否則那行是 generator 不會覆寫的 prose),其餘整棵樹拒絕 exit 2,refs #87/#221/#287
     │   ├── auto-merge-on-green.sh           # auto-merge-on-green skill 的腳本:arm gh pr merge --auto + poll mergeStateStatus(MERGED/BEHIND→update-branch/DIRTY/FAIL/grace),refs #211
     │   ├── serial-merge.sh                  # 同 repo 多 PR 依序落地:逐一 delegate auto-merge-on-green.sh(只 arm 隊首→≤1 armed→CI O(N²)→O(N)),skip-and-continue + summary,refs #235
     │   ├── prune-merged-worktrees.sh        # 批次清掉「branch 有 MERGED PR」的 worktree + local branch(squash-merge 讓 --is-ancestor 失效,故問 gh);每個 path 自己解析所屬 repo(rev-parse --git-common-dir)後用 git -C <repo> 操作→cwd-independent,--dry-run 走同一套 resolution/validation 只跳過 mutation,refs #260
@@ -145,8 +146,9 @@ docker/
     │   ├── new-adr.sh                         # /adr 的實作:auto-number 8 位數補零,從 doc/adr/[0-9]*.md 掃 max+1,渲染 5-section 模板 (Date/Status/Context/Decision/Alternatives/Consequences),refs #97
     │   ├── check-log-helper-usage.sh           # CI lint：scan .claude/scripts/*.sh 偵測 bare printf|echo（usage() 內 + log-allow:script/start..end allowlist marker 外）為違反 lib/log.sh adoption,refs #148 M5
     │   ├── _instinct_parser.py               # instinct-query.sh 用的 stdlib-only YAML parser helper (避免 PyYAML dep 在 Alpine test image 缺失)
-    │   ├── sync-doc-test-counts.sh           # doc/test/*.md generator：per-spec `### <path> (N)` heading、per-test catalogue rows、per-level `**N tests**` 與 TEST.md 索引全部從 spec tree 推導；`--check` 用同一條 code path 產生 scratch copy 再 diff（ci.sh doc-count-check / system spec 的 gate),取代手抄目錄,refs #265
+    │   ├── sync-doc-test-counts.sh           # doc/test/*.md generator：per-spec `### <path> (N)` heading、per-test catalogue rows、per-level `**N tests**` 與 TEST.md 索引全部從 spec tree 推導；`--check` 用同一條 code path 產生 scratch copy 再 diff（ci.sh doc-count-check / system spec 的 gate),取代手抄目錄;`--list-outputs` 印出它會改寫的 root-relative 路徑(與 _sync_all 同一份列舉),讓 update-stale-pr.sh 用問的而非自備清單,refs #265/#287
     │   ├── sync-org-repo-settings.sh         # idempotent org-wide repo settings sync (fork PR approval / merge defaults / branch protection); supports --dry-run + --repo <name>; private repos skip fork-PR + protection per API constraints
+    │   ├── unpublished-worktrees.sh          # sweep a worktree root for branches holding work that reached nobody: commits ahead of origin/main AND no PR in ANY state (--squash means merged branches are never ancestors, so ahead-of-main alone reports every landed worktree), gated on quiet period + clean tree; each worktree resolved against its OWN origin (no --repo flag), exact-line match against a cached PR window with every miss re-asked per branch (--limit truncates silently), --watch dedups on repo+branch (directories are recycled) and rebuilds its seen set each sweep so a re-entry is reported again; the default root is the directory a linked worktree sits in (../worktree relative to the repo root otherwise) and is resolved only when --root is absent; anything that leaves the sweep unanswered (missing root, no checkout to derive one from, a PR list gh refused) is exit 2, never the all-clear, refs base#1003
     │   └── lib/
     │       ├── checkpoint.sh                  # /tmp checkpoint protocol helper — write_checkpoint + is_acked,Tier 2 E2 hook 共享 deny/ack 契約,refs ADR-00000002 / #117
     │       ├── log.sh                          # OTel-aligned 5-level JSON logger; mirror of ycpss91255-docker/base@v0.37.0 (script/docker/lib/log.sh),refs base#423 / base#438 / #148
@@ -154,7 +156,9 @@ docker/
     │       ├── log.lnav-format.json           # lnav format file for the JSON logger output
     │       ├── roster.tsv                      # THE 一份 org repo 名冊(取代先前散在 4 支 script + pr.md 的複本):欄位 repo/path/fanout(active|parked|n-a)/mutation/settings/check/note;fanout 欄同時餵 batch-base-upgrade(開 PR)與 check-template-versions(驗證),所以兩邊不可能再看不同集合,refs #272
     │       ├── roster.sh                       # roster.tsv 的唯一 reader:roster_fanout_paths/_repos <active|parked|all>、roster_mutation_paths/_repos、roster_settings_repos、roster_required_check <repo>、roster_file;純讀不改,refs #272
-    │       └── ci-required-jobs.sh             # 從 repo 自己的 workflow 推導「CI 到底要求什麼」的純讀函式庫:ci_required_jobs(ci-rollup needs,flow/block 兩種 YAML seq)、ci_ci_sh_targets / ci_check_targets(docker_harness 兩邊 target 集合)、ci_actionlint_image / ci_actionlint_ignores(pin + 抑制規則);ci-and-stamp.sh 用它把 marker 的宣稱釘在 workflow 上而非手抄表,refs #272
+    │       ├── ci-required-jobs.sh             # 從 repo 自己的 workflow 推導「CI 到底要求什麼」的純讀函式庫:ci_required_jobs(ci-rollup needs,flow/block 兩種 YAML seq)、ci_ci_sh_targets / ci_check_targets(docker_harness 兩邊 target 集合)、ci_actionlint_image / ci_actionlint_ignores(pin + 抑制規則);ci-and-stamp.sh 用它把 marker 的宣稱釘在 workflow 上而非手抄表,refs #272
+    │       ├── gh-command.sh                   # 「這條 command 到底跑的是哪個程式」的共用 parser(strip_heredocs / fold_continuations / gh_segment / gh_subcommand / gh_repo_flag / gh_flag_value):heredoc body 與引號內字串是資料不是語法,先切出 command word 真的是 `gh` 的那一段再判斷 flag;從 enforce_gh_body_file.sh 抽出,#255/#276/#283 同型 bug 的唯一解析點(CONTEXT.md §15),refs #294
+    │       └── ready-for-agent.sh              # `ready-for-agent` 四要件(Seams / First slice / Gate / Bound)readiness 檢查的唯一實作,Gate A(enforce_ready_for_agent.sh 貼 label)與 Gate B(check-ready-for-agent.sh 開工前)共用:rfa_missing_parts / rfa_label_defined / rfa_issue_text(body + comments,因為 grill 結論寫在 comment)/ rfa_check;label 未定義或 gh 問不到一律靜默,refs ADR-00000015 / #294
     ├── memory/               # Claude Code per-project memory（auto-loaded via symlink）
     │   ├── MEMORY.md         # 入口索引(被 Claude Code 自動讀進 system prompt 開頭)
     │   ├── feedback_*.md     # 個別 feedback / workflow rule（每檔有 name + description + type frontmatter）
@@ -175,6 +179,7 @@ docker/
     │   ├── remind_no_heredoc_redirect.sh # cat <<EOF > file 時提醒用 Write 工具
     │   ├── remind_no_chinese_in_git_artifacts.sh # git commit / gh PR / issue title|body|comment 前 BLOCK CJK 與全形字符
     │   ├── enforce_gh_body_file.sh     # gh issue/pr create/edit/comment/close/review 前 BLOCK 違反 body-file 規律的 8 種 pattern(配合 [[gh-artifact-format]] skill,refs #64)
+    │   ├── enforce_ready_for_agent.sh  # Gate A of ADR-00000015:`gh issue edit N --add-label ready-for-agent` 前讀 issue(body + comments),四要件(Seams / First slice / Gate / Bound)缺任何一項就 BLOCK 並點名缺的;判斷走 lib/gh-command.sh(引號/heredoc 裡的字串不算 invocation)、readiness 走 lib/ready-for-agent.sh(與 Gate B 同一份);repo 沒定義該 label 或 gh 問不到就靜默,refs #294
     │   ├── remind_test_tools_smoke_sync.sh # Dockerfile.test-tools 改動但同層 release-test-tools.yaml 未同步時提醒
     │   ├── auto_allow_rm_in_workspace.sh # rm <workspace+/tmp 內 path> 自動 allow（避開 Bash(rm:*) ask yes-fatigue）
     │   ├── auto_allow_touch_ack.sh       # touch $TMPDIR/claude-checkpoint-*.ack 自動 allow（/tmp checkpoint 協定一鍵 ack,refs ADR-00000002 / #117）
@@ -186,6 +191,7 @@ docker/
     │   ├── enforce_worktree_for_branch.sh # 主 checkout 內 git checkout -b|-B 前 BLOCK,要求改走 git worktree add <path> -b <branch> main(內部 worktree 自動放行,checkpoint ack 可解,refs #122 / PR #89 / ADR-00000006)
     │   ├── enforce_merge_update_not_rebase.sh # git rebase(除 --abort/--continue/--skip)+ 有 open PR 的 branch force-push 前 BLOCK,改走 git merge origin/main + 一般 push;no-PR force-push / gh 錯誤 fail-open,checkpoint ack 可解,refs #221
     │   ├── enforce_local_full_ci_before_pr.sh # gh pr create/ready 前 BLOCK：HEAD 無 local-CI marker(.claude/state/local-ci-pass/<sha>.ok,由 .claude/test/ci.sh test 綠時寫)且非「綠後只動 doc」則 deny;LOCAL_CI_ACK=<sha> 可 override(refs #176)
+    │   ├── enforce_scripts_tracked_before_pr.sh # gh pr create/ready 前 BLOCK：.claude/scripts/ 下(含 lib/)還有 untracked *.sh 就 deny 並列出檔名 — enforce_batch_via_script 只管「產生」不管「善後」,15 個 fanout 一次性腳本累積成 local lint 長紅的根因;放 PR-open 而非 ci.sh check,因為腳本寫到一半未 commit 是合法中間狀態(refs #282)
     │   ├── check_prefer_dot_sh.sh       # docker build/run/exec/stop/compose 前：cwd 有對應 .sh wrapper 則 deny,沒有則 ask
     │   ├── remind_topics_yaml_on_new_repo.sh # gh repo create ycpss91255-docker/* 前提醒去 .github topics.yaml 加 repos.* 條目
     │   ├── auto_clean_worktree_leak.sh  # PreToolUse Bash：git pull / git checkout origin/* / git merge origin/* 前掃 main checkout 非 whitelist M(`.claude/instincts.yaml` + `.claude/memory/**`)→ 寫 cleaned event 到 ~/.claude/log/worktree-leak-events.jsonl + git checkout HEAD -- <files> 還原後放行；refs #167
@@ -217,7 +223,7 @@ docker/
     ├── test/                           # docker_harness 自己的 hook 測試 infra（與下游 repo 的 Dockerfile 無關）
     │   ├── Dockerfile                  # bats 1.11 + shellcheck on Alpine（COPY .claude/hooks/ + .claude/scripts/ + .claude/test/）
     │   ├── bats/                       # ISTQB 測試 specs — unit/integration/system/acceptance + lib/test_helper.bash（見 doc/test/,ADR-00000013）
-    │   ├── ci.sh                       # CI runner driver — both CI (.github/workflows/test.yaml) 與 local justfile 都呼叫；targets build / test / lint / hadolint / check / tree-check / ceiling-check / log-helper-check / doc-count-check / clean
+    │   ├── ci.sh                       # CI runner driver — both CI (.github/workflows/test.yaml) 與 local justfile 都呼叫；targets build / test / lint / hadolint / check / tree-check / ceiling-check / log-helper-check / doc-count-check / clean;lint 的檔案清單由 host 上的 lint_targets()(git ls-files)算出再交給 container,所以 local(掛 live worktree,refs #214)與 CI(clean checkout)蓋同一組 tracked *.sh,refs #282
     │   └── justfile                    # local just wrapper：just -f .claude/test/justfile <target> 轉呼 ci.sh <target>
     ├── settings.json                   # hooks 註冊 + permissions + sandbox（**唯一一份,無 settings.local.json**）
     └── instincts.yaml                  # 結構化 repo conventions (#95 pilot) — hooks/skills/commands 用 `instinct-query.sh` 查詢,取代 CLAUDE.md prose grep
@@ -727,6 +733,18 @@ pattern**，改用替代寫法可以根除大量無謂的 user prompt：
 其他 pattern（複雜 for-loop / Monitor body）沒有簡單 heuristic，靠這個
 section 的規則 + `[[skillification-candidates]]` skill 在任務結束時主動列
 skill 化候選收斂。
+
+### Hook 解析 command 的共同規則（refs #255 / #276 / #283）
+
+寫 hook 判斷一條 bash command 時，**先確定「跑的是哪個 command」，再判斷
+它包含什麼**——四次同型 bug 都是把資料當語法：
+
+- heredoc body 是資料不是 command（先剝掉）；backslash 續行是同一個
+  command 的一部分（先折成一行）——換行本身仍然是 command 邊界。
+- 以 shell 分隔符（`&&` `||` `|` `;` 換行）切段後，只認「命令字本身」就是
+  目標程式的那一段；引號參數裡提到的 `git` / `gh` 是別人的字串。
+- 放寬的只有「這條是不是那個 command」的判斷，規則本身（`--body-file`
+  routing、artifact 只能英文）一律不放寬。
 
 ## 16. Per-project memory (repo-portable via symlink)
 

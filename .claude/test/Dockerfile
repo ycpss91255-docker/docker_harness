@@ -23,7 +23,20 @@ USER root
 #   - python3    check_no_emoji's regex matcher
 #   - shellcheck lint target
 #   - grep / coreutils — GNU userland for consistent flags
-RUN apk add --no-cache \
+#
+# APK_MIRROR points apk at a different host. The default keeps the upstream
+# CDN, so a network that can reach it sees no change. Networks that cannot
+# reach dl-cdn.alpinelinux.org exist -- on one of ours, apk spends 480s and
+# then reports every package as "no such package", because an unreachable
+# index reads as an empty one. That is the whole failure: not a timeout the
+# reader can recognise, but a package list that appears not to contain bash.
+# Base solves the same problem for Debian and Ubuntu with APT_MIRROR_DEBIAN /
+# APT_MIRROR_UBUNTU; this is the Alpine spelling of it.
+ARG APK_MIRROR="dl-cdn.alpinelinux.org"
+RUN if [ "${APK_MIRROR}" != "dl-cdn.alpinelinux.org" ]; then \
+      sed -i "s@dl-cdn\.alpinelinux\.org@${APK_MIRROR}@g" /etc/apk/repositories; \
+    fi && \
+    apk add --no-cache \
       bash \
       coreutils \
       file \

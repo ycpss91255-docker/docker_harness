@@ -18,16 +18,16 @@ The `justfile` recipes are the local wrapper; CI
 (`.github/workflows/test.yaml`) invokes the same `.claude/test/ci.sh
 <target>` driver directly (no `just` in CI).
 
-Grand total (all levels): **1161 tests**.
+Grand total (all levels): **1253 tests**.
 
 ## Test docs by level / type
 
 | Doc | Scope | Count |
 |-----|-------|-------|
-| [unit.md](unit.md) | `.claude/test/bats/unit/` -- one hook / script in isolation | 1152 |
-| [integration.md](integration.md) | `.claude/test/bats/integration/` -- several hooks on one input | 3 |
+| [unit.md](unit.md) | `.claude/test/bats/unit/` -- one hook / script in isolation | 1231 |
+| [integration.md](integration.md) | `.claude/test/bats/integration/` -- several hooks on one input | 15 |
 | [system.md](system.md) | `.claude/test/bats/system/` -- whole framework passes its own gates | 4 |
-| [acceptance.md](acceptance.md) | `.claude/test/bats/acceptance/` -- what a consumer session receives | 2 |
+| [acceptance.md](acceptance.md) | `.claude/test/bats/acceptance/` -- what a consumer session receives | 3 |
 | [smoke.md](smoke.md) | N/A -- no product image build stage | 0 |
 
 ## Generated, not hand-maintained
@@ -53,7 +53,7 @@ spec produces a matching doc diff. Full contract: the script's header.
 
 `just -f .claude/test/justfile lint` runs `shellcheck` on every top-level
 `.sh` in `.claude/hooks/` and `.claude/scripts/`
-(42 hooks + 40 helper scripts); `... hadolint` lints
+(44 hooks + 42 helper scripts); `... hadolint` lints
 `.claude/test/Dockerfile`. The full gate
 `... check` also runs the repo-integrity audits (tree / ceiling /
 log-helper) that the System specs mirror. CI runs the same

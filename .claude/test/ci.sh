@@ -59,7 +59,16 @@ readonly REPO_ROOT="${TEST_DIR%/.claude/test}"
 
 t_build() {
   # Build context = repo root; Dockerfile COPY paths stay relative to it.
-  docker build -f "${TEST_DIR}/Dockerfile" -t "${IMAGE}" "${REPO_ROOT}"
+  #
+  # APK_MIRROR is forwarded only when the caller set it, so the image's own
+  # default stays the single place the upstream host is named. Passing it
+  # unconditionally would put an empty --build-arg in front of that default
+  # on every machine that does not need one.
+  local _args=()
+  if [ -n "${APK_MIRROR:-}" ]; then
+    _args=(--build-arg "APK_MIRROR=${APK_MIRROR}")
+  fi
+  docker build "${_args[@]}" -f "${TEST_DIR}/Dockerfile" -t "${IMAGE}" "${REPO_ROOT}"
 }
 
 t_test() {
@@ -70,13 +79,43 @@ t_test() {
   docker run --rm "${WORKTREE_MOUNT_FLAGS[@]}" -v "${REPO_ROOT}:/work" "${IMAGE}"
 }
 
+# lint_targets <root> -- print, one per line and repo-relative, the shell
+# scripts the lint gate covers: the git-TRACKED *.sh under .claude/hooks
+# and .claude/scripts (lib/ included).
+#
+# WHY tracked and not a glob: the local run bind-mounts the live worktree
+# (deliberately, refs #214) while CI checks out a clean one, so a glob
+# inside the container made the two gates answer different questions --
+# and the local one was the useless answer, red for weeks over fifteen
+# untracked one-off scripts CI never sees (refs #282). Computing the list
+# from git keeps both runs on the same set; git runs on the HOST, where
+# the repo and git are, and only the resulting paths enter the container.
+#
+# A path git still tracks but the worktree no longer has is dropped: the
+# container lints the mount, so naming it would fail the gate on a file
+# that is not there.
+lint_targets() {
+  local root="$1" f
+  git -C "${root}" ls-files -z -- \
+    '.claude/hooks/*.sh' '.claude/scripts/*.sh' '.claude/scripts/lib/*.sh' \
+    | while IFS= read -r -d '' f; do
+        [[ -f "${root}/${f}" ]] || continue
+        printf '%s\n' "${f}"
+      done
+}
+
 t_lint() {
   t_build
+  local targets=()
+  mapfile -t targets < <(lint_targets "${REPO_ROOT}")
+  if (( ${#targets[@]} == 0 )); then
+    printf 'ci.sh: no tracked shell scripts to lint under %s\n' "${REPO_ROOT}" >&2
+    return 1
+  fi
   # -v mounts the live worktree so shellcheck lints the working-tree
-  # scripts, not the build-time COPY (refs #214).
+  # content of those scripts, not the build-time COPY (refs #214).
   docker run --rm "${WORKTREE_MOUNT_FLAGS[@]}" -v "${REPO_ROOT}:/work" \
-    --entrypoint sh "${IMAGE}" -c \
-    'shellcheck /work/.claude/hooks/*.sh /work/.claude/scripts/*.sh /work/.claude/scripts/lib/*.sh'
+    --entrypoint shellcheck "${IMAGE}" "${targets[@]/#//work/}"
 }
 
 t_hadolint() {
@@ -142,4 +181,8 @@ main() {
   esac
 }
 
-main "$@"
+# Sourcing the driver exposes its helpers (lint_targets) without running a
+# target -- that is how the bats specs exercise them.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi

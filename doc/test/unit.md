@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1152 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1231 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -364,7 +364,7 @@ re-invoke `/wait-pr-ci` on the same PR. Silent on initial `-u` pushes
 | silent on bash -c "cat \<\<EOF > path" (allowed wrapper) | `bash -c` wraps the heredoc → SILENT |
 | fires on chained command: git status && cat \<\<EOF > /path | command-position heredoc after `&&` → FIRE |
 
-### .claude/test/bats/unit/remind_no_chinese_in_git_artifacts_spec.bats (11)
+### .claude/test/bats/unit/remind_no_chinese_in_git_artifacts_spec.bats (17)
 
 Covers `.claude/hooks/remind_no_chinese_in_git_artifacts.sh` — blocking
 PreToolUse hook that DENIES `git commit` and `gh pr|issue` commands when
@@ -386,6 +386,12 @@ exempt from `--body-file` scanning.
 | silent on git commit -m with em-dash and smart quotes (English typography) | allowed non-ASCII typography → SILENT |
 | silent on non-git/gh command containing CJK | matcher narrows to git/gh subcommands → SILENT |
 | silent on gh pr list --json (no body/title editing) | non-editing gh subcommand → SILENT |
+| silent on echo whose quoted argument mentions git commit and holds CJK | - |
+| denies a backslash-continued git commit whose CJK message is on a later line | - |
+| silent on a backslash-continued echo mentioning git commit with CJK | - |
+| silent on a heredoc body holding CJK and a git commit line | - |
+| denies a real git commit with CJK on a line after a heredoc block | - |
+| denies a real git commit with CJK chained after an unrelated echo | - |
 
 ### .claude/test/bats/unit/remind_test_tools_smoke_sync_spec.bats (7)
 | Test | Scenario |
@@ -398,7 +404,7 @@ exempt from `--body-file` scanning.
 | silent when Dockerfile.test-tools has no final-stage apk add | no final apk → SILENT |
 | handles empty smoke step gracefully | YAML run block empty → no crash |
 
-### .claude/test/bats/unit/enforce_gh_body_file_spec.bats (57)
+### .claude/test/bats/unit/enforce_gh_body_file_spec.bats (63)
 
 Covers `.claude/hooks/enforce_gh_body_file.sh` -- the PreToolUse hook
 that BLOCKS gh routing violations from issue #64. Renamed + upgraded
@@ -465,6 +471,12 @@ threshold for short inline bodies.
 | #255: real gh uses --body-file; trailing echo mentioning --body= is silent | detection scoped to the gh segment |
 | #255: a quoted gh-comment mention before a real gh pr view is silent | quoted gh in another command ignored |
 | #255: gh issue create missing --body-file still denied despite trailing echo mentioning one | foreign --body-file does not satisfy the rule |
+| #283: backslash-continued gh issue create with --body-file on a later line allowed | - |
+| #283: backslash-continued gh issue create with inline --body still denied | - |
+| #283: heredoc body containing a gh-leading line does not drive the verdict | - |
+| #283: --body-file on a second gh command line does not satisfy the first | - |
+| #283: a complete gh issue create followed by another gh command is silent | - |
+| #283: a real gh issue create after a heredoc block is still denied | - |
 
 ### .claude/test/bats/unit/wait_pr_ci_spec.bats (32)
 
@@ -1993,3 +2005,95 @@ escaping, and the read-only `--check` gate.
 | --skip drops named repos | - |
 | --list-repos prints the effective selection without probing anything | - |
 | --manifest reads the expected paths from a file instead of running init.sh | - |
+
+### .claude/test/bats/unit/check_ready_for_agent_spec.bats (9)
+
+| Test | Scenario |
+|------|----------|
+| an issue missing a part exits 1 and names the missing part | - |
+| a complete issue exits 0 | - |
+| the verdict does not depend on the label being defined | - |
+| an unready issue that already carries the label still exits 1 | - |
+| parts living in a comment are found | - |
+| an issue URL is accepted as the target | - |
+| a gh that cannot answer exits 2, never a false ready | - |
+| no issue argument exits 2 with usage | - |
+| --help exits 0 with usage | - |
+
+### .claude/test/bats/unit/ci_sh_lint_targets_spec.bats (5)
+
+| Test | Scenario |
+|------|----------|
+| lint targets are the tracked hook, script and lib shell scripts | - |
+| an untracked script is not a lint target | - |
+| a tracked non-shell file is not a lint target | - |
+| a tracked script deleted in the working tree is not a lint target | - |
+| t_lint lints the computed target list, not a shell glob | - |
+
+### .claude/test/bats/unit/enforce_ready_for_agent_spec.bats (23)
+
+| Test | Scenario |
+|------|----------|
+| add-label ready-for-agent on an issue missing a part is denied, naming it | - |
+| the denial names every missing part, not just the first | - |
+| add-label ready-for-agent on a complete issue is silent | - |
+| ready-for-agent behind a second --add-label flag is still gated | - |
+| ready-for-agent inside a comma-separated --add-label is still gated | - |
+| adding a different label to the same unready issue is untouched | - |
+| removing ready-for-agent from an unready issue is untouched | - |
+| a label that merely contains ready-for-agent is not the label | - |
+| the four parts are found when they live in a comment, not the body | - |
+| parts split across the body and a comment together count | - |
+| comments that do not supply the missing part still leave it missing | - |
+| the gate reads the repo and number out of an issue URL | - |
+| a complete issue named by URL still takes the label | - |
+| an explicit -R repo is used for the lookup | - |
+| an issue argument that is neither a number nor a URL is silent | - |
+| a repo that does not define ready-for-agent is silent | - |
+| a repo that does define ready-for-agent is gated | - |
+| gh that cannot answer leaves the edit alone | - |
+| an issue body quoting the labelling command does not trigger the gate | - |
+| the labelling command inside a heredoc body is prose, not an invocation | - |
+| a real labelling command chained after another still fires | - |
+| a labelling command folded over a line continuation still fires | - |
+| a gh subcommand that is not issue edit is silent | - |
+
+### .claude/test/bats/unit/enforce_scripts_tracked_before_pr_spec.bats (8)
+
+| Test | Scenario |
+|------|----------|
+| denies PR open while .claude/scripts holds an untracked .sh | - |
+| silent on PR open when every .claude/scripts .sh is tracked | - |
+| denies when the untracked .sh sits in .claude/scripts/lib/ | - |
+| silent when the untracked file under .claude/scripts is not a .sh | - |
+| silent when an untracked .sh is covered by an explicit gitignore rule | - |
+| denies PR ready too, not just PR create | - |
+| silent on a non-PR-open gh command with an untracked .sh present | - |
+| silent when cwd is not a git repo | - |
+
+### .claude/test/bats/unit/unpublished_worktrees_spec.bats (22)
+
+| Test | Scenario |
+|------|----------|
+| --help prints usage and exits 0 | - |
+| an unknown argument exits 2 and names itself | - |
+| a sweep root that does not exist is an error, not the all-clear | - |
+| the default root is read off the main worktree, not the linked one | - |
+| a merged, open or closed PR all silence the branch; only no-PR is reported | - |
+| everything published means exit 0 with no output at all | - |
+| each worktree is answered against its OWN origin, not one shared repo | - |
+| a branch that committed inside the quiet period is not reported | - |
+| --quiet-minutes 0 reports the branch the default window withheld | - |
+| a dirty working tree is not reported, however long it has been idle | - |
+| a branch with no commits ahead of origin/main is not reported | - |
+| the PR match is exact: fix/9 is not answered by a PR for fix/99 | - |
+| a worktree parked on main is skipped even when it is ahead | - |
+| a plain directory is skipped even when a repo encloses the sweep root | - |
+| watch mode reports a stalled branch once, not once per interval | - |
+| watch mode reports a branch that entered the state after it started | - |
+| a gh failure is an error, not a repo that has no PRs | - |
+| a PR older than the list window is still found, by the exact query | - |
+| --root is honoured from a location with no git checkout above it | - |
+| no --root and no checkout to derive one from is an error, not a crash | - |
+| watch mode names the second branch to occupy a recycled directory | - |
+| watch mode reports a branch again after it leaves the state and re-enters | - |
