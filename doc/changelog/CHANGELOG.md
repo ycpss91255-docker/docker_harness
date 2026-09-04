@@ -7,6 +7,29 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **`ready-for-agent` now means something, at both ends (closes #294).**
+  ADR-00000015 defines the label as an assertion that four things are
+  present in the issue -- **Seams**, **First slice**, **Gate**, **Bound** --
+  and nothing checked it, which is why the four repos defining it gave it
+  four different descriptions across its 49 uses. Two gates now do, and the ADR records them
+  as different questions rather than the same check twice.
+  `enforce_ready_for_agent.sh` is the first: a PreToolUse hook that reads
+  the issue behind `gh issue edit N --add-label ready-for-agent` and denies
+  when any part is absent, naming the ones that are.
+  `check-ready-for-agent.sh` is the second: the same question, callable,
+  for the fix pipeline to ask before it opens a worktree regardless of what
+  labels the issue wears (#296 consumes it). Both answer through one
+  implementation, `lib/ready-for-agent.sh` -- two copies of the parts list
+  would drift.
+  They read the issue's **comments as well as its body**: the body stays
+  the original spec and a grill writes its conclusions back as a comment,
+  so a body-only check would have failed every grilled issue against its
+  own gate. The heading shape authors must write is documented in
+  `gh-artifact-format` section 7.
+  A repo whose label inventory has no `ready-for-agent` sees no gate at
+  all, and a gh that cannot be reached leaves the label edit alone -- a
+  gate firing where the vocabulary is not adopted is pure friction (#278's
+  own reasoning), and neither gate may block on a transient failure.
 - **a review loop with a fixed point, and an accounting of what it leaves
   behind (refs base#1003).** Three branches held finished, committed,
   test-green work for hours with nothing published -- 210 lines on one, 427
@@ -75,6 +98,87 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   branches stranded with no PR, idle 3.1 and 7.9 days.
 
 ### Changed
+- **the label docs describe the org that exists, not the one before
+  ADR-00000015 (closes #295).** `gh-artifact-format` section 6 documented a
+  "stock label inventory in every org repo" -- `question`, `wontfix`,
+  `invalid`, `duplicate`, `good first issue`, `help wanted`, which carry one
+  issue between them -- and said the `base`-only labels were "not yet rolled
+  out org-wide" with cross-repo alignment "out of scope for #91". All of
+  that is false since `labels.yaml`, `script/sync-labels.sh` and the weekly
+  drift cron landed in `ycpss91255-docker/.github` (#25) and the org default
+  labels were reduced to the same five (#26). The section is now the five
+  managed labels on two axes, sourced from `labels.yaml` word for word.
+  The title-prefix mapping table stays -- hook rule 9 still enforces it --
+  but what it left implicit is now stated: four of the six prefixes
+  (`feat`, `refactor`, `chore`, `track`) map to `enhancement`, which is why
+  ADR-00000015 defines that label by exclusion rather than as GitHub's "new
+  feature requests". Sections 6 and 7 read as one pair: 6 says which labels
+  exist, 7 says what the only one with a precondition costs to apply.
+- **`/new-repo` names the labels step and the reason its checklist gets
+  skipped (closes #295).** A GitHub template repository copies the file
+  tree and nothing else -- never labels, topics, branch protection or
+  settings -- so a repo created "from template" looks right and is not.
+  `sam_manager`, `omniverse_web_viewer` and `github_runner` were all created
+  after the checklist existed and all three still diverge from the five
+  managed labels. Post-setup is now stated as mandatory, and carries a
+  labels step pointing at `script/sync-labels.sh` rather than at
+  `gh label create`.
+- **ADR-00000015 listed a label that exists in no org repo (closes #295).**
+  Its six never-used GitHub defaults were taken from GitHub's current
+  documentation instead of from the live inventory, so the list included
+  `accessibility` -- a newer default that **zero** of the 24 repos carry --
+  and omitted `question`, which all 24 carry and which has the single use
+  already shown in the ADR's own measurement table. The ADR also read as
+  leaving the six untouched on both label surfaces. Those are different
+  surfaces: the org **default-label list** seeds newly created repositories
+  only and changing it touches no existing repo, so the six were removed
+  from it (ycpss91255-docker/.github#26) while they stay in place and
+  unmanaged in every repository that already carries them.
+- **`update-stale-pr.sh` recomputes the one conflict shape that is always
+  mechanical (closes #287).** Landing a batch against `strict` branch
+  protection means every branch merges the base into itself first, and in
+  the last cycle roughly fifteen of them conflicted on exactly the same
+  thing: the derived test-count figures in `doc/test/`. Both sides added
+  tests, so both rewrote the same total, and neither number is right
+  afterwards -- the right one is what the generator computes from the merged
+  tree. The script now classifies each conflict hunk and calls it
+  **regenerated** when the two sides are identical once every digit run is
+  masked AND the generator lands the same tree whichever side is kept. If
+  every hunk in every conflicted file qualifies, it drops the markers,
+  re-runs `sync-doc-test-counts.sh`, stages, commits and pushes, printing the
+  file, hunk count and before / after figures so the landed number is
+  visibly recomputed rather than picked. Anything else -- a prose hunk,
+  markers that do not parse -- still exits 2 with the merge untouched, and
+  the refusal is whole-tree: one real conflict and nothing is resolved, so a
+  reviewer never has to work out which hunks a tool touched. The set of
+  files eligible for this is asked of the generator at run time via a new
+  `sync-doc-test-counts.sh --list-outputs`, sharing the enumeration
+  `_sync_all` writes through; a numeric-looking conflict in a file nothing
+  recomputes is a real conflict, because taking either side there silently
+  drops a figure a person typed. The same reasoning applies INSIDE an owned
+  file, which is why the digit mask is not the last word: the generator
+  preserves hand-written prose verbatim by design, so a line reading
+  `refs #265` against `refs #287` -- or "covers 3 of the supported hosts"
+  against 7 -- masks equal while nothing is going to overwrite it, and
+  keeping a side there would drop the other side's committed edit under an
+  annotation claiming the value was recomputed. So the shape is proven
+  before it is trusted: the tree is resolved twice in scratch copies, once
+  keeping each side, the generator runs over both, and the two results must
+  be byte-identical. `--dry-run` on a worktree that is already mid-merge
+  prints the same classification, runs the same proof, and writes nothing,
+  so it cannot advertise a tree the live path will refuse.
+- **command parsing moved into `lib/gh-command.sh` (refs #255 / #276 /
+  #283).** Those three reports were one defect -- a hook reading data as
+  syntax -- and the rule that came out of them (CONTEXT.md section 15) is
+  that a hook must establish what the command IS before deciding what it
+  contains. `enforce_gh_body_file.sh` held the only implementation of that
+  rule; the new gate needed the same answer, and a second copy is how the
+  next report of the same defect gets written. `gh_segment`,
+  `strip_heredocs` and `fold_continuations` now live in one library, joined
+  by `gh_issue_ref_parts` (a bare number or an issue URL, which carries its
+  own repo) and `gh_flag_values` (every occurrence of a repeated flag, not
+  the first -- `--add-label bug --add-label ready-for-agent` is the ordinary
+  way to set a kind and a state label at once).
 - **the hooks stopped knowing about `make` and `justfile.ci` (closes #280).**
   The make -> just migration finished a while ago: no repo root in the
   workspace carries a `Makefile.ci` or a `justfile.ci`, and every repo has a
