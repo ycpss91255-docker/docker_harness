@@ -179,6 +179,84 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   own repo) and `gh_flag_values` (every occurrence of a repeated flag, not
   the first -- `--add-label bug --add-label ready-for-agent` is the ordinary
   way to set a kind and a state label at once).
+- **rm safety went back into the permission ask; the hook only removes
+  prompts now (closes #290, ADR-00000015).** One property was at stake --
+  *a deletion that would remove any part of any git working tree needs a
+  human, a deletion that would not does not* -- and it was expressed as
+  literal prefix matches over the command STRING: `permissions.ask:
+  Bash(rm:*)` plus a list of `Bash(rm ...)` allow rules that reached 480
+  entries while still missing the next caller-chosen variable name
+  (`rm -rf "$TMPDIR/mut957"`, `SCRATCH=...; rm -rf $SCRATCH/x`) and
+  allowing `rm -rf /tmp/../etc`, which begins with the allowed prefix
+  `rm -rf /tmp/`. The first attempt computed the property in a hook and
+  made the hook the guard, with the blanket ask deleted. Three reviews
+  then walked past it -- a heredoc fed to a shell, a here-string fed to a
+  shell, `bash -c --`, `builtin cd`, and a command word spelled `r"m"` --
+  each proven by deleting a tracked file out of a real working tree. A
+  command string is not a set of paths until a shell expands it, and
+  bash's spellings are not finite, so **the ask rule is back and is the
+  guard**, and `auto_allow_rm_outside_git_tree.sh` (renamed from
+  `enforce_rm_outside_git_tree.sh`) may now only emit `allow` when it
+  resolved every target of every rm and every one of them is outside every
+  working tree and holds none, `ask` with the resolved target and the
+  tree's root when it can name a reason, and NOTHING otherwise. It never
+  emits `deny`. That inversion is what makes the five bypasses dead by
+  construction rather than handled: none of them can produce an allow, and
+  the worst any of them can do is leave the hook silent -- which is now a
+  human. The same sentence covers a construct the lexer refuses, a missing
+  `jq` (previously the one dependency whose absence turned the guard into
+  allow-everything), an unbound variable, a signal and the 10s hook
+  timeout, so the EXIT trap that used to manufacture a deny is gone: there
+  is no default left worth writing. Three rules do the rest, each a rule
+  and not a case -- text the lexer discards as data is still text a shell
+  may execute, so an rm token in a heredoc body or a here-string word
+  makes the whole command un-allowable; a word the guard cannot place is
+  never analysed as if it could be (`bash -c --` says so instead of
+  reading the `--`); and a simple command the guard does not model may
+  have moved the shell, so it blanks the tracked cwd, which covers
+  `builtin cd`, `command cd`, `eval` and whatever comes next without a
+  list of builtins to maintain. An assignment PREFIX no longer feeds its
+  own command's expansions (`X=v rm -rf $X/y` resolved a path bash would
+  not, and allowed it); `git` lost its blanket skip, because the
+  justification (`git rm` stages a recoverable deletion) covered
+  subcommands that delete THROUGH git and not `git submodule foreach
+  'rm ...'`, `git bisect run rm ...` or `git rebase -x 'rm ...'`; the
+  containment search's directory and wall-clock budgets are now spent once
+  per INVOCATION rather than once per operand, because sixty operands each
+  paying a full budget outlive the hook timeout and a hook killed for
+  running long emits nothing; and the cheap text gate in front of the
+  lexer reads quoting as the shell does, so `r"m"`, `r'm'` and `r\m` reach
+  the lexer instead of never waking the hook. The cost is stated beside
+  the code and is a prompt, never a refusal: an rm token in a command the
+  hook cannot place asks even when it is inert (`echo rm`, `grep 'rm'
+  file`, `git rm README.md`). What is deliberately NOT closed is written
+  in the header in those words -- the ask rule is itself a text match
+  performed by Claude Code, so `/bin/rm -rf <repo>/x` and
+  `X=r; ${X}m -rf <repo>/x` do not match it, and a PreToolUse hook cannot
+  make a tool call not happen. Closing those needs the question asked
+  AFTER expansion, by an `rm` shim on the agent shell's PATH;
+  ADR-00000015 records that it is installable on this harness (settings
+  `env` does reach Bash tool calls, `CLAUDE_CODE_SHELL_PREFIX` does wrap
+  them) and why it is not shipped here -- `env` values are not
+  interpolated, so the wrapper path is machine-specific and absent from a
+  fresh clone; a shim can only refuse, never ask; and `/bin/rm` walks past
+  a PATH shim anyway. `auto_allow_rm_in_workspace.sh` and its spec are
+  gone: it allowed rm anywhere under the workspace checkout, which is
+  where the working trees are. The machine-local untracked
+  `settings.local.json` still carries the 480 dead allow rules, and they
+  matter again now that the hook can be silent -- an allow rule beats the
+  ask. Pruning them is a local step for that file's owner:
+  `jq '.permissions.allow |= map(select(startswith("Bash(rm ") | not))'
+  .claude/settings.local.json > /tmp/pruned.json` and move it into place.
+  Two operands the hook used to resolve to the WRONG path, both found by
+  driving it against real fixtures and both reaching the one outcome it must
+  not be able to reach -- an affirmative allow while bash deletes a tracked
+  file -- are closed with it: `$'...'` and `$"..."` are quoting forms rather
+  than a literal dollar (`rm -rf $'<repo>/src'` became the relative operand
+  `$/<repo>/src`, which resolved outside every tree), and a command that
+  assigns `IFS` is never allowed, because default word splitting is what
+  every unquoted expansion here is resolved against (`IFS=/; X=/a/b;
+  rm -rf $X` deletes the relative `a` and `b` in the cwd).
 - **the hooks stopped knowing about `make` and `justfile.ci` (closes #280).**
   The make -> just migration finished a while ago: no repo root in the
   workspace carries a `Makefile.ci` or a `justfile.ci`, and every repo has a
