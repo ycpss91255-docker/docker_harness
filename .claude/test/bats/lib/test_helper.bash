@@ -90,7 +90,11 @@ assert_message_contains() {
 }
 
 # mktemp_repo [opts] — create a temp git repo and echo its path. opts may
-# include "changelog" to seed doc/changelog/CHANGELOG.md.
+# include "changelog" to seed a pre-split changelog: one
+# doc/changelog/CHANGELOG.md carrying the live `## [Unreleased]` heading.
+# The heading is what identifies the live changelog (the same invariant
+# base's `changelog-layout` lint enforces), so a fixture without it is not a
+# repo with a changelog — it is a repo whose changelog cannot be derived.
 mktemp_repo() {
   local opts="${1:-}"
   local dir
@@ -103,7 +107,7 @@ mktemp_repo() {
     case "${opts}" in
       *changelog*)
         mkdir -p doc/changelog
-        echo "# Changelog" > doc/changelog/CHANGELOG.md
+        printf '# Changelog\n\n## [Unreleased]\n' > doc/changelog/CHANGELOG.md
         ;;
     esac
     mkdir -p script

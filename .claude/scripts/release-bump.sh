@@ -27,7 +27,8 @@
 #
 # Options:
 #   --repo-root <path>   Repo to edit (default: git toplevel of cwd).
-#   --changelog <path>   Changelog file (default: <root>/doc/changelog/CHANGELOG.md).
+#   --changelog <path>   Changelog file (default: the file under
+#                        <root>/doc/changelog/ carrying `## [Unreleased]`).
 #   --date <YYYY-MM-DD>  Release date for the promoted heading (default: today).
 #   --slug <owner/repo>  Compare-link slug (default: derived from origin).
 #   --links-only         Skip the .version / heading edits.
@@ -52,8 +53,8 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 readonly SCRIPT_DIR
 # shellcheck source=lib/log.sh disable=SC1091
 source "${SCRIPT_DIR}/lib/log.sh"
-
-readonly DEFAULT_CHANGELOG_REL="doc/changelog/CHANGELOG.md"
+# shellcheck source=lib/changelog-path.sh disable=SC1091
+source "${SCRIPT_DIR}/lib/changelog-path.sh"
 
 usage() {
   sed -n '/^# Usage:/,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
@@ -211,7 +212,23 @@ main() {
     _log_fatal release-bump precondition_missing path="${root:-<cwd>}" reason=not-a-git-repo
     return 2
   fi
-  [[ -n "${changelog}" ]] || changelog="${root}/${DEFAULT_CHANGELOG_REL}"
+  # Which file is live is DERIVED, never named: `doc/changelog/CHANGELOG.md`
+  # is the generated index once a repo has split its changelog per series
+  # (base#926), and a default naming it stopped base's v0.43.0-rc2 release
+  # with a message that said which path it read and not what it wanted from
+  # it. The heading is the marker on both layouts, so this needs no per-repo
+  # configuration and does not go stale when the series rolls.
+  if [[ -z "${changelog}" ]]; then
+    if ! changelog="$(changelog_live_file "${root}")"; then
+      err "cannot tell which file is this repo's live changelog"
+      local line
+      while IFS= read -r line; do err "  ${line}"; done \
+        < <(changelog_why_no_live_file "${root}")
+      err "  pass --changelog <path> for a layout this rule cannot see"
+      _log_fatal release-bump precondition_missing path="$(changelog_dir "${root}")" reason=no-changelog
+      return 1
+    fi
+  fi
   if [[ ! -f "${changelog}" ]]; then
     _log_fatal release-bump precondition_missing path="${changelog}" reason=no-changelog
     return 1
