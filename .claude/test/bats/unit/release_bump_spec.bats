@@ -174,3 +174,168 @@ ${body}"
   run grep -c 'github.com/ycpss91255-docker/multi_run/' "${CL}"
   refute_output '0'
 }
+
+# --- split changelog layout (refs #307) -------------------------------------
+#
+# `ycpss91255-docker/base`#926 split the changelog into one file per `0.Y`
+# series behind a GENERATED index. `doc/changelog/CHANGELOG.md` is now that
+# index: it carries no release section, and base's `changelog-layout` lint
+# refuses one there. The live `## [Unreleased]` lives in the series file.
+#
+# Every test above uses the pre-split fixture, which is exactly why a
+# hardcoded `doc/changelog/CHANGELOG.md` default shipped and stopped base's
+# v0.43.0-rc2 release with a message that named a path and never said what it
+# wanted from it.
+
+# seed_split -- index + two series files, the newest carrying [Unreleased].
+seed_split() {
+  printf '# Changelog\n\nGenerated index -- do not hand-edit.\n\n| Series | File |\n|---|---|\n| v0.43 | [v0.43.md](v0.43.md) |\n' \
+    > "${CL}"
+  printf '# v0.42\n\n## [v0.6.8] - 2026-04-20\n\n- eight\n' \
+    > "${REPO}/doc/changelog/v0.42.md"
+  printf '# v0.43\n\n## [Unreleased]\n\n### Fixed\n- something\n\n## [v0.43.0] - 2026-09-01\n\n- shipped\n' \
+    > "${REPO}/doc/changelog/v0.43.md"
+}
+
+@test "split layout: promotes the series file and leaves the generated index alone" {
+  seed_split
+  local index_before
+  index_before="$(cat "${CL}")"
+  run bump v0.6.9 --repo-root "${REPO}" --date 2026-04-21
+  assert_success
+  assert_equal "$(cat "${CL}")" "${index_before}"
+  run grep -c '^## \[v0.6.9\] - 2026-04-21' "${REPO}/doc/changelog/v0.43.md"
+  assert_output '1'
+  assert_equal "$(cat "${REPO}/.version")" 'v0.6.9'
+}
+
+@test "split layout: the link block lands in the series file, not the index" {
+  seed_split
+  run bump --links-only --repo-root "${REPO}"
+  assert_success
+  run grep -c '^\[Unreleased\]: https://github.com/ycpss91255-docker/base/compare/' \
+    "${REPO}/doc/changelog/v0.43.md"
+  assert_output '1'
+  run grep -c 'https://github.com' "${CL}"
+  assert_output '0'
+}
+
+@test "split layout: the rule follows the series to v0.44 with nothing to edit" {
+  seed_split
+  printf '# v0.43\n\n## [v0.43.0] - 2026-09-01\n\n- shipped\n' \
+    > "${REPO}/doc/changelog/v0.43.md"
+  printf '# v0.44\n\n## [Unreleased]\n\n### Added\n- next\n' \
+    > "${REPO}/doc/changelog/v0.44.md"
+  run bump v0.44.0 --repo-root "${REPO}" --date 2026-09-05
+  assert_success
+  run grep -c '^## \[v0.44.0\] - 2026-09-05' "${REPO}/doc/changelog/v0.44.md"
+  assert_output '1'
+  run grep -c '^## \[v0.44.0\]' "${REPO}/doc/changelog/v0.43.md"
+  assert_output '0'
+}
+
+@test "refuses when nothing under doc/changelog carries Unreleased, and says so" {
+  printf '# Changelog\n\nGenerated index -- do not hand-edit.\n' > "${CL}"
+  run bump v0.6.9 --repo-root "${REPO}" --date 2026-04-21
+  assert_failure 1
+  assert_output --partial 'Unreleased'
+  assert_output --partial "${REPO}/doc/changelog"
+  assert_output --partial 'CHANGELOG.md'
+  assert_output --partial '--changelog'
+}
+
+@test "refuses when several files carry Unreleased, naming each candidate" {
+  seed_split
+  printf '# v0.42\n\n## [Unreleased]\n\n- stale\n' \
+    > "${REPO}/doc/changelog/v0.42.md"
+  run bump v0.6.9 --repo-root "${REPO}" --date 2026-04-21
+  assert_failure 1
+  assert_output --partial 'doc/changelog/v0.42.md'
+  assert_output --partial 'doc/changelog/v0.43.md'
+}
+
+@test "--changelog still overrides the derivation for a layout the rule cannot see" {
+  seed_split
+  mkdir -p "${REPO}/other"
+  printf '# elsewhere\n\n## [Unreleased]\n\n- x\n' > "${REPO}/other/LOG.md"
+  run bump v0.6.9 --repo-root "${REPO}" --changelog "${REPO}/other/LOG.md" --date 2026-04-21
+  assert_success
+  run grep -c '^## \[v0.6.9\]' "${REPO}/other/LOG.md"
+  assert_output '1'
+  run grep -c '^## \[v0.6.9\]' "${REPO}/doc/changelog/v0.43.md"
+  assert_output '0'
+}
+
+# --- cross-series compare links (refs #307) ---------------------------------
+#
+# The link block is derived from the headings in ONE file. While the whole
+# changelog WAS one file that was the whole history, so its oldest heading had
+# nothing above it and correctly got a `releases/tag/` link. After base#926
+# each series file's oldest heading DOES have a predecessor -- the newest tag
+# in the previous series file -- and base's real `v0.43.md` already links it
+# that way by hand (`compare/v0.42.0...v0.43.0-rc1`).
+#
+# Deriving from the live file alone therefore does not fail, it DEGRADES: the
+# next release silently rewrites that correct cross-series compare into a tag
+# link. Same shape as the hardcoded path this script stopped naming -- a
+# derivation whose domain quietly stopped being the whole story.
+
+# seed_series -- an index plus three series files with coherent versions, the
+# newest carrying [Unreleased]. v0.42 holds both a final and an rc so the
+# predecessor cannot be picked by `sort -V` order alone.
+seed_series() {
+  printf '# Changelog\n\nGenerated index -- do not hand-edit.\n' > "${CL}"
+  printf '# v0.41\n\n## [v0.41.0] - 2026-07-01\n\n- old\n' \
+    > "${REPO}/doc/changelog/v0.41.md"
+  printf '# v0.42\n\n## [v0.42.0] - 2026-08-01\n\n- final\n\n## [v0.42.0-rc4] - 2026-07-20\n\n- rc\n' \
+    > "${REPO}/doc/changelog/v0.42.md"
+  printf '# v0.43\n\n## [Unreleased]\n\n## [v0.43.0-rc1] - 2026-09-04\n\n- rc\n' \
+    > "${REPO}/doc/changelog/v0.43.md"
+}
+
+@test "split layout: the oldest heading compares against the previous series" {
+  seed_series
+  run bump --links-only --repo-root "${REPO}"
+  assert_success
+  run cat "${REPO}/doc/changelog/v0.43.md"
+  assert_line '[v0.43.0-rc1]: https://github.com/ycpss91255-docker/base/compare/v0.42.0...v0.43.0-rc1'
+  refute_output --partial 'releases/tag/'
+}
+
+@test "split layout: the previous series' released tag wins over its candidates" {
+  seed_series
+  run bump --links-only --repo-root "${REPO}"
+  assert_success
+  run cat "${REPO}/doc/changelog/v0.43.md"
+  refute_output --partial 'compare/v0.42.0-rc4...v0.43.0-rc1'
+}
+
+@test "split layout: promoting does not degrade the cross-series link already there" {
+  seed_series
+  printf '\n[Unreleased]: https://github.com/ycpss91255-docker/base/compare/v0.43.0-rc1...HEAD\n[v0.43.0-rc1]: https://github.com/ycpss91255-docker/base/compare/v0.42.0...v0.43.0-rc1\n' \
+    >> "${REPO}/doc/changelog/v0.43.md"
+  run bump v0.43.0-rc2 --repo-root "${REPO}" --date 2026-09-05
+  assert_success
+  run cat "${REPO}/doc/changelog/v0.43.md"
+  assert_line '[v0.43.0-rc1]: https://github.com/ycpss91255-docker/base/compare/v0.42.0...v0.43.0-rc1'
+  refute_output --partial 'releases/tag/'
+}
+
+@test "pre-split layout: the oldest heading still links to its release tag" {
+  seed_changelog
+  run bump --links-only --repo-root "${REPO}"
+  assert_success
+  run cat "${CL}"
+  assert_line '[v0.6.6]: https://github.com/ycpss91255-docker/base/releases/tag/v0.6.6'
+}
+
+@test "--changelog outside the layout keeps the single-file link shape" {
+  seed_series
+  mkdir -p "${REPO}/other"
+  printf '# elsewhere\n\n## [Unreleased]\n\n## [v9.0.0] - 2026-01-01\n\n- x\n' \
+    > "${REPO}/other/LOG.md"
+  run bump --links-only --repo-root "${REPO}" --changelog "${REPO}/other/LOG.md"
+  assert_success
+  run cat "${REPO}/other/LOG.md"
+  assert_line '[v9.0.0]: https://github.com/ycpss91255-docker/base/releases/tag/v9.0.0'
+}

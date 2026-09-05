@@ -170,7 +170,8 @@ run_doc_scan() {
     [[ -f "${abs}" ]] || continue
     case "${abs}" in
       */CLAUDE.md|*/.claude/commands/*.md|*/.claude/skills/*/SKILL.md) continue ;;
-      */doc/test/*.md|*/doc/changelog/CHANGELOG.md) continue ;;
+      # Changelog exempt by directory, not by filename — mirrors the hooks.
+      */doc/test/*.md|*/doc/changelog/*) continue ;;
       */.claude/test/bats/*) continue ;;
       */.claude/instincts.yaml) continue ;;
     esac

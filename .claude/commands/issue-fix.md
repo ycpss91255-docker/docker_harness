@@ -146,7 +146,7 @@ If during implementation the production diff (excluding test fixtures) exceeds *
 - Leave the worktree in place for human inspection (do NOT auto-remove)
 - Single-issue mode: report to user with the worktree path. Batch mode: record outcome and continue to next issue.
 
-Sync `doc/test/TEST.md` / `doc/changelog/CHANGELOG.md` / 4-language READMEs per `/doc-sync` rules — same for any auto-fix as for any human-driven change.
+Sync `doc/test/TEST.md` / the live changelog / 4-language READMEs per `/doc-sync` rules — same for any auto-fix as for any human-driven change. The live changelog is the file under `doc/changelog/` carrying `## [Unreleased]` (`changelog_live_rel` in `.claude/scripts/lib/changelog-path.sh`), which on a split-changelog repo is the series file and never the generated `CHANGELOG.md` index.
 
 ### 6. Commit + push + create PR
 

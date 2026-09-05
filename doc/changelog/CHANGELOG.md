@@ -6,6 +6,45 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **The live changelog is now derived, not named (closes #307, closes #308).**
+  `ycpss91255-docker/base`#926 split the changelog into one file per `0.Y`
+  series behind a generated index, and seven places in this repo spelled out
+  `doc/changelog/CHANGELOG.md`. All seven changed meaning at once:
+  `release-bump.sh` refused to promote base's v0.43.0-rc2 because the index
+  carries no `[Unreleased]`, `check_changelog_drift.sh` warned on every code
+  commit that the file the commit must NOT hand-edit was missing, and the
+  emoji / AI-attribution scanners exempted the generated rows while scanning
+  the prose that needs the exemption.
+  The rule is now one shared reader, `.claude/scripts/lib/changelog-path.sh`:
+  the live changelog is the file under `doc/changelog/` carrying
+  `## [Unreleased]`, which is the invariant base's `changelog-layout` lint
+  already enforces. On a pre-split repo that file IS `CHANGELOG.md`, so
+  nothing about an unsplit repo changes and no per-repo configuration
+  appears; on a split repo it follows the series to v0.44 with nothing to
+  edit, where a documented `--changelog doc/changelog/v0.43.md` would be a
+  value that goes stale every minor series. Zero candidates or several are a
+  refusal naming the directory searched and the files found, rather than a
+  guess; `--changelog` remains the override.
+  The two scanners are fixed the other way, by exempting `doc/changelog/` as
+  a directory: they are not looking for the live file, they are excluding a
+  category, and everything in that directory is changelog prose or generated
+  rows.
+- **Compare links no longer degrade at a series boundary (refs #307).**
+  `release-bump.sh` derives the whole Keep-a-Changelog link block from the
+  headings in one file, and linked its OLDEST heading to `releases/tag/`
+  because nothing preceded it. That held while the changelog was one file.
+  After the split each series file's oldest heading does have a predecessor
+  -- the newest tag in the previous series file -- and base's real
+  `v0.43.md` already links it that way. Making the primitive run on the split
+  layout without teaching it this would not have failed loudly; it would have
+  rewritten a correct `compare/v0.42.0...v0.43.0-rc1` into a tag link on the
+  next release, and running `--check` against base's real changelog reported
+  exactly that drift. The predecessor is now derived from the newest heading
+  of each other file in the directory, so a pre-split repo (nothing else
+  there) keeps `releases/tag/` and an explicit `--changelog` pointing outside
+  the layout is left alone.
+
 ### Added
 - **`ready-for-agent` now means something, at both ends (closes #294).**
   ADR-00000015 defines the label as an assertion that four things are

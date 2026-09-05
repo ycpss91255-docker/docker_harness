@@ -43,7 +43,13 @@ reference (refs #272). The canonical primitive owns all of them:
 It sets `.version` to the tag literal, promotes `## [Unreleased]` to
 `## [vX.Y.Z] - <today>`, re-inserts an empty `[Unreleased]` above it, and
 regenerates the **whole** compare-link block from the heading list plus the
-repo's own `origin` remote. Regenerating (rather than appending) is what makes
+repo's own `origin` remote. Which file it edits is derived, not configured:
+the live changelog is the one file under `doc/changelog/` carrying
+`## [Unreleased]`, so the invocation above is correct both before and after a
+repo splits its changelog per series (`ycpss91255-docker/base`#926) and stays
+correct when the series rolls. `--changelog <path>` overrides it for a layout
+the rule cannot see; zero or several candidates are a refusal that names the
+directory searched and the files found. Regenerating (rather than appending) is what makes
 a rename self-correct and the block impossible to leave behind again.
 `--links-only` repairs the block without a bump; `--check` is the read-only
 drift gate.

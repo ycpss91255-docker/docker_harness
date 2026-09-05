@@ -27,7 +27,8 @@
 #
 # Options:
 #   --repo-root <path>   Repo to edit (default: git toplevel of cwd).
-#   --changelog <path>   Changelog file (default: <root>/doc/changelog/CHANGELOG.md).
+#   --changelog <path>   Changelog file (default: the file under
+#                        <root>/doc/changelog/ carrying `## [Unreleased]`).
 #   --date <YYYY-MM-DD>  Release date for the promoted heading (default: today).
 #   --slug <owner/repo>  Compare-link slug (default: derived from origin).
 #   --links-only         Skip the .version / heading edits.
@@ -52,8 +53,8 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 readonly SCRIPT_DIR
 # shellcheck source=lib/log.sh disable=SC1091
 source "${SCRIPT_DIR}/lib/log.sh"
-
-readonly DEFAULT_CHANGELOG_REL="doc/changelog/CHANGELOG.md"
+# shellcheck source=lib/changelog-path.sh disable=SC1091
+source "${SCRIPT_DIR}/lib/changelog-path.sh"
 
 usage() {
   sed -n '/^# Usage:/,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
@@ -88,13 +89,70 @@ headings() {
   sed -n 's/^## \[\([^]]*\)\].*/\1/p' "$1"
 }
 
-# link_block <changelog> <slug> -- print the complete, correct link-definition
-# block for the file's current headings. Pure function of (headings, slug):
+# oldest_version <changelog> -- the last (oldest) version label in the file.
+# That is the one heading whose predecessor, if any, is not in this file.
+oldest_version() {
+  headings "$1" | grep -v '^Unreleased$' | tail -1
+}
+
+# predecessor_tag <live-changelog> <root> -- print the tag the live file's
+# OLDEST heading should compare against: the newest version recorded in the
+# next-older changelog file. Returns 1 when there is none.
+#
+# Why: `link_block` linked its oldest heading to `releases/tag/` because
+# nothing preceded it -- true only while the whole changelog is ONE file.
+# Once base#926 split it per `0.Y` series, every series file's oldest heading
+# does have a predecessor, in the previous series file, and base's real
+# v0.43.md already links it that way (`compare/v0.42.0...v0.43.0-rc1`).
+# Rederiving from one file alone silently rewrites that correct cross-series
+# compare into a tag link on the next release. Same class of bug as the
+# hardcoded path this script just stopped naming: a derivation whose domain
+# quietly stopped being the whole story, degrading a good link with no error.
+#
+# Candidates are each OTHER file's NEWEST heading, so every comparison is
+# across series and never rc-vs-release inside one, where `sort -V` orders
+# `v0.42.0` below `v0.42.0-rc4`.
+#
+# Returns 1 when the live file is not part of the changelog directory -- an
+# explicit `--changelog` outside the layout keeps the single-file behaviour,
+# because we cannot tell what precedes a file we do not know the shape of.
+predecessor_tag() {
+  local live="$1" root="$2"
+  local mine
+  mine="$(oldest_version "${live}")"
+  [[ -n "${mine}" ]] || return 1
+
+  local f newest in_layout=0
+  local -a cands=()
+  while IFS= read -r f; do
+    if [[ "${f}" == "${live}" ]]; then
+      in_layout=1
+      continue
+    fi
+    newest="$(headings "${f}" | grep -v '^Unreleased$' | head -1)"
+    [[ -n "${newest}" ]] && cands+=("${newest}")
+  done < <(changelog_files "${root}")
+
+  (( in_layout )) || return 1
+  (( ${#cands[@]} )) || return 1
+
+  local pred
+  pred="$(printf '%s\n' "${cands[@]}" "${mine}" | sort -V -u | awk -v me="${mine}" '
+    $0 == me { print prev; exit }
+    { prev = $0 }')"
+  [[ -n "${pred}" ]] || return 1
+  printf '%s\n' "${pred}"
+}
+
+# link_block <changelog> <slug> [predecessor] -- print the complete, correct
+# link-definition block for the file's current headings. Pure function of
+# (headings, slug, predecessor):
 #   [Unreleased]  -> compare <newest release>...HEAD
 #   [vN]          -> compare <next older>...<vN>
-#   [oldest]      -> releases/tag/<oldest>   (nothing to compare against)
+#   [oldest]      -> compare <predecessor>...<oldest> when a previous series
+#                    file records one, else releases/tag/<oldest>
 link_block() {
-  local cl="$1" slug="$2"
+  local cl="$1" slug="$2" pred="${3:-}"
   local -a labels=()
   mapfile -t labels < <(headings "${cl}")
   (( ${#labels[@]} )) || return 0
@@ -121,8 +179,13 @@ link_block() {
     printf '[%s]: %s/compare/%s...%s\n' \
       "${versions[i]}" "${base_url}" "${versions[i+1]}" "${versions[i]}"
   done
-  printf '[%s]: %s/releases/tag/%s\n' \
-    "${versions[last]}" "${base_url}" "${versions[last]}"
+  if [[ -n "${pred}" ]]; then
+    printf '[%s]: %s/compare/%s...%s\n' \
+      "${versions[last]}" "${base_url}" "${pred}" "${versions[last]}"
+  else
+    printf '[%s]: %s/releases/tag/%s\n' \
+      "${versions[last]}" "${base_url}" "${versions[last]}"
+  fi
 }
 
 # strip_link_block <changelog> -- print the file without its version link
@@ -135,9 +198,10 @@ strip_link_block() {
   ' "$1"
 }
 
-# relink <changelog> <slug> -- print the file with a freshly derived link block.
+# relink <changelog> <slug> [predecessor] -- print the file with a freshly
+# derived link block.
 relink() {
-  local cl="$1" slug="$2" body
+  local cl="$1" slug="$2" pred="${3:-}" body
   body="$(strip_link_block "${cl}")"
   # Collapse any trailing blank lines the removal left, then re-attach the
   # block after exactly one, so repeated runs converge on one shape.
@@ -150,7 +214,7 @@ relink() {
     }
   '
   printf '\n'
-  link_block "${cl}" "${slug}"
+  link_block "${cl}" "${slug}" "${pred}"
 }
 
 # promote <changelog> <tag> <date> -- print the file with `## [Unreleased]`
@@ -211,7 +275,23 @@ main() {
     _log_fatal release-bump precondition_missing path="${root:-<cwd>}" reason=not-a-git-repo
     return 2
   fi
-  [[ -n "${changelog}" ]] || changelog="${root}/${DEFAULT_CHANGELOG_REL}"
+  # Which file is live is DERIVED, never named: `doc/changelog/CHANGELOG.md`
+  # is the generated index once a repo has split its changelog per series
+  # (base#926), and a default naming it stopped base's v0.43.0-rc2 release
+  # with a message that said which path it read and not what it wanted from
+  # it. The heading is the marker on both layouts, so this needs no per-repo
+  # configuration and does not go stale when the series rolls.
+  if [[ -z "${changelog}" ]]; then
+    if ! changelog="$(changelog_live_file "${root}")"; then
+      err "cannot tell which file is this repo's live changelog"
+      local line
+      while IFS= read -r line; do err "  ${line}"; done \
+        < <(changelog_why_no_live_file "${root}")
+      err "  pass --changelog <path> for a layout this rule cannot see"
+      _log_fatal release-bump precondition_missing path="$(changelog_dir "${root}")" reason=no-changelog
+      return 1
+    fi
+  fi
   if [[ ! -f "${changelog}" ]]; then
     _log_fatal release-bump precondition_missing path="${changelog}" reason=no-changelog
     return 1
@@ -225,10 +305,16 @@ main() {
     }
   fi
 
+  # The oldest heading in a series file is not the start of history -- the
+  # previous series file holds what it compares against. Derived once here so
+  # the promote path can relink a temp copy and still know its predecessor.
+  local pred=""
+  pred="$(predecessor_tag "${changelog}" "${root}")" || pred=""
+
   # --check: is the derived block already what the file says?
   if (( check )); then
     local want got
-    want="$(relink "${changelog}" "${slug}")"
+    want="$(relink "${changelog}" "${slug}" "${pred}")"
     got="$(cat "${changelog}")"
     if [[ "${want}" == "${got}" ]]; then
       printf 'changelog links up to date (%s)\n' "${slug}"
@@ -242,7 +328,7 @@ main() {
 
   local new_changelog
   if (( links_only )); then
-    new_changelog="$(relink "${changelog}" "${slug}")"
+    new_changelog="$(relink "${changelog}" "${slug}" "${pred}")"
   else
     if ! grep -q '^## \[Unreleased\]' "${changelog}"; then
       err "no '## [Unreleased]' heading in ${changelog} -- nothing to promote"
@@ -258,7 +344,7 @@ main() {
     local tmp
     tmp="$(mktemp)" || { err "mktemp failed"; return 1; }
     printf '%s\n' "${promoted}" > "${tmp}"
-    new_changelog="$(relink "${tmp}" "${slug}")"
+    new_changelog="$(relink "${tmp}" "${slug}" "${pred}")"
     rm -f "${tmp}"
   fi
 

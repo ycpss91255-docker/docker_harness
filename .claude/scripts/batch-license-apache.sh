@@ -16,8 +16,11 @@
 #      shield) right after the H1 in README.md and the three
 #      doc/README.<lang>.md translations. Translated READMEs link
 #      LICENSE via ../LICENSE; root README via ./LICENSE.
-#   4. Add `[Unreleased] / Added` CHANGELOG entry referencing the
-#      repo's per-repo license issue.
+#   4. Add `[Unreleased] / Added` entry to the repo's LIVE changelog --
+#      derived via lib/changelog-path.sh, not named. A repo that has split
+#      its changelog per series (base#926) keeps `[Unreleased]` in the series
+#      file, and appending to the generated `CHANGELOG.md` index there would
+#      write a section the next index regeneration silently overwrites.
 #   5. Commit, push via HTTPS, open PR closing the issue.
 #
 # Usage:
@@ -35,6 +38,8 @@ readonly WORKSPACE="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.
 _BLA_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 # shellcheck source=lib/log.sh disable=SC1091
 source "${_BLA_SCRIPT_DIR}/lib/log.sh"
+# shellcheck source=lib/changelog-path.sh disable=SC1091
+source "${_BLA_SCRIPT_DIR}/lib/changelog-path.sh"
 
 # repo|category|issue
 # roster-exempt: one-shot org-wide Apache-2.0 LICENSE add, already executed.
@@ -131,9 +136,11 @@ write_pr_body() {
   # $1 = output path
   # $2 = repo basename
   # $3 = issue number
+  # $4 = live changelog, repo-relative (derived, not assumed)
   local out="$1"
   local repo="$2"
   local issue="$3"
+  local changelog_rel="$4"
   cat > "${out}" <<EOF
 ## Why
 
@@ -147,7 +154,7 @@ This is a fresh add: \`${repo}\` previously had no LICENSE and no README badges.
 - **\`README.md\` + \`doc/README.{zh-TW,zh-CN,ja}.md\`** -- inserted two badges immediately after the H1 on a single line:
   - CI badge for \`main.yaml\` workflow
   - License badge linking to the new \`LICENSE\` (\`./LICENSE\` from root, \`../LICENSE\` from translated READMEs)
-- **\`doc/changelog/CHANGELOG.md\`** -- \`[Unreleased] / Added\` entry covering the LICENSE + badge fresh add.
+- **\`${changelog_rel}\`** -- \`[Unreleased] / Added\` entry covering the LICENSE + badge fresh add.
 
 No code, Dockerfile, or workflow changes -- pure license + doc.
 
@@ -201,11 +208,20 @@ process_repo() {
     fi
   done
 
-  add_changelog_entry "${worktree_path}/doc/changelog/CHANGELOG.md" "${issue}"
+  # Fail closed rather than write the entry into a file the next index
+  # regeneration overwrites: a repo whose live changelog cannot be derived
+  # gets no PR, not a silent loss.
+  local changelog_rel
+  if ! changelog_rel="$(changelog_live_rel "${worktree_path}")"; then
+    _log_warn batch-license repo_skipped repo="${repo}" reason=no-live-changelog \
+      path="$(changelog_dir "${worktree_path}")"
+    return 1
+  fi
+  add_changelog_entry "${worktree_path}/${changelog_rel}" "${issue}"
 
   git -C "${worktree_path}" add LICENSE README.md \
     doc/README.zh-TW.md doc/README.zh-CN.md doc/README.ja.md \
-    doc/changelog/CHANGELOG.md
+    "${changelog_rel}"
   git -C "${worktree_path}" commit -m "${TITLE}
 
 Closes #${issue}"
@@ -213,7 +229,7 @@ Closes #${issue}"
   git -C "${worktree_path}" push "https://github.com/${ORG}/${repo}.git" \
     "${BRANCH}:${BRANCH}" 2>&1 | tail -3
 
-  write_pr_body "${body_file}" "${repo}" "${issue}"
+  write_pr_body "${body_file}" "${repo}" "${issue}" "${changelog_rel}"
   gh pr create --repo "${ORG}/${repo}" --base main --head "${BRANCH}" \
     --title "${TITLE}" --body-file "${body_file}"
 }
