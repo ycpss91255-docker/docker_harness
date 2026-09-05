@@ -46,3 +46,25 @@ teardown() {
   run "$(hook check_no_emoji.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/repo/.claude/commands/foo.md\"}}"
   assert_silent
 }
+
+# --- the changelog directory is one category, not one filename (refs #308) ---
+#
+# Same inversion as check_no_ai_attribution.sh: after
+# `ycpss91255-docker/base`#926 the prose that legitimately quotes forbidden
+# characters lives in `doc/changelog/vX.Y.md`, while the exempt name
+# `CHANGELOG.md` became a generated index of derived rows.
+
+@test "silent on a changelog series file (prose describing the emoji rule)" {
+  mkdir -p "${TMPDIR}/repo/doc/changelog"
+  printf 'entry: dropped the \xF0\x9F\x9A\x80 from the banner\n' \
+    > "${TMPDIR}/repo/doc/changelog/v0.43.md"
+  run "$(hook check_no_emoji.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/repo/doc/changelog/v0.43.md\"}}"
+  assert_silent
+}
+
+@test "silent on the generated changelog index" {
+  mkdir -p "${TMPDIR}/repo/doc/changelog"
+  printf '| v0.43 | \xF0\x9F\x9A\x80 |\n' > "${TMPDIR}/repo/doc/changelog/CHANGELOG.md"
+  run "$(hook check_no_emoji.sh)" <<< "{\"tool_input\":{\"file_path\":\"${TMPDIR}/repo/doc/changelog/CHANGELOG.md\"}}"
+  assert_silent
+}
