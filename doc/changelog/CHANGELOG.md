@@ -30,6 +30,20 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a directory: they are not looking for the live file, they are excluding a
   category, and everything in that directory is changelog prose or generated
   rows.
+- **Compare links no longer degrade at a series boundary (refs #307).**
+  `release-bump.sh` derives the whole Keep-a-Changelog link block from the
+  headings in one file, and linked its OLDEST heading to `releases/tag/`
+  because nothing preceded it. That held while the changelog was one file.
+  After the split each series file's oldest heading does have a predecessor
+  -- the newest tag in the previous series file -- and base's real
+  `v0.43.md` already links it that way. Making the primitive run on the split
+  layout without teaching it this would not have failed loudly; it would have
+  rewritten a correct `compare/v0.42.0...v0.43.0-rc1` into a tag link on the
+  next release, and running `--check` against base's real changelog reported
+  exactly that drift. The predecessor is now derived from the newest heading
+  of each other file in the directory, so a pre-split repo (nothing else
+  there) keeps `releases/tag/` and an explicit `--changelog` pointing outside
+  the layout is left alone.
 
 ### Added
 - **`ready-for-agent` now means something, at both ends (closes #294).**

@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1338 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1343 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -1953,7 +1953,7 @@ escaping, and the read-only `--check` gate.
 | verifier and upgrader iterate the same list | - |
 | --expect over an empty selection fails instead of passing vacuously | - |
 
-### .claude/test/bats/unit/release_bump_spec.bats (18)
+### .claude/test/bats/unit/release_bump_spec.bats (23)
 
 | Test | Scenario |
 |------|----------|
@@ -1975,6 +1975,11 @@ escaping, and the read-only `--check` gate.
 | refuses when nothing under doc/changelog carries Unreleased, and says so | - |
 | refuses when several files carry Unreleased, naming each candidate | - |
 | --changelog still overrides the derivation for a layout the rule cannot see | - |
+| split layout: the oldest heading compares against the previous series | - |
+| split layout: the previous series' released tag wins over its candidates | - |
+| split layout: promoting does not degrade the cross-series link already there | - |
+| pre-split layout: the oldest heading still links to its release tag | - |
+| --changelog outside the layout keeps the single-file link shape | - |
 
 ### .claude/test/bats/unit/check_base_delivery_spec.bats (17)
 
