@@ -157,6 +157,7 @@ docker/
     │       ├── roster.tsv                      # THE 一份 org repo 名冊(取代先前散在 4 支 script + pr.md 的複本):欄位 repo/path/fanout(active|parked|n-a)/mutation/settings/check/note;fanout 欄同時餵 batch-base-upgrade(開 PR)與 check-template-versions(驗證),所以兩邊不可能再看不同集合,refs #272
     │       ├── roster.sh                       # roster.tsv 的唯一 reader:roster_fanout_paths/_repos <active|parked|all>、roster_mutation_paths/_repos、roster_settings_repos、roster_required_check <repo>、roster_file;純讀不改,refs #272
     │       ├── ci-required-jobs.sh             # 從 repo 自己的 workflow 推導「CI 到底要求什麼」的純讀函式庫:ci_required_jobs(ci-rollup needs,flow/block 兩種 YAML seq)、ci_ci_sh_targets / ci_check_targets(docker_harness 兩邊 target 集合)、ci_actionlint_image / ci_actionlint_ignores(pin + 抑制規則);ci-and-stamp.sh 用它把 marker 的宣稱釘在 workflow 上而非手抄表,refs #272
+    │       ├── changelog-path.sh             # 「哪個檔案是這個 repo 的 live changelog」的唯一 reader:changelog_dir / changelog_files / changelog_live_files / changelog_live_file / changelog_live_rel / changelog_why_no_live_file;規則=doc/changelog/ 底下帶 `## [Unreleased]` 的那一個檔(即 base changelog-layout lint 的 invariant),pre-split 時就是 CHANGELOG.md、split 後是 series 檔且換 series 不用改任何設定;0 個或 >1 個一律 fail closed 並印出「找了哪個目錄、找到哪些檔」,取代散在 release-bump / drift hook / batch-license 的硬寫路徑,refs #307 / #308 / base#926
     │       ├── gh-command.sh                   # 「這條 command 到底跑的是哪個程式」的共用 parser(strip_heredocs / fold_continuations / gh_segment / gh_subcommand / gh_repo_flag / gh_flag_value):heredoc body 與引號內字串是資料不是語法,先切出 command word 真的是 `gh` 的那一段再判斷 flag;從 enforce_gh_body_file.sh 抽出,#255/#276/#283 同型 bug 的唯一解析點(CONTEXT.md §15),refs #294
     │       └── ready-for-agent.sh              # `ready-for-agent` 四要件(Seams / First slice / Gate / Bound)readiness 檢查的唯一實作,Gate A(enforce_ready_for_agent.sh 貼 label)與 Gate B(check-ready-for-agent.sh 開工前)共用:rfa_missing_parts / rfa_label_defined / rfa_issue_text(body + comments,因為 grill 結論寫在 comment)/ rfa_check;label 未定義或 gh 問不到一律靜默,refs ADR-00000015 / #294
     ├── memory/               # Claude Code per-project memory（auto-loaded via symlink）
@@ -167,7 +168,7 @@ docker/
     │   ├── check_no_emoji.sh           # Edit/Write 後掃 emoji
     │   ├── check_no_coverage_excl.sh   # Edit/Write 後掃 LCOV_EXCL_* 等覆蓋率忽略註解
     │   ├── check_no_ai_attribution.sh  # Edit/Write 後掃 Co-Authored-By/Generated with Claude
-    │   ├── check_changelog_drift.sh    # git commit 前比對 staged code vs CHANGELOG.md
+    │   ├── check_changelog_drift.sh    # git commit 前比對 staged code vs live changelog(檔名由 lib/changelog-path.sh 推導,推不出來就靜默)
     │   ├── remind_readme_on_core_script.sh # git commit 前提醒 base 核心 .sh 改動是否同步 README
     │   ├── check_test_md_drift.sh      # *.bats / test_*.py|*_test.py / TEST.md 後比對測試數(.bats 數 @test、.py 數 def test_,refs #156/#198)
     │   ├── remind_tdd_categories.sh    # 動到 .sh/Dockerfile/compose 等時提醒 4 類測試

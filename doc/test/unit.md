@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1315 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1338 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -44,7 +44,7 @@ stdin and asserts one of three behaviours:
 | silent on an agent git commit | - |
 | silent on an agent touching a non-ack path | - |
 
-### .claude/test/bats/unit/check_changelog_drift_spec.bats (6)
+### .claude/test/bats/unit/check_changelog_drift_spec.bats (10)
 | Test | Scenario |
 |------|----------|
 | fires when code staged without CHANGELOG | code-only staged, no `doc/changelog/CHANGELOG.md` in commit → FIRE |
@@ -53,6 +53,10 @@ stdin and asserts one of three behaviours:
 | silent on --amend | `--amend` skips the rule → SILENT |
 | silent in repo without doc/changelog/CHANGELOG.md (rule N/A) | rule does not apply → SILENT |
 | resolves repo via cd subdir && git commit | `cd <repo> && git commit` parses correct repo → FIRE |
+| split layout: silent when the commit edits only the series file | - |
+| split layout: a code commit with no changelog edit still warns, naming the series file | - |
+| split layout: never asks for the generated index | - |
+| silent when no file under doc/changelog carries [Unreleased] (rule N/A) | - |
 
 ### .claude/test/bats/unit/remind_readme_on_core_script_spec.bats (13)
 | Test | Scenario |
@@ -71,13 +75,15 @@ stdin and asserts one of three behaviours:
 | git commit with core script + translated README is silent | `README.zh-TW.md` counts → SILENT |
 | git -C \<path> commit resolves work dir from -C | parses `-C <repo>` to find correct repo → FIRE |
 
-### .claude/test/bats/unit/check_no_ai_attribution_spec.bats (4)
+### .claude/test/bats/unit/check_no_ai_attribution_spec.bats (6)
 | Test | Scenario |
 |------|----------|
 | fires on Co-Authored-By: Claude | content has `Co-Authored-By: Claude` → FIRE |
 | fires on Generated with [Claude Code] | content has bracketed marker → FIRE |
 | fires on Generated with Claude Code (no brackets) | content has plain marker → FIRE |
 | silent on clean file | no markers → SILENT |
+| silent on a changelog series file (prose that quotes the rule) | - |
+| silent on the generated changelog index | - |
 
 ### .claude/test/bats/unit/check_no_coverage_excl_spec.bats (5)
 | Test | Scenario |
@@ -88,7 +94,7 @@ stdin and asserts one of three behaviours:
 | silent on clean file | no markers → SILENT |
 | silent on .md file (skip) | `.md` is skipped by hook → SILENT |
 
-### .claude/test/bats/unit/check_no_emoji_spec.bats (6)
+### .claude/test/bats/unit/check_no_emoji_spec.bats (8)
 | Test | Scenario |
 |------|----------|
 | fires when file contains emoji | emoji codepoint present → FIRE |
@@ -97,6 +103,8 @@ stdin and asserts one of three behaviours:
 | silent when file is binary | binary file detected → SILENT |
 | silent on meta-doc CLAUDE.md (legitimate emoji quoting) | rule-describing CLAUDE.md → SILENT |
 | silent on .claude/commands/*.md meta-doc (rule description) | command markdown → SILENT |
+| silent on a changelog series file (prose describing the emoji rule) | - |
+| silent on the generated changelog index | - |
 
 ### .claude/test/bats/unit/test_helper_stanzas_spec.bats (2)
 
@@ -1945,7 +1953,7 @@ escaping, and the read-only `--check` gate.
 | verifier and upgrader iterate the same list | - |
 | --expect over an empty selection fails instead of passing vacuously | - |
 
-### .claude/test/bats/unit/release_bump_spec.bats (12)
+### .claude/test/bats/unit/release_bump_spec.bats (18)
 
 | Test | Scenario |
 |------|----------|
@@ -1961,6 +1969,12 @@ escaping, and the read-only `--check` gate.
 | refuses to bump a version the changelog already records | - |
 | refuses when there is no Unreleased section to promote | - |
 | derives the slug from the remote, so a renamed repo self-corrects | - |
+| split layout: promotes the series file and leaves the generated index alone | - |
+| split layout: the link block lands in the series file, not the index | - |
+| split layout: the rule follows the series to v0.44 with nothing to edit | - |
+| refuses when nothing under doc/changelog carries Unreleased, and says so | - |
+| refuses when several files carry Unreleased, naming each candidate | - |
+| --changelog still overrides the derivation for a layout the rule cannot see | - |
 
 ### .claude/test/bats/unit/check_base_delivery_spec.bats (17)
 
@@ -2182,3 +2196,17 @@ escaping, and the read-only `--check` gate.
 | a command that redefines IFS is not one whose word splitting is known | - |
 | an IFS assignment inside a bash -c payload counts too | - |
 | the same command without the IFS assignment is still allowed | - |
+
+### .claude/test/bats/unit/changelog_path_spec.bats (9)
+
+| Test | Scenario |
+|------|----------|
+| pre-split layout: the live file is CHANGELOG.md | - |
+| split layout: the live file is the series file, not the generated index | - |
+| the rule follows the series forward without an edit | - |
+| changelog_live_rel prints the path a commit and a git diff use | - |
+| refuses when no file carries [Unreleased], naming what it searched | - |
+| refuses when several files carry [Unreleased], naming every one | - |
+| refuses when there is no doc/changelog directory at all | - |
+| changelog_files lists the markdown in the directory and nothing else | - |
+| a trailing slash on the root does not double up in the path | - |
