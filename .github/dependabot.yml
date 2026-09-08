@@ -1,0 +1,44 @@
+# Dependabot configuration.
+#
+# WHY THIS FILE EXISTS. Nothing in this repo was advancing its pins. When it
+# was added, `.github/workflows/test.yaml` still called actions/checkout@v4
+# while `base` had been on v7 for some time -- three majors of drift, green
+# the whole way, because a stale pin is not a failing build.
+#
+# Both ecosystems below are declared because both are unowned here. `base`
+# deliberately declares only github-actions: its tool-version-watch
+# (.github/workflows/tool-version-watch.yaml) owns Dockerfile FROM tags, and
+# giving one pin two mechanisms with opinions is worse than one that works.
+# This repo has no such watch, so the docker updater has nothing to conflict
+# with -- `.claude/test/Dockerfile` pins bats/bats and nothing else reads it.
+# If a watch is ever added here, drop the docker ecosystem at the same time.
+#
+# ── Read this before closing a dependabot pull request ──────────────────────
+#
+# Closing one is not deferring the bump. Dependabot never re-proposes a version
+# pair whose pull request was closed, for any call site the bump covered --
+# including call sites written long afterwards, which were never part of the
+# decision. Nothing in this file records that the opt-out happened, so the
+# resulting blind spot is not discoverable by reading the tree; the only way to
+# find one is to trawl closed pull requests.
+#
+# base has the scar: its docker/build-push-action v6 -> v7 pull request was
+# closed, and five call sites then sat on v6 while six elsewhere ran v7.
+#
+# To postpone a bump, leave the pull request OPEN. To decline one, say so at
+# the pin itself, not by closing a pull request that leaves no trace.
+
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # .claude/test/Dockerfile -- the bats image the whole test suite runs in.
+  - package-ecosystem: "docker"
+    directory: "/.claude/test"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
