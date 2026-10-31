@@ -67,15 +67,39 @@ seed_base_go_repo() {
 }
 
 # stub_just_argv -- a `just` PATH shim that appends its argv to
-# ${STUB_DIR}/just.argv and exits ${STUB_GO_RC:-0} for `test go`, 0 otherwise.
+# ${STUB_DIR}/just.argv and exits 1 when its argv equals ${STUB_FAIL:-}
+# (e.g. STUB_FAIL='test lint'), 0 otherwise. One shim serves the green run
+# and a red run at each position of the base recipe chain (refs base#1474).
 stub_just_argv() {
   cat > "${STUB_DIR}/just" <<'SHIM'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${STUB_DIR}/just.argv"
-if [[ "$*" == "test go" ]]; then exit "${STUB_GO_RC:-0}"; fi
+if [[ -n "${STUB_FAIL:-}" && "$*" == "${STUB_FAIL}" ]]; then exit 1; fi
 exit 0
 SHIM
   chmod +x "${STUB_DIR}/just"
+}
+
+# assert_base_red_stops_at <failing argv> <expected argv lines...> -- seed the
+# base go fixture plus a stale marker for HEAD, make the recipe named by the
+# first argument fail, run the stamp, then require: non-zero exit, no marker
+# for HEAD, and a just argv log equal to the remaining arguments exactly (the
+# chain stops at the first red recipe: nothing after it runs) (refs base#1474).
+assert_base_red_stops_at() {
+  local fail="$1"; shift
+  seed_base_go_repo
+  stub_just_argv
+  mkdir -p "${REPO}/.claude/state/local-ci-pass"
+  : > "$(marker)"
+  PATH="${STUB_DIR}:${PATH}" STUB_DIR="${STUB_DIR}" STUB_FAIL="${fail}" \
+    run "$(script ci-and-stamp.sh)" "${REPO}"
+  assert_failure
+  [[ ! -f "$(marker)" ]] || { echo "a red '${fail}' must leave no marker"; return 1; }
+  local want got
+  want="$(printf '%s\n' "$@")"
+  got="$(cat "${STUB_DIR}/just.argv" 2>/dev/null || true)"
+  [[ "${got}" == "${want}" ]] \
+    || { echo "just argv after red '${fail}': want [${want}] got [${got}]"; return 1; }
 }
 
 @test "docker_harness-style (.claude/test/ci.sh) green -> stamps marker" {
@@ -175,7 +199,7 @@ SHIM
 @test "base-style mirror runs just test go and attests config-gen (refs base#1474)" {
   seed_base_go_repo
   stub_just_argv
-  PATH="${STUB_DIR}:${PATH}" STUB_DIR="${STUB_DIR}" STUB_GO_RC=0 \
+  PATH="${STUB_DIR}:${PATH}" STUB_DIR="${STUB_DIR}" LOG_FORMAT=json \
     run "$(script ci-and-stamp.sh)" "${REPO}"
   assert_success
   [[ -f "$(marker)" ]] || { echo "marker not written: $(marker)"; return 1; }
@@ -189,21 +213,25 @@ SHIM
   got="$(cat "${STUB_DIR}/just.argv" 2>/dev/null || true)"
   [[ "${got}" == "${want}" ]] \
     || { echo "just argv: want [${want}] got [${got}]"; return 1; }
-  grep -q '^# mirror .*just test go' "$(marker)" \
-    || { echo "marker mirror line must name just test go"; cat "$(marker)"; return 1; }
+  # The whole mirror field, not a substring: a dropped or stale command fails.
+  got="$(sed -n 's/^# mirror  //p' "$(marker)")"
+  [[ "${got}" == "actionlint + just test + just test lint + just test go" ]] \
+    || { echo "marker mirror field: got [${got}]"; cat "$(marker)"; return 1; }
+  # The logged ci_start event: exactly one, kind=base, the full command chain.
+  got="$(printf '%s\n' "${output}" \
+    | jq -Rr 'fromjson? | select(.body == "ci_start") | "\(.attributes.kind)|\(.attributes.cmd)"')"
+  [[ "${got}" == "base|just test && just test lint && just test go" ]] \
+    || { echo "ci_start events: got [${got}]"; echo "${output}"; return 1; }
+}
+
+@test "a red just test stops the base chain and leaves no marker (refs base#1474)" {
+  assert_base_red_stops_at 'test' 'test'
+}
+
+@test "a red just test lint stops the base chain and leaves no marker (refs base#1474)" {
+  assert_base_red_stops_at 'test lint' 'test' 'test lint'
 }
 
 @test "a red just test go fails the stamp and leaves no marker (refs base#1474)" {
-  seed_base_go_repo
-  stub_just_argv
-  mkdir -p "${REPO}/.claude/state/local-ci-pass"
-  : > "$(marker)"
-  PATH="${STUB_DIR}:${PATH}" STUB_DIR="${STUB_DIR}" STUB_GO_RC=1 \
-    run "$(script ci-and-stamp.sh)" "${REPO}"
-  assert_failure
-  [[ ! -f "$(marker)" ]] || { echo "a red just test go must leave no marker"; return 1; }
-  local last
-  last="$(tail -n1 "${STUB_DIR}/just.argv" 2>/dev/null || true)"
-  [[ "${last}" == "test go" ]] \
-    || { echo "last just call should be 'test go', got [${last}]"; return 1; }
+  assert_base_red_stops_at 'test go' 'test' 'test lint' 'test go'
 }
