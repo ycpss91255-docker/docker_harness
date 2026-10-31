@@ -290,7 +290,8 @@ run_ci() {
       ;;
     base)
       # actionlint first, mirroring the workflow (there it gates the rest, and
-      # it is the cheapest of the thirteen -- one container, no image build).
+      # it is the cheapest of the mirrored jobs -- one container, no image
+      # build), then the three just recipes, stopping at the first red one.
       run_actionlint "${root}" || return $?
       _log_info ci-and-stamp ci_start kind=base cmd="just test && just test lint && just test go"
       ( cd "${root}" && just test && just test lint && just test go )

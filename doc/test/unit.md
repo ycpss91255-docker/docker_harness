@@ -1340,8 +1340,8 @@ that cannot write its marker reports red.
 | failing run REMOVES a stale marker for the same HEAD | stale green cleared (#261) |
 | failing run keeps markers belonging to other shas | removal scoped to HEAD (#261) |
 | green run whose marker cannot be written exits non-zero | unrecordable green -> red (#261) |
-| base-style mirror runs just test go and attests config-gen (refs base#1474) | - |
-| a red just test go fails the stamp and leaves no marker (refs base#1474) | - |
+| base-style mirror runs just test go and attests config-gen (refs base#1474) | argv order test / test lint / test go; marker attests config-gen (base#1474) |
+| a red just test go fails the stamp and leaves no marker (refs base#1474) | red go -> red stamp, stale marker cleared (base#1474) |
 
 ### .claude/test/bats/unit/enforce_worktree_for_branch_spec.bats (14)
 
