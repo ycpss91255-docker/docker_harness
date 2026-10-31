@@ -48,11 +48,11 @@ marker() { echo "${REPO}/.claude/state/local-ci-pass/$(git -C "${REPO}" rev-pars
 # The point of the guard under test is that ci-and-stamp reads them out of
 # the workflow rather than out of a table like this one; the list is here
 # only to build the fixture and to assert the parser agrees with it.
-readonly ROLLUP_NEEDS='actionlint, classify, compute-shards, shellcheck, doc-counts, lint-static, hadolint, bats-fragile, bats-integration, coverage, coverage-gate, acceptance, system, worker-selftest'
+readonly ROLLUP_NEEDS='actionlint, classify, compute-shards, shellcheck, doc-counts, lint-static, hadolint, bats-fragile, bats-integration, coverage, coverage-gate, acceptance, system, config-gen, worker-selftest'
 
 # seed_base_repo -- make ${REPO} look like a `base` checkout: root justfile,
 # no .base/ subtree, and a self-test.yaml whose ci-rollup carries the real
-# 14-job needs list plus the pinned actionlint invocation.
+# 15-job needs list plus the pinned actionlint invocation.
 seed_base_repo() {
   echo 'test:' > "${REPO}/justfile"
   mkdir -p "${REPO}/.github/workflows"
@@ -117,7 +117,7 @@ seed_base_repo() {
   body="$(cat "$(marker)")"
   for job in actionlint classify compute-shards shellcheck doc-counts \
              lint-static hadolint bats-fragile bats-integration coverage \
-             coverage-gate acceptance system worker-selftest; do
+             coverage-gate acceptance system config-gen worker-selftest; do
     [[ "${body}" == *"${job}"* ]] \
       || fail "marker does not account for required job '${job}':
 ${body}"

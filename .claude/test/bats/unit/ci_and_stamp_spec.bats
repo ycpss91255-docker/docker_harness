@@ -5,7 +5,8 @@
 # enforce_local_full_ci_before_pr.sh checks. Detection is by marker
 # file (.claude/test/ci.sh -> docker_harness `.claude/test/ci.sh check`;
 # root justfile + .base/ subtree -> downstream `just build test`;
-# root justfile, no .base/ -> base `just test` + `just test lint`;
+# root justfile, no .base/ -> base `just test` + `just test lint` +
+# `just test go`;
 # none -> no stamp, fail-open notice). Detection order matters: the
 # downstream `.base/` check precedes the base check (both have a root
 # justfile; the .base/ subtree is what a consumer repo vendors). Refs #220.
@@ -52,6 +53,29 @@ stub_harness_ci() {
   mkdir -p "${REPO}/.claude/test"
   printf '#!/usr/bin/env bash\nexit ${STUB_RC:-0}\n' > "${REPO}/.claude/test/ci.sh"
   chmod +x "${REPO}/.claude/test/ci.sh"
+}
+
+# seed_base_go_repo -- a base-style fixture (root justfile, no .base/) whose
+# ci-rollup requires config-gen, the job base's `just test go` backs
+# (refs base#1474). No actionlint pin, so actionlint is not required and no
+# docker is needed.
+seed_base_go_repo() {
+  echo 'test:' > "${REPO}/justfile"
+  mkdir -p "${REPO}/.github/workflows"
+  printf 'jobs:\n  ci-rollup:\n    needs: [bats-fragile, config-gen]\n    if: always()\n' \
+    > "${REPO}/.github/workflows/self-test.yaml"
+}
+
+# stub_just_argv -- a `just` PATH shim that appends its argv to
+# ${STUB_DIR}/just.argv and exits ${STUB_GO_RC:-0} for `test go`, 0 otherwise.
+stub_just_argv() {
+  cat > "${STUB_DIR}/just" <<'SHIM'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${STUB_DIR}/just.argv"
+if [[ "$*" == "test go" ]]; then exit "${STUB_GO_RC:-0}"; fi
+exit 0
+SHIM
+  chmod +x "${STUB_DIR}/just"
 }
 
 @test "docker_harness-style (.claude/test/ci.sh) green -> stamps marker" {
@@ -146,4 +170,40 @@ stub_harness_ci() {
   assert_failure
   assert_output --partial "marker_write_failed"
   [[ ! -f "$(marker)" ]] || { echo "no marker can exist when the write failed"; return 1; }
+}
+
+@test "base-style mirror runs just test go and attests config-gen (refs base#1474)" {
+  seed_base_go_repo
+  stub_just_argv
+  PATH="${STUB_DIR}:${PATH}" STUB_DIR="${STUB_DIR}" STUB_GO_RC=0 \
+    run "$(script ci-and-stamp.sh)" "${REPO}"
+  assert_success
+  [[ -f "$(marker)" ]] || { echo "marker not written: $(marker)"; return 1; }
+  local n
+  n="$(grep -cx 'attested config-gen' "$(marker)" || true)"
+  [[ "${n}" -eq 1 ]] || { echo "expected one 'attested config-gen' line, got ${n}:"; cat "$(marker)"; return 1; }
+  ! grep -q '^excluded config-gen' "$(marker)" \
+    || { echo "config-gen must be attested, not excluded"; cat "$(marker)"; return 1; }
+  local want got
+  want="$(printf 'test\ntest lint\ntest go')"
+  got="$(cat "${STUB_DIR}/just.argv" 2>/dev/null || true)"
+  [[ "${got}" == "${want}" ]] \
+    || { echo "just argv: want [${want}] got [${got}]"; return 1; }
+  grep -q '^# mirror .*just test go' "$(marker)" \
+    || { echo "marker mirror line must name just test go"; cat "$(marker)"; return 1; }
+}
+
+@test "a red just test go fails the stamp and leaves no marker (refs base#1474)" {
+  seed_base_go_repo
+  stub_just_argv
+  mkdir -p "${REPO}/.claude/state/local-ci-pass"
+  : > "$(marker)"
+  PATH="${STUB_DIR}:${PATH}" STUB_DIR="${STUB_DIR}" STUB_GO_RC=1 \
+    run "$(script ci-and-stamp.sh)" "${REPO}"
+  assert_failure
+  [[ ! -f "$(marker)" ]] || { echo "a red just test go must leave no marker"; return 1; }
+  local last
+  last="$(tail -n1 "${STUB_DIR}/just.argv" 2>/dev/null || true)"
+  [[ "${last}" == "test go" ]] \
+    || { echo "last just call should be 'test go', got [${last}]"; return 1; }
 }
