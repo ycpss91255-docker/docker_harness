@@ -35,6 +35,7 @@
 #   <root>/justfile  +  <root>/.base/ -> downstream      -> just build test
 #   <root>/justfile  (no .base/)      -> base            -> actionlint, then
 #                                        just test && just test lint
+#                                        && just test go
 #   none of the above             -> no CI mechanism -> do NOT stamp,
 #                                    exit 0 with a notice (the gate
 #                                    fail-opens for such repos)
@@ -74,11 +75,15 @@ readonly BASE_WORKFLOW=".github/workflows/self-test.yaml"
 readonly HARNESS_WORKFLOW=".github/workflows/test.yaml"
 
 # Required `ci-rollup` jobs the base mirror really runs. Membership is a claim
-# about what `actionlint` + `just test` + `just test lint` cover:
+# about what `actionlint` + `just test` + `just test lint` + `just test go`
+# cover:
 #   the lint phase's _LINT_TOOLS entries  -> shellcheck, hadolint, doc-counts
 #   the phase's remaining five lints      -> lint-static
 #   _run_tests (unit + integration)       -> bats-fragile, bats-integration
 #   run_actionlint below, at the pin the workflow declares -> actionlint
+#   just test go (justfile.test `go:` = config_gen_gates.sh +
+#     config_gen_redpath.sh; needs the host docker daemon) -> config-gen
+#     (refs base#1474)
 # Adding a name here without changing what the mirror runs is the one way to
 # make the marker lie again; the excluded table below is the honest way to
 # shrink the claim.
@@ -90,6 +95,7 @@ readonly _BASE_ATTESTED=(
   lint-static
   bats-fragile
   bats-integration
+  config-gen
 )
 
 # Required jobs the base mirror deliberately does NOT run, as `<job>=<reason>`.
@@ -155,7 +161,7 @@ build_attestation() {
 
   case "${kind}" in
     base)
-      mirror="actionlint + just test + just test lint"
+      mirror="actionlint + just test + just test lint + just test go"
       required="$(ci_required_jobs "${root}/${BASE_WORKFLOW}" ci-rollup || true)"
       source_desc="${BASE_WORKFLOW} :: ci-rollup needs"
       attested="$(printf '%s\n' "${_BASE_ATTESTED[@]}")"
@@ -286,8 +292,8 @@ run_ci() {
       # actionlint first, mirroring the workflow (there it gates the rest, and
       # it is the cheapest of the thirteen -- one container, no image build).
       run_actionlint "${root}" || return $?
-      _log_info ci-and-stamp ci_start kind=base cmd="just test && just test lint"
-      ( cd "${root}" && just test && just test lint )
+      _log_info ci-and-stamp ci_start kind=base cmd="just test && just test lint && just test go"
+      ( cd "${root}" && just test && just test lint && just test go )
       ;;
   esac
 }

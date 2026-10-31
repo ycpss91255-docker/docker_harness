@@ -7,6 +7,15 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **The base stamp runs `just test go` and attests `config-gen` (refs
+  ycpss91255-docker/base#1474).** Base's `ci-rollup` now needs `config-gen`,
+  which neither `_BASE_ATTESTED` nor `_BASE_EXCLUDED` listed, so
+  `ci-and-stamp.sh` on base exited 3 with "CI requires job(s) this mirror
+  neither runs nor excludes: config-gen" and stamped nothing. The base
+  mirror now runs `just test && just test lint && just test go`, stopping at
+  the first red command, and attests `config-gen` -- the same command and
+  attestation base's own `script/ci/pre_pr_mirror.sh` uses. The marker's
+  `# mirror` line names `just test go`; a red `just test go` leaves no marker.
 - **The live changelog is now derived, not named (closes #307, closes #308).**
   `ycpss91255-docker/base`#926 split the changelog into one file per `0.Y`
   series behind a generated index, and seven places in this repo spelled out
