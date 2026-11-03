@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1343 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1347 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -1310,7 +1310,7 @@ nothing can stamp it (refs #176 / #208).
 | [#280] fail-open: a lone justfile.ci is not a detectable CI mechanism | - |
 | fail-open: repo with no detectable CI mechanism is silent (refs #208) | no ci.sh/justfile.ci/justfile → SILENT (issue #208) |
 
-### .claude/test/bats/unit/ci_and_stamp_spec.bats (10)
+### .claude/test/bats/unit/ci_and_stamp_spec.bats (14)
 
 Covers `.claude/scripts/ci-and-stamp.sh` (refs #208) — runs a repo's
 full CI mirror and, on green, writes the local-ci-pass marker the gate
@@ -1318,7 +1318,8 @@ checks. Centralises marker-writing docker_harness-side so base /
 downstream PRs (not just docker_harness) can satisfy the gate; the
 runner is auto-detected (`.claude/test/ci.sh` → `.claude/test/ci.sh
 check`; root `justfile` + `.base/` → `just build test`;
-root `justfile` without `.base/` → `just test` + `just test lint`;
+root `justfile` without `.base/` → `just test` + `just test lint` +
+`just test go`;
 none → no stamp + notice; the `.base/` subtree distinguishes a
 downstream consumer from base since both carry a root justfile). The CI
 runner is stubbed via a PATH shim exiting 0/1 (no real docker). Exit
@@ -1339,6 +1340,10 @@ that cannot write its marker reports red.
 | failing run REMOVES a stale marker for the same HEAD | stale green cleared (#261) |
 | failing run keeps markers belonging to other shas | removal scoped to HEAD (#261) |
 | green run whose marker cannot be written exits non-zero | unrecordable green -> red (#261) |
+| base-style mirror runs just test go and attests config-gen (refs base#1474) | argv order test / test lint / test go; marker attests config-gen; full mirror field and ci_start chain (base#1474) |
+| a red just test stops the base chain and leaves no marker (refs base#1474) | red test -> red stamp, no later recipe, stale marker cleared (base#1474) |
+| a red just test lint stops the base chain and leaves no marker (refs base#1474) | red lint -> red stamp, go never runs, stale marker cleared (base#1474) |
+| a red just test go fails the stamp and leaves no marker (refs base#1474) | red go -> red stamp, stale marker cleared (base#1474) |
 
 ### .claude/test/bats/unit/enforce_worktree_for_branch_spec.bats (14)
 
