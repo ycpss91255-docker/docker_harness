@@ -29,7 +29,7 @@ main() {
 
   [[ "${cmd}" =~ gh[[:space:]]+pr[[:space:]]+create ]] || return 0
 
-  msg="PR open reminder: don't sleep-poll. After opening, run the auto-merge-on-green skill (.claude/skills/auto-merge-on-green/SKILL.md) -- arm GitHub-native auto-merge (--auto --squash --delete-branch) and wrap .claude/scripts/auto-merge-on-green.sh in a single Monitor: on green CI GitHub merges server-side, BEHIND triggers an automatic update-branch, and a CI failure is only reported while auto stays armed (a fix-push lands it automatically). Use wait-pr-ci only for pure monitoring (no merge)."
+  msg="PR open reminder: don't sleep-poll. After opening, run the auto-merge-on-green skill (.claude/skills/auto-merge-on-green/SKILL.md) -- arm GitHub-native auto-merge (--auto --merge --delete-branch) and wrap .claude/scripts/auto-merge-on-green.sh in a single Monitor: on green CI GitHub merges server-side, BEHIND triggers an automatic update-branch, and a CI failure is only reported while auto stays armed (a fix-push lands it automatically). Use wait-pr-ci only for pure monitoring (no merge)."
 
   jq -n --arg m "${msg}" '{
     systemMessage: $m,
