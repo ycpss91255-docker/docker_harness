@@ -6,6 +6,16 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Removed
+- **`check_prefer_dot_sh.sh` deleted: raw `docker run` is no longer blocked
+  (owner decision 2026-11-18).** The PreToolUse Bash hook denied
+  `docker build/run/exec/stop` and `docker compose up/down/build/run/exec`
+  whenever the cwd justfile had a matching recipe, and asked otherwise.
+  Testing routinely runs `docker run` directly, so the restriction went.
+  Hook + unit spec removed, `settings.json` wiring removed, CONTEXT.md
+  tree synced. A new acceptance case asserts that no registered Bash
+  PreToolUse hook denies or asks on those commands.
+
 ### Fixed
 - **The base stamp runs `just test go` and attests `config-gen` (refs
   ycpss91255-docker/base#1474).** Base's `ci-rollup` now needs `config-gen`,

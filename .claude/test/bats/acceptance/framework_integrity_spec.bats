@@ -54,3 +54,46 @@ load '../lib/test_helper'
     return 1
   }
 }
+
+@test "acceptance: no Bash PreToolUse hook blocks or prompts on raw docker / docker compose" {
+  # Owner decision 2026-11-18: testing often runs `docker run` (and the
+  # rest of the container verbs) directly, so no registered hook may
+  # deny or ask on them, even in a repo whose justfile has matching
+  # build / run / exec / stop recipes.
+  local repo blocked=""
+  repo="$(mktemp -d)"
+  printf 'build *args:\n\t:\nrun *args:\n\t:\nexec *args:\n\t:\nstop:\n\t:\n' > "${repo}/justfile"
+  local -a cmds=(
+    "docker build -t foo ."
+    "docker run --rm foo"
+    "docker exec -it foo bash"
+    "docker stop foo"
+    "docker compose up -d"
+    "docker compose down"
+    "docker compose build"
+    "docker compose run --rm foo"
+    "docker compose exec foo bash"
+  )
+  local hooks
+  hooks="$(jq -r '.hooks.PreToolUse[] | select(.matcher | test("Bash")) | .hooks[].command' \
+    "${PROJECT_ROOT}/.claude/settings.json")"
+  local cmd hook path input out decision
+  for cmd in "${cmds[@]}"; do
+    input="$(jq -nc --arg c "${cmd}" --arg d "${repo}" \
+      '{tool_name:"Bash",tool_input:{command:$c},cwd:$d}')"
+    while IFS= read -r hook; do
+      [[ -z "${hook}" ]] && continue
+      path="${hook/\$CLAUDE_PROJECT_DIR/${PROJECT_ROOT}}"
+      out="$(cd "${repo}" && CLAUDE_PROJECT_DIR="${PROJECT_ROOT}" "${path}" <<< "${input}" 2>/dev/null || true)"
+      decision="$(jq -r '.hookSpecificOutput.permissionDecision // empty' <<< "${out}" 2>/dev/null || true)"
+      if [[ "${decision}" == "deny" || "${decision}" == "ask" ]]; then
+        blocked+="  ${decision}: $(basename "${path}") on '${cmd}'"$'\n'
+      fi
+    done <<< "${hooks}"
+  done
+  rm -rf "${repo}"
+  [[ -z "${blocked}" ]] || {
+    echo "hooks that block or prompt on raw docker commands:"$'\n'"${blocked}"
+    return 1
+  }
+}

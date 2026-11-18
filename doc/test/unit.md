@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1348 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1328 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -1134,38 +1134,6 @@ template v0.18.0 / v0.18.1 to ship with `.version` still on v0.17.0
 | silent on non-git command | unrelated command |
 | resolves repo via cd subdir && git tag | cwd-resolution path |
 | resolves repo via git -C and blocks mismatch | `-C` resolution path |
-
-### .claude/test/bats/unit/check_prefer_dot_sh_spec.bats (20)
-
-Covers `.claude/hooks/check_prefer_dot_sh.sh` — PreToolUse hook that
-detects `docker build/run/exec/stop` and `docker compose <up|down|build|
-run|exec>` calls. Denies + steers to the matching `just <verb>` recipe
-when cwd has a root `justfile` defining that recipe; forces `ask` prompt
-when there is no justfile or no such recipe. Read-only subs /
-make-internal calls / already-asked subs (rm/push/...) stay silent.
-
-| Test | Scenario |
-|------|----------|
-| deny docker build when justfile has build recipe | recipe-present, build path |
-| deny docker run when justfile has run recipe | recipe-present, run path |
-| deny docker exec when justfile has exec recipe | recipe-present, exec path |
-| deny docker stop when justfile has stop recipe | recipe-present, stop path |
-| deny docker compose up → just run | compose up → just run map |
-| deny docker compose down → just stop | compose down → just stop map |
-| deny docker compose build → just build | compose build map |
-| deny docker compose exec → just exec | compose exec map |
-| deny docker compose run → just run | compose run map |
-| ask when docker build but no justfile | no-justfile fallback |
-| ask when justfile present but no build recipe | justfile-without-recipe fallback |
-| ask when docker compose up but no justfile | no-justfile fallback (compose) |
-| silent on read-only docker subcommand (ps) | non-target sub |
-| silent on read-only docker subcommand (images) | non-target sub |
-| silent on docker pull (download is harmless) | pull is harmless |
-| silent on docker rm (already in permissions.ask) | leave to perm rule |
-| silent on non-docker command | unrelated cmd |
-| silent on make (subprocess docker is not visible to Claude) | wrapper composition |
-| strips single env-prefix and matches docker build | env-prefix tolerance |
-| strips multiple env-prefixes and matches docker build | multi env-prefix |
 
 ### .claude/test/bats/unit/enforce_wrapper_first_upgrade_spec.bats (24)
 
