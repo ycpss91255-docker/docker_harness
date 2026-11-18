@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # log-allow:script -- emits data-product output (markdown table / next-step hint / Monitor protocol / pass-fail summary) alongside _log_*; per-callsite split deferred until tooling can distinguish.
 
-# batch-pr-merge.sh — squash-merge a list of PRs across repos.
+# batch-pr-merge.sh — merge-commit a list of PRs across repos.
 #
 # Pairs together with batch-base-upgrade.sh — that script opens N
 # downstream PRs, this one closes them out once their CI is green.
@@ -17,12 +17,12 @@
 # Options:
 #   --owner <OWNER>  Default owner for short `<repo>` form
 #                    (default: ycpss91255-docker)
-#   --reset-local    After each successful squash-merge, fetch + checkout
+#   --reset-local    After each successful merge, fetch + checkout
 #                    main + reset --hard origin/main in the local repo
 #                    checkout. Closes the detached-HEAD aftermath of the
 #                    batch-base-upgrade.sh flow (the upgrade script
 #                    operates on main checkouts, leaving HEAD detached on
-#                    the pre-squash chore branch once GitHub squash-merges
+#                    the pre-merge chore branch once GitHub merges
 #                    it). Best-effort: missing local checkout / git
 #                    failures are logged but do not fail the merge step.
 #                    Refs docker_harness#146.

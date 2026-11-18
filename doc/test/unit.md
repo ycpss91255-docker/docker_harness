@@ -621,7 +621,7 @@ repos with a shared `--reason` comment posted first. Sibling of
 
 ### .claude/test/bats/unit/batch_pr_merge_spec.bats (18)
 
-Covers `.claude/scripts/batch-pr-merge.sh` — squash-merge the N PRs
+Covers `.claude/scripts/batch-pr-merge.sh` — merge-commit the N PRs
 opened by `batch-template-upgrade.sh` once their CI is green. Mirrors
 `wait-pr-ci-batch.sh`'s argument contract (default-owner prefix +
 `--owner` override + up-front PR validation) so the next-step block
