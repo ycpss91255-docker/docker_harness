@@ -30,7 +30,7 @@
 #   -h, --help       Show this help
 #
 # Behaviour:
-#   - Squash-merges each PR with --delete-branch (matches the project's
+#   - Merges each PR with a merge commit (--merge) and --delete-branch (matches the project's
 #     branch-protection setup: enforce_admins=true, no force-push, etc.)
 #   - On any single-PR failure, prints the gh CLI error and continues
 #     with the rest. Prints a summary at the end with merged / failed
