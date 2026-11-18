@@ -97,14 +97,15 @@ EOF
   refute_output --partial '"severity_text":"ERROR"'
 }
 
-@test "successful merge invokes gh pr merge with --squash --delete-branch" {
+@test "successful merge invokes gh pr merge with --merge --delete-branch" {
   stub_gh_capture
   run "$(script batch-pr-merge.sh)" ai_agent:1
   assert_success
   run cat "${GH_STUB_DIR}/calls.log"
   assert_output --partial "pr"
   assert_output --partial "merge"
-  assert_output --partial "--squash"
+  assert_output --partial "--merge"
+  refute_output --partial "--squash"
   assert_output --partial "--delete-branch"
 }
 

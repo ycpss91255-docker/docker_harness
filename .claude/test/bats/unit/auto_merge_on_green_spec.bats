@@ -110,10 +110,10 @@ _fixture() { printf '%s' "$1" > "${FIXTURE_JSON}"; }
   assert_output --partial "cannot read PR 1"
 }
 
-@test "arm step runs gh pr merge --auto --squash --delete-branch" {
+@test "arm step runs gh pr merge --auto --merge --delete-branch" {
   _fixture '{"state":"MERGED","mergeStateStatus":"CLEAN","statusCheckRollup":[{"name":"bats","status":"COMPLETED","conclusion":"SUCCESS"}]}'
   run "${SCRIPT}" --repo o/r --pr 9 --interval 0 --max-iterations 1
   assert_success
-  run grep -qE "pr merge 9 --repo o/r --auto --squash --delete-branch" "${GH_LOG}"
+  run grep -qE "pr merge 9 --repo o/r --auto --merge --delete-branch" "${GH_LOG}"
   assert_success
 }

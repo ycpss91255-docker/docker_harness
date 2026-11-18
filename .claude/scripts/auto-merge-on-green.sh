@@ -23,7 +23,7 @@
 # Options:
 #   --repo <OWNER>/<REPO>  GitHub repo (required)
 #   --pr <N>               PR number (required)
-#   --merge-method <m>     squash|merge|rebase (default squash)
+#   --merge-method <m>     squash|merge|rebase (default merge)
 #   --no-delete-branch     Do not pass --delete-branch when arming
 #   --no-arm               Skip the `gh pr merge --auto` arm step (poll only;
 #                          used by tests and when auto-merge is pre-armed)
@@ -63,7 +63,7 @@ err() {
 }
 
 main() {
-  local repo="" pr="" merge_method="squash" delete_branch=1 arm=1
+  local repo="" pr="" merge_method="merge" delete_branch=1 arm=1
   local interval=30 grace=90 max_iter=0
 
   while (( $# > 0 )); do

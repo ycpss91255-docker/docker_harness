@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1347 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1348 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -207,7 +207,7 @@ parity; the count tracks def-functions not collected cases, so
 | silent on git commit without attribution | clean message → SILENT |
 | silent on non-git/gh command containing attribution string | `echo Co-Authored-By: Claude` → SILENT |
 
-### .claude/test/bats/unit/remind_ci_auto_merge_spec.bats (6)
+### .claude/test/bats/unit/remind_ci_auto_merge_spec.bats (7)
 
 Covers `.claude/hooks/remind_ci_auto_merge.sh` (renamed from
 `remind_pr_wait_ci`; refs #211). PreToolUse on Bash matcher; fires ONLY
@@ -222,6 +222,7 @@ on `gh pr create`, instructing the agent to land the PR via the
 | silent on gh pr list | non-create gh command → SILENT |
 | silent on git push (owned by remind_monitor_on_git_push) | `git push` → SILENT |
 | silent on unrelated command | `echo hello` → SILENT |
+| reminder recommends --merge, never --squash (base#1681) | message names `--auto --merge --delete-branch` |
 | silent on empty command | empty input → SILENT |
 
 ### .claude/test/bats/unit/auto_merge_on_green_spec.bats (12)
@@ -245,7 +246,7 @@ deterministic. The gh-call log asserts arm / update-branch side effects.
 | pending check still running -> keeps polling (max-iter 124) | pending keeps waiting |
 | BLOCKED with no pending/failed check past grace -> FAIL blocked | grace bail |
 | no PR (empty gh view) -> FAIL exit 1 | missing PR |
-| arm step runs gh pr merge --auto --squash --delete-branch | arm side effect |
+| arm step runs gh pr merge --auto --merge --delete-branch | arm side effect |
 
 ### .claude/test/bats/unit/serial_merge_spec.bats (9)
 
@@ -621,7 +622,7 @@ repos with a shared `--reason` comment posted first. Sibling of
 
 ### .claude/test/bats/unit/batch_pr_merge_spec.bats (18)
 
-Covers `.claude/scripts/batch-pr-merge.sh` — squash-merge the N PRs
+Covers `.claude/scripts/batch-pr-merge.sh` — merge-commit the N PRs
 opened by `batch-template-upgrade.sh` once their CI is green. Mirrors
 `wait-pr-ci-batch.sh`'s argument contract (default-owner prefix +
 `--owner` override + up-front PR validation) so the next-step block
@@ -637,7 +638,7 @@ printed by `batch-template-upgrade.sh` works for both scripts.
 | full owner/repo form is accepted (no prefix added) | full form override |
 | --owner overrides default for short form | owner flag |
 | --dry-run prints planned merges and skips gh invocation | dry-run no-op |
-| successful merge invokes gh pr merge with --squash --delete-branch | argv shape |
+| successful merge invokes gh pr merge with --merge --delete-branch | argv shape |
 | gh failure produces summary and exits 1 | failure surfacing |
 | mixed success and failure continues and reports both | continue-on-error semantics |
 | --reset-local is accepted and dry-run still skips gh + reset (#146) | dry-run covers the reset step too |

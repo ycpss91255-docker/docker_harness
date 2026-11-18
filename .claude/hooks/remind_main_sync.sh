@@ -24,7 +24,7 @@
 #   2. run the trigger regex on the cleaned string
 #   3. add a command-boundary anchor (start, or after ; & | $( ) so that
 #      `gh pr merge` only matches as an actual subcommand
-# Not limited to `--squash` / `--merge` / `--rebase`; any merge mode fires.
+# Not limited to one merge method (merge, squash, rebase flags all fire).
 # Skip read-only `gh pr view` / `gh pr checks` etc.
 
 set -uo pipefail

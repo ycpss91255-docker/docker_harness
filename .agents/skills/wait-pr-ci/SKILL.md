@@ -174,7 +174,7 @@ Once `ALL_DONE` arrives:
 
 ```bash
 # PR
-gh pr merge <PR> --repo <OWNER>/<REPO> --squash --delete-branch
+gh pr merge <PR> --repo <OWNER>/<REPO> --merge --delete-branch
 
 # Tag (release flow continues per .claude/commands/release.md)
 ```
