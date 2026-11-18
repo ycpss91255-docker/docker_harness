@@ -33,3 +33,19 @@ load '../lib/test_helper'
   assert_success
   assert_output --partial "in sync"
 }
+
+@test "system: merge helpers and their docs never pass --squash (base#1681)" {
+  local f hits=""
+  for f in \
+    .claude/scripts/auto-merge-on-green.sh \
+    .claude/scripts/serial-merge.sh \
+    .claude/scripts/batch-pr-merge.sh \
+    .claude/hooks/remind_ci_auto_merge.sh \
+    .claude/hooks/remind_main_sync.sh \
+    .claude/skills/auto-merge-on-green/SKILL.md \
+    .claude/skills/wait-pr-ci/SKILL.md; do
+    [[ -f "${PROJECT_ROOT}/${f}" ]] || continue
+    if grep -n -e '--squash' "${PROJECT_ROOT}/${f}"; then hits+="${f} "; fi
+  done
+  [[ -z "${hits}" ]] || { echo "--squash found in: ${hits}"; return 1; }
+}
