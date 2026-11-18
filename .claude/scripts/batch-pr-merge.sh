@@ -165,7 +165,7 @@ main() {
       continue
     fi
 
-    if gh pr merge "${pr}" -R "${repo}" --squash --delete-branch 2>&1; then
+    if gh pr merge "${pr}" -R "${repo}" --merge --delete-branch 2>&1; then
       _log_info batch-pr-merge pr_merged repo="${repo}" pr="${pr}"
       merged=$((merged + 1))
       if (( reset_local )); then
