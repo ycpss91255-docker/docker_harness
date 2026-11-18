@@ -245,7 +245,7 @@ deterministic. The gh-call log asserts arm / update-branch side effects.
 | pending check still running -> keeps polling (max-iter 124) | pending keeps waiting |
 | BLOCKED with no pending/failed check past grace -> FAIL blocked | grace bail |
 | no PR (empty gh view) -> FAIL exit 1 | missing PR |
-| arm step runs gh pr merge --auto --squash --delete-branch | arm side effect |
+| arm step runs gh pr merge --auto --merge --delete-branch | arm side effect |
 
 ### .claude/test/bats/unit/serial_merge_spec.bats (9)
 
