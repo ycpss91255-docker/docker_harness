@@ -29,7 +29,7 @@ Monitor(
 
 The script:
 
-1. Idempotently arms `gh pr merge <n> --auto --squash --delete-branch`.
+1. Idempotently arms `gh pr merge <n> --auto --merge --delete-branch`.
 2. Polls `gh pr view --json state,mergeStateStatus,statusCheckRollup` -- keyed
    on `mergeStateStatus`, so it is **repo-agnostic** (no hardcoded check name;
    GitHub enforces whatever checks branch protection requires -- here
@@ -56,7 +56,7 @@ Same contract as the `wait-pr-ci` siblings, so Monitor treats them uniformly.
 
 ## Notes
 
-- Squash + delete-branch is the default merge method (`--merge-method`,
+- Merge commit + delete-branch is the default merge method (`--merge-method`,
   `--no-delete-branch` to change).
 - Degraded case: if the session ends AND the branch later goes `BEHIND`,
   GitHub native auto-merge stalls until someone runs `gh pr update-branch`
