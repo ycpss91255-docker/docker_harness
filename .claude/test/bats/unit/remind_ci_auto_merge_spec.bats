@@ -27,6 +27,13 @@ load '../lib/test_helper'
   assert_silent
 }
 
+@test "reminder recommends --merge, never --squash (base#1681)" {
+  run "$(hook remind_ci_auto_merge.sh)" <<< '{"tool_input":{"command":"gh pr create --title foo --body bar"}}'
+  assert_success
+  assert_output --partial "--auto --merge --delete-branch"
+  refute_output --partial "--squash"
+}
+
 @test "silent on empty command" {
   run "$(hook remind_ci_auto_merge.sh)" <<< '{"tool_input":{}}'
   assert_silent
