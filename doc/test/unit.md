@@ -637,7 +637,7 @@ printed by `batch-template-upgrade.sh` works for both scripts.
 | full owner/repo form is accepted (no prefix added) | full form override |
 | --owner overrides default for short form | owner flag |
 | --dry-run prints planned merges and skips gh invocation | dry-run no-op |
-| successful merge invokes gh pr merge with --squash --delete-branch | argv shape |
+| successful merge invokes gh pr merge with --merge --delete-branch | argv shape |
 | gh failure produces summary and exits 1 | failure surfacing |
 | mixed success and failure continues and reports both | continue-on-error semantics |
 | --reset-local is accepted and dry-run still skips gh + reset (#146) | dry-run covers the reset step too |
