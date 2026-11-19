@@ -17,6 +17,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `.claude/scripts/lib/attribution_marker.sh`. A repo opts in with
   `core.hooksPath=.claude/githooks`, which
   `.claude/scripts/install-git-hooks.sh` sets when run from the repo root.
+  When an active `commit-msg` hook already exists there, the install leaves
+  it in place, prints how to chain the tracked hook from it, and exits 0.
 
 ### Fixed
 - **The base stamp runs `just test go` and attests `config-gen` (refs
