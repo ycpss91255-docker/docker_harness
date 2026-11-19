@@ -10,7 +10,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **A tracked `commit-msg` hook refuses AI attribution markers (refs
   ycpss91255-docker/base#1988).** `.claude/githooks/commit-msg` reads the
   commit or merge message and, when it carries a marker such as a co-author
-  trailer naming the AI, a trailer whose address is the noreply Anthropic
+  trailer naming the AI (the name ends at whitespace, `<` or the end of the
+  line, so a person whose name only starts with it passes), a trailer whose address is the noreply Anthropic
   address (with or without angle brackets, also on an indented continuation
   line, which git's trailer parse joins onto the trailer), or a "Generated
   with" line in any letter case,

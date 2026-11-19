@@ -15,7 +15,10 @@
 # (`git interpret-trailers --parse`), which joins an indented continuation
 # line onto its trailer.
 
-ATTRIBUTION_MARKER_ERE='Generated with (\[)?Claude Code|Co-Authored-By:[[:space:]]*Claude'
+# The co-author name must end at whitespace, '<' or the end of the line, so
+# a person whose name only starts with it is not a match; that one boundary
+# character is trimmed from the printed marker.
+ATTRIBUTION_MARKER_ERE='Generated with (\[)?Claude Code|Co-Authored-By:[[:space:]]*Claude([[:space:]<]|$)'
 
 # Prints "<Key>: ... <address>" for the first line holding the whole noreply
 # address with a `Key:` before it.
@@ -38,6 +41,7 @@ attribution_marker_find() {
   local text hit
   text="$(cat)"
   hit="$(grep -m1 -oiE "${ATTRIBUTION_MARKER_ERE}" <<< "${text}")"
+  hit="${hit%[[:space:]<]}"
   [[ -n "${hit}" ]] || hit="$({ printf '%s\n' "${text}"
     git interpret-trailers --parse <<< "${text}" 2>/dev/null; } | awk "${_ATTRIBUTION_ADDRESS_AWK}")"
   [[ -n "${hit}" ]] || return 1
