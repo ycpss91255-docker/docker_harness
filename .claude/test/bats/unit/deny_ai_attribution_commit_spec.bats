@@ -54,14 +54,25 @@ assert_denied_naming() {
 }
 
 # stub_gh <pr5-body> [exit] -- a gh on PATH that logs "<cwd>|<args>" to
-# ${STUB}/gh.log, prints <pr5-body> when its args name PR 5 and a clean body
-# for any other PR, then exits [exit] (default 0).
+# ${STUB}/gh.log and answers ONLY the PR-body lookup
+# `pr view [<n>] [--repo R] --json body -q .body`: <pr5-body> for PR 5, a clean
+# body for the current branch's PR and for any other PR, then exits [exit]
+# (default 0). Any other gh call (another field, another subcommand) fails,
+# so a lookup that stops asking for the body cannot pass.
 stub_gh() {
   printf '%s\n' "$1" > "${STUB}/body5.txt"
   cat > "${STUB}/gh" <<EOF
 #!/usr/bin/env bash
 printf '%s|%s\n' "\${PWD}" "\$*" >> "${STUB}/gh.log"
-if [[ " \$* " == *" 5 "* ]]; then cat "${STUB}/body5.txt"; else echo "Summary: another PR"; fi
+if [[ "\$1 \$2" != "pr view" || " \$* " != *" --json body -q .body "* ]]; then
+  echo "gh stub: unsupported: \$*" >&2
+  exit 1
+fi
+case "\$3" in
+  5) cat "${STUB}/body5.txt" ;;
+  [0-9]*) echo "Summary: another PR" ;;
+  *) echo "Summary: the current branch PR" ;;
+esac
 exit ${2:-0}
 EOF
   chmod +x "${STUB}/gh"
@@ -110,6 +121,36 @@ EOF
   stub_gh "$(printf 'Summary\n\n%s' "${TRAILER}")" 1
   run_hook 'gh pr merge 5 --merge'
   assert_silent
+}
+
+@test "git -C <dir> commit -F <file> reads the file git reads, under <dir>" {
+  mkdir -p "${REPO}/sub"
+  printf 'feat: clean\n' > "${REPO}/msg.txt"
+  printf 'feat\n\n%s\n' "${TRAILER}" > "${REPO}/sub/msg.txt"
+  run_hook 'git -C sub commit -F msg.txt'
+  assert_denied_naming "Co-Authored-By: ${AI}"
+}
+
+@test "a quoted -F / --body-file path holding a space is read whole" {
+  printf 'feat\n\n%s\n' "${TRAILER}" > "${REPO}/release message.txt"
+  run_hook 'git commit -F "release message.txt"'
+  assert_denied_naming "Co-Authored-By: ${AI}"
+
+  stub_gh 'Summary: clean'
+  run_hook "gh pr merge 5 --merge --body-file 'release message.txt'"
+  assert_denied_naming "Co-Authored-By: ${AI}"
+}
+
+@test "gh pr merge --merge <n> looks up PR <n>, not the current branch PR" {
+  stub_gh "$(printf 'Summary\n\n%s' "${TRAILER}")"
+  run_hook 'gh pr merge --merge 5'
+  assert_denied_naming "Co-Authored-By: ${AI}"
+}
+
+@test "a --subject whose text names --body still has the stored PR body checked" {
+  stub_gh "$(printf 'Summary\n\n%s' "${TRAILER}")"
+  run_hook 'gh pr merge 5 --merge --subject "docs: explain --body usage"'
+  assert_denied_naming "Co-Authored-By: ${AI}"
 }
 
 @test "settings.json wires the guard as a PreToolUse Bash hook" {
