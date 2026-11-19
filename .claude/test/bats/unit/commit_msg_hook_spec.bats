@@ -55,3 +55,18 @@ commit_in_repo() {
   assert_output --partial "AI attribution marker"
   assert_equal "$(git -C "${REPO}" rev-parse HEAD)" "${BEFORE}"
 }
+
+@test "a marker only in a '#' comment line of an edited message is accepted" {
+  # The editor appends the marker as a comment line; git's default cleanup
+  # for an edited message strips it, so the commit carries no marker.
+  local trailer
+  trailer="Co-Authored-By: $(printf '%s' Cla ude) <noreply@$(printf '%s' anth ropic).com>"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "# %s" >> "$1"\n' "${trailer}" \
+    > "${TMPDIR}/editor"
+  chmod +x "${TMPDIR}/editor"
+  GIT_EDITOR="${TMPDIR}/editor" run commit_in_repo -e -m feat
+  assert_success
+  [[ "$(git -C "${REPO}" rev-parse HEAD)" != "${BEFORE}" ]]
+  run git -C "${REPO}" log -1 --format=%B
+  refute_output --partial "noreply@"
+}
