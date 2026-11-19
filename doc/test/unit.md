@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1354 tests** across
+Unit level (ISTQB): one hook or script in isolation. **1355 tests** across
 78 specs under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -2237,3 +2237,9 @@ escaping, and the read-only `--check` gate.
 |------|----------|
 | in a fresh repo the install sets core.hooksPath and the hook then gates commits | - |
 | with an active commit-msg hook already in place the install leaves it and prints how to chain | - |
+
+### .claude/test/bats/unit/deny_ai_attribution_commit_spec.bats (1)
+
+| Test | Scenario |
+|------|----------|
+| git commit -m with a co-author trailer is denied naming the marker; a clean one is silent | - |
