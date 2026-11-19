@@ -43,3 +43,25 @@ run_hook() {
   assert_permission_decision "deny"
   assert_output --partial "Generated with"
 }
+
+# stub_gh_body <body> -- a gh on PATH that prints <body> for any call, so
+# `gh pr view <n> --json body -q .body` returns it.
+stub_gh_body() {
+  mkdir -p "${REPO}/bin"
+  printf '%s\n' "$1" > "${REPO}/body.txt"
+  printf '#!/usr/bin/env bash\ncat %q\n' "${REPO}/body.txt" > "${REPO}/bin/gh"
+  chmod +x "${REPO}/bin/gh"
+  export PATH="${REPO}/bin:${PATH}"
+}
+
+@test "gh pr merge whose PR body carries a co-author trailer is denied naming the marker; a clean body is silent" {
+  stub_gh_body "$(printf 'Summary\n\nCo-Authored-By: %s <noreply@%s.com>' \
+    "Cla$(printf '%s' ude)" "anth$(printf '%s' ropic)")"
+  run_hook 'gh pr merge 5 --merge'
+  assert_permission_decision "deny"
+  assert_output --partial "Co-Authored-By"
+
+  stub_gh_body 'Summary: add the .claude/hooks guard'
+  run_hook 'gh pr merge 5 --merge'
+  assert_silent
+}
