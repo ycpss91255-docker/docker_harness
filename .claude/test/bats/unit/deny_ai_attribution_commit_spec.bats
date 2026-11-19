@@ -160,9 +160,15 @@ EOF
   assert_denied_naming "Signed-off-by: X <${addr}>"
 }
 
-@test "settings.json wires the guard as a PreToolUse Bash hook" {
+@test "settings.json wires the guard as a PreToolUse Bash hook of type command" {
   run jq -r '.hooks.PreToolUse[]? | select(.matcher == "Bash") | .hooks[].command' \
     "${PROJECT_ROOT}/.claude/settings.json"
   assert_success
   assert_line '$CLAUDE_PROJECT_DIR/.claude/hooks/deny_ai_attribution_commit.sh'
+
+  run jq -r '.hooks.PreToolUse[]? | select(.matcher == "Bash") | .hooks[]
+    | select(.command == "$CLAUDE_PROJECT_DIR/.claude/hooks/deny_ai_attribution_commit.sh")
+    | .type' "${PROJECT_ROOT}/.claude/settings.json"
+  assert_success
+  assert_output "command"
 }

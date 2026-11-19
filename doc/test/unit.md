@@ -2268,4 +2268,4 @@ escaping, and the read-only `--check` gate.
 | gh pr merge --merge \<n> looks up PR \<n>, not the current branch PR | - |
 | a --subject whose text names --body still has the stored PR body checked | - |
 | git commit -m with a trailer whose only marker is the noreply address is denied naming it | - |
-| settings.json wires the guard as a PreToolUse Bash hook | - |
+| settings.json wires the guard as a PreToolUse Bash hook of type command | - |
