@@ -24,7 +24,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   file (resolved against the hook's `cwd`), carries a marker, naming the
   marker, before the commit runs. It also denies a `gh pr merge [<n>]`
   whose PR body, read with `gh pr view [<n>] --json body -q .body` under a
-  10-second timeout, carries a marker.
+  10-second timeout, carries a marker. `.claude/settings.json` wires it as a
+  PreToolUse Bash hook next to `remind_no_ai_attribution.sh`.
 
 ### Fixed
 - **The base stamp runs `just test go` and attests `config-gen` (refs
