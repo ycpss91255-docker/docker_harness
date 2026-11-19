@@ -10,10 +10,13 @@ load '../lib/test_helper'
 
 setup() {
   REPO="$(mktemp -d)"
+  STUB="$(mktemp -d)"
+  AI="Cla$(printf '%s' ude)"
+  TRAILER="Co-Authored-By: ${AI} <bot@example.invalid>"
 }
 
 teardown() {
-  rm -rf "${REPO}"
+  rm -rf "${REPO}" "${STUB}"
 }
 
 # run_hook <cmd> -- feed the hook the PreToolUse stdin JSON, built with jq so
@@ -25,12 +28,14 @@ run_hook() {
   run "$(hook deny_ai_attribution_commit.sh)" <<< "${json}"
 }
 
-@test "git commit -m with a co-author trailer is denied naming the marker; a clean one is silent" {
-  local trailer
-  trailer="Co-Authored-By: $(printf '%s' Cla ude) <noreply@$(printf '%s' anth ropic).com>"
-  run_hook "git commit -m feat -m \"${trailer}\""
+assert_denied_naming() {
   assert_permission_decision "deny"
-  assert_output --partial "Co-Authored-By"
+  assert_message_contains "carries an AI attribution marker: '$1'"
+}
+
+@test "git commit -m with a co-author trailer is denied naming the marker; a clean one is silent" {
+  run_hook "git commit -m feat -m \"${TRAILER}\""
+  assert_denied_naming "Co-Authored-By: ${AI}"
 
   run_hook 'git commit -m "feat: add the .claude/hooks guard"'
   assert_silent
@@ -38,30 +43,71 @@ run_hook() {
 
 @test "git commit -F <file> whose file carries a generated-with line is denied naming the marker" {
   printf 'feat: add x\n\n%s with [%s Code](https://x)\n' \
-    "Gene$(printf '%s' rated)" "Cla$(printf '%s' ude)" > "${REPO}/msg.txt"
+    "Gene$(printf '%s' rated)" "${AI}" > "${REPO}/msg.txt"
   run_hook 'git commit -F msg.txt'
-  assert_permission_decision "deny"
-  assert_output --partial "Generated with"
+  assert_denied_naming "Generated with [${AI} Code"
 }
 
-# stub_gh_body <body> -- a gh on PATH that prints <body> for any call, so
-# `gh pr view <n> --json body -q .body` returns it.
-stub_gh_body() {
-  mkdir -p "${REPO}/bin"
-  printf '%s\n' "$1" > "${REPO}/body.txt"
-  printf '#!/usr/bin/env bash\ncat %q\n' "${REPO}/body.txt" > "${REPO}/bin/gh"
-  chmod +x "${REPO}/bin/gh"
-  export PATH="${REPO}/bin:${PATH}"
+@test "a read-only git log --grep whose search text names commit and a marker is silent" {
+  run_hook "git log --grep='commit message containing ${TRAILER}'"
+  assert_silent
 }
 
-@test "gh pr merge whose PR body carries a co-author trailer is denied naming the marker; a clean body is silent" {
-  stub_gh_body "$(printf 'Summary\n\nCo-Authored-By: %s <noreply@%s.com>' \
-    "Cla$(printf '%s' ude)" "anth$(printf '%s' ropic)")"
+# stub_gh <pr5-body> [exit] -- a gh on PATH that logs "<cwd>|<args>" to
+# ${STUB}/gh.log, prints <pr5-body> when its args name PR 5 and a clean body
+# for any other PR, then exits [exit] (default 0).
+stub_gh() {
+  printf '%s\n' "$1" > "${STUB}/body5.txt"
+  cat > "${STUB}/gh" <<EOF
+#!/usr/bin/env bash
+printf '%s|%s\n' "\${PWD}" "\$*" >> "${STUB}/gh.log"
+if [[ " \$* " == *" 5 "* ]]; then cat "${STUB}/body5.txt"; else echo "Summary: another PR"; fi
+exit ${2:-0}
+EOF
+  chmod +x "${STUB}/gh"
+  export PATH="${STUB}:${PATH}"
+}
+
+@test "gh pr merge <n> looks up PR <n> from the command's cwd: a marked body is denied, other PRs are silent" {
+  stub_gh "$(printf 'Summary\n\n%s' "${TRAILER}")"
   run_hook 'gh pr merge 5 --merge'
-  assert_permission_decision "deny"
-  assert_output --partial "Co-Authored-By"
+  assert_denied_naming "Co-Authored-By: ${AI}"
+  run grep -F "${REPO}|pr view 5 " "${STUB}/gh.log"
+  assert_success
 
-  stub_gh_body 'Summary: add the .claude/hooks guard'
+  run_hook 'gh pr merge 6 --merge'
+  assert_silent
+}
+
+@test "gh pr merge with a clean stored body is silent" {
+  stub_gh 'Summary: add the .claude/hooks guard'
+  run_hook 'gh pr merge 5 --merge'
+  assert_silent
+}
+
+@test "gh pr merge --repo OWNER/REPO passes the repo to the PR lookup" {
+  stub_gh "$(printf 'Summary\n\n%s' "${TRAILER}")"
+  run_hook 'gh pr merge 5 --repo OWNER/REPO --merge'
+  assert_denied_naming "Co-Authored-By: ${AI}"
+  run grep -E -- "--repo OWNER/REPO|-R OWNER/REPO" "${STUB}/gh.log"
+  assert_success
+}
+
+@test "gh pr merge with a clean explicit --body is silent even when the stored body is marked" {
+  stub_gh "$(printf 'Summary\n\n%s' "${TRAILER}")"
+  run_hook 'gh pr merge 5 --merge --body "Summary: clean"'
+  assert_silent
+}
+
+@test "gh pr merge --body-file <file> whose file is marked is denied even when the stored body is clean" {
+  stub_gh 'Summary: clean'
+  printf 'Summary\n\n%s\n' "${TRAILER}" > "${REPO}/body.md"
+  run_hook 'gh pr merge 5 --merge --body-file body.md'
+  assert_denied_naming "Co-Authored-By: ${AI}"
+}
+
+@test "a PR lookup that prints a marked body and then fails is ignored (fail open)" {
+  stub_gh "$(printf 'Summary\n\n%s' "${TRAILER}")" 1
   run_hook 'gh pr merge 5 --merge'
   assert_silent
 }
