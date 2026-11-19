@@ -37,3 +37,12 @@ commit_in_repo() {
   assert_output --partial "AI attribution marker"
   assert_equal "$(git -C "${REPO}" rev-parse HEAD)" "${BEFORE}"
 }
+
+@test "a commit with a lower-case 'generated with' line naming the AI tool is refused" {
+  local line
+  line="$(printf '%s' gener ated) with $(printf '%s' cla ude) code"
+  run commit_in_repo -m feat -m "${line}"
+  assert_failure
+  assert_output --partial "AI attribution marker"
+  assert_equal "$(git -C "${REPO}" rev-parse HEAD)" "${BEFORE}"
+}
