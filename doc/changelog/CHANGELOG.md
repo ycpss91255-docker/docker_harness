@@ -25,7 +25,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   When any active hook already exists in the hooks dir, the install leaves
   `core.hooksPath` unchanged and links the tracked `commit-msg` into the hooks
   dir; when a `commit-msg` already exists it is left as it is, and the
-  install prints the line to add to it to chain the tracked hook.
+  install prints the line to add to it to chain the tracked hook, placed on
+  its success path before any explicit `exit 0`.
   A PreToolUse Bash hook, `.claude/hooks/deny_ai_attribution_commit.sh`,
   denies a `git commit` or `gh pr merge` whose command text, or whose `-F` /
   `--file` / `--body-file` file (resolved against the hook's `cwd` and any

@@ -31,6 +31,6 @@ elif [[ ! -e "${hook}" && ! -L "${hook}" ]]; then
     "${dir}" "${active[*]}" "${hook}" "${target}"
 else
   # shellcheck disable=SC2016  # "$1" is the literal line to paste into the hook
-  printf 'install-git-hooks: %s already exists; left it and core.hooksPath unchanged. To chain, add this line to it and keep it executable (chmod +x %s): %s/commit-msg "$1" || exit 1\n' \
+  printf 'install-git-hooks: %s already exists; left it and core.hooksPath unchanged. To chain, add this line to it on its success path, before any explicit exit 0, and keep it executable (chmod +x %s): %s/commit-msg "$1" || exit 1\n' \
     "${hook}" "${hook}" "${tracked}"
 fi
