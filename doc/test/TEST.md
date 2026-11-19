@@ -18,13 +18,13 @@ The `justfile` recipes are the local wrapper; CI
 (`.github/workflows/test.yaml`) invokes the same `.claude/test/ci.sh
 <target>` driver directly (no `just` in CI).
 
-Grand total (all levels): **1371 tests**.
+Grand total (all levels): **1372 tests**.
 
 ## Test docs by level / type
 
 | Doc | Scope | Count |
 |-----|-------|-------|
-| [unit.md](unit.md) | `.claude/test/bats/unit/` -- one hook / script in isolation | 1348 |
+| [unit.md](unit.md) | `.claude/test/bats/unit/` -- one hook / script in isolation | 1349 |
 | [integration.md](integration.md) | `.claude/test/bats/integration/` -- several hooks on one input | 15 |
 | [system.md](system.md) | `.claude/test/bats/system/` -- whole framework passes its own gates | 5 |
 | [acceptance.md](acceptance.md) | `.claude/test/bats/acceptance/` -- what a consumer session receives | 3 |

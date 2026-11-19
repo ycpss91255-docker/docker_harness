@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# commit-msg -- refuse a commit whose message carries an AI attribution marker
+# (refs base#1988). Install with core.hooksPath=.claude/githooks.
+#
+# Catches honest mistakes, such as a default co-author trailer; it is not a
+# defence against deliberate evasion. The CI check (base#1989) is the backstop.
+
+set -uo pipefail
+
+lib="$(dirname "$0")/../scripts/lib/attribution_marker.sh"
+if [[ ! -f "${lib}" ]]; then
+  echo "commit-msg: ${lib} not found; skipping the AI attribution check" >&2
+  exit 0
+fi
+# shellcheck source=SCRIPTDIR/../scripts/lib/attribution_marker.sh
+source "${lib}"
+
+if match="$(attribution_marker_find < "$1")"; then
+  echo "commit message carries an AI attribution marker: '${match}'. Remove it and commit again." >&2
+  exit 1
+fi
+exit 0
