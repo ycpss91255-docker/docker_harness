@@ -35,3 +35,11 @@ run_hook() {
   run_hook 'git commit -m "feat: add the .claude/hooks guard"'
   assert_silent
 }
+
+@test "git commit -F <file> whose file carries a generated-with line is denied naming the marker" {
+  printf 'feat: add x\n\n%s with [%s Code](https://x)\n' \
+    "Gene$(printf '%s' rated)" "Cla$(printf '%s' ude)" > "${REPO}/msg.txt"
+  run_hook 'git commit -F msg.txt'
+  assert_permission_decision "deny"
+  assert_output --partial "Generated with"
+}
