@@ -50,3 +50,18 @@ commit_in_repo() {
   assert_success
   [[ "$(git -C "${REPO}" rev-parse HEAD)" != "${before}" ]]
 }
+
+@test "with an active commit-msg hook already in place the install leaves it and prints how to chain" {
+  local existing="${REPO}/.git/hooks/commit-msg"
+  printf '#!/bin/sh\nexit 0\n' > "${existing}"
+  chmod +x "${existing}"
+  cp "${existing}" "${TMPDIR}/commit-msg.orig"
+
+  run bash -c 'cd "$1" && bash .claude/scripts/install-git-hooks.sh' _ "${REPO}"
+  assert_success
+  assert_output --partial "commit-msg"
+  assert_output --partial ".claude/githooks/commit-msg"
+  run git -C "${REPO}" config --get core.hooksPath
+  assert_failure
+  cmp "${existing}" "${TMPDIR}/commit-msg.orig"
+}
