@@ -9,23 +9,30 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 - **A tracked `commit-msg` hook refuses AI attribution markers (refs
   ycpss91255-docker/base#1988).** `.claude/githooks/commit-msg` reads the
-  commit message and, when it carries a marker such as a co-author trailer
-  naming the AI, a trailer using the noreply Anthropic address, or a
-  "Generated with" line in any letter case, prints the marker and exits 1, so the commit is refused and
-  HEAD stays where it was. Lines starting with `#` are skipped, since git
-  strips them from an edited message. The matcher lives in one sourced library,
+  commit or merge message and, when it carries a marker such as a co-author
+  trailer naming the AI, a trailer using the noreply Anthropic address (with
+  or without angle brackets), or a "Generated with" line in any letter case,
+  prints the marker and exits 1, so the commit is refused and HEAD stays
+  where it was. Lines starting with `#` are skipped only after an editor ran,
+  since git's default cleanup strips them then and keeps them otherwise. The
+  matcher lives in one sourced library,
   `.claude/scripts/lib/attribution_marker.sh`. A repo opts in with
   `core.hooksPath=.claude/githooks`, which
   `.claude/scripts/install-git-hooks.sh` sets when run from the repo root.
-  When an active `commit-msg` hook already exists there, the install leaves
-  it in place, prints how to chain the tracked hook from it, and exits 0.
+  When any active hook already exists in the hooks dir, the install leaves
+  `core.hooksPath` unchanged, prints the line to add to `commit-msg` to chain
+  the tracked hook, and exits 0.
   A PreToolUse Bash hook, `.claude/hooks/deny_ai_attribution_commit.sh`,
-  denies a `git commit` whose command text, or whose `-F` / `--file` message
-  file (resolved against the hook's `cwd`), carries a marker, naming the
-  marker, before the commit runs. It also denies a `gh pr merge [<n>]`
-  whose PR body, read with `gh pr view [<n>] --json body -q .body` under a
-  10-second timeout, carries a marker. `.claude/settings.json` wires it as a
-  PreToolUse Bash hook next to `remind_no_ai_attribution.sh`.
+  denies a `git commit` or `gh pr merge` whose command text, or whose `-F` /
+  `--file` / `--body-file` file (resolved against the hook's `cwd`), carries
+  a marker, naming the marker, before the command runs. It reads which
+  command runs per segment, so a `git log --grep` is not a commit. For a
+  `gh pr merge [<n>]` without `--body` / `--body-file` it also checks the PR
+  body from `gh pr view [<n>] [--repo R] --json body -q .body`, run from the
+  hook's `cwd` under a 10-second timeout; a failed lookup is ignored.
+  `.claude/settings.json` wires it as a PreToolUse Bash hook next to
+  `remind_no_ai_attribution.sh`. `ci.sh lint` covers `.claude/githooks`, and
+  the test image copies `.claude/githooks` and `.claude/settings.json`.
 
 ### Fixed
 - **The base stamp runs `just test go` and attests `config-gen` (refs
