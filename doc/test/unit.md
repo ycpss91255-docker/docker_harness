@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1379 tests** across 92 specs
+Unit level (ISTQB): one hook or script in isolation. **1380 tests** across 92 specs
 under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -2223,7 +2223,7 @@ escaping, and the read-only `--check` gate.
 | changelog_files lists the markdown in the directory and nothing else | - |
 | a trailing slash on the root does not double up in the path | - |
 
-### .claude/test/bats/unit/commit_msg_hook_spec.bats (13)
+### .claude/test/bats/unit/commit_msg_hook_spec.bats (14)
 
 | Test | Scenario |
 |------|----------|
@@ -2240,6 +2240,7 @@ escaping, and the read-only `--check` gate.
 | git commit -C reusing a marked message is refused and HEAD is unchanged | - |
 | a trailer whose noreply address sits on an indented continuation line is refused | - |
 | a trailer whose address only starts with the noreply anthropic address is accepted | - |
+| a co-author trailer for a person whose name only starts with the AI name is accepted | - |
 
 ### .claude/test/bats/unit/install_git_hooks_spec.bats (3)
 

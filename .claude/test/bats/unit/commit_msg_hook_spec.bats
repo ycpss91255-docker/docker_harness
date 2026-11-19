@@ -152,3 +152,9 @@ marked_commit() {
   assert_success
   [[ "$(git -C "${REPO}" rev-parse HEAD)" != "${BEFORE}" ]]
 }
+
+@test "a co-author trailer for a person whose name only starts with the AI name is accepted" {
+  run commit_in_repo -m feat -m "Co-Authored-By: ${AI}tte Martin <cm@example.org>"
+  assert_success
+  [[ "$(git -C "${REPO}" rev-parse HEAD)" != "${BEFORE}" ]]
+}
