@@ -78,16 +78,21 @@ install_hooks() {
   assert_success
 }
 
-@test "an existing pre-commit hook with no commit-msg hook is left running and the notice is printed" {
+@test "an existing pre-commit hook with no commit-msg hook keeps running and the check gates commits" {
   printf '#!/bin/sh\ntouch "%s/pre-commit-ran"\n' "${TMPDIR}" > "${HOOKS}/pre-commit"
   chmod +x "${HOOKS}/pre-commit"
 
   install_hooks
   assert_success
-  assert_output --partial ".claude/githooks/commit-msg"
-  run git -C "${REPO}" config --get core.hooksPath
-  assert_failure
 
+  local before
+  before="$(git -C "${REPO}" rev-parse HEAD)"
+  run commit_in_repo -m feat -m "${TRAILER}"
+  assert_failure
+  assert_output --partial "AI attribution marker"
+  assert_equal "$(git -C "${REPO}" rev-parse HEAD)" "${before}"
+
+  rm -f "${TMPDIR}/pre-commit-ran"
   run commit_in_repo -m "feat: a clean subject"
   assert_success
   [[ -f "${TMPDIR}/pre-commit-ran" ]]
