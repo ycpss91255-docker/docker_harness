@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # deny_ai_attribution_commit.sh -- Claude Code PreToolUse hook (matcher: Bash).
 #
-# Denies a `git ... commit` whose command text carries an AI attribution
-# marker, or a `gh pr merge` whose PR body does, before it runs (refs
+# Denies a `git ... commit` whose command text or -F / --file message file
+# carries an AI attribution marker, or a `gh pr merge` whose PR body does,
+# before it runs (refs
 # base#1988). The matcher is shared with the commit-msg hook
 # (.claude/scripts/lib/attribution_marker.sh).
 #
@@ -17,16 +18,20 @@ lib="${HOOK_DIR}/../scripts/lib/attribution_marker.sh"
 # shellcheck source=SCRIPTDIR/../scripts/lib/attribution_marker.sh
 source "${lib}"
 
-# message_files <cmd> -- print each path passed with -F / --file, one per line.
+# message_files <cmd> -- print each path passed with -F / --file, one per line,
+# with one layer of surrounding quotes removed.
 message_files() {
   local -a words
   read -ra words <<< "$1"
-  local i
+  local i f
   for ((i = 0; i < ${#words[@]}; i++)); do
     case "${words[i]}" in
-      -F | --file) printf '%s\n' "${words[i + 1]:-}" ;;
-      --file=*) printf '%s\n' "${words[i]#--file=}" ;;
+      -F | --file) f="${words[i + 1]:-}" ;;
+      --file=*) f="${words[i]#--file=}" ;;
+      *) continue ;;
     esac
+    f="${f%\"}"; f="${f#\"}"; f="${f%\'}"; f="${f#\'}"
+    printf '%s\n' "${f}"
   done
 }
 
@@ -49,7 +54,6 @@ main() {
     {
       printf '%s\n' "${cmd}"
       while IFS= read -r f; do
-        f="${f%\"}"; f="${f#\"}"; f="${f%\'}"; f="${f#\'}"
         [[ -n "${f}" && "${f}" != /* && -n "${cwd}" ]] && f="${cwd}/${f}"
         [[ -f "${f}" ]] && cat -- "${f}" 2>/dev/null
       done < <(message_files "${cmd}") || true
