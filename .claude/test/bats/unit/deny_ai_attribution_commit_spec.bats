@@ -65,3 +65,10 @@ stub_gh_body() {
   run_hook 'gh pr merge 5 --merge'
   assert_silent
 }
+
+@test "settings.json wires the guard as a PreToolUse Bash hook" {
+  run jq -r '.hooks.PreToolUse[]? | select(.matcher == "Bash") | .hooks[].command' \
+    "${PROJECT_ROOT}/.claude/settings.json"
+  assert_success
+  assert_line '$CLAUDE_PROJECT_DIR/.claude/hooks/deny_ai_attribution_commit.sh'
+}
