@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1370 tests** across 92 specs
+Unit level (ISTQB): one hook or script in isolation. **1379 tests** across 92 specs
 under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -2223,7 +2223,7 @@ escaping, and the read-only `--check` gate.
 | changelog_files lists the markdown in the directory and nothing else | - |
 | a trailing slash on the root does not double up in the path | - |
 
-### .claude/test/bats/unit/commit_msg_hook_spec.bats (8)
+### .claude/test/bats/unit/commit_msg_hook_spec.bats (13)
 
 | Test | Scenario |
 |------|----------|
@@ -2235,6 +2235,11 @@ escaping, and the read-only `--check` gate.
 | a '#' heading in an unedited -F message, which git keeps, is refused when it carries a marker | - |
 | a long message with a marker near the top is refused | - |
 | a git merge --no-ff -m carrying a marker is refused and HEAD is unchanged | - |
+| a marked trailer an editor adds to an edited message is refused naming the marker | - |
+| git commit --amend --no-edit keeping a marked message is refused and HEAD is unchanged | - |
+| git commit -C reusing a marked message is refused and HEAD is unchanged | - |
+| a trailer whose noreply address sits on an indented continuation line is refused | - |
+| a trailer whose address only starts with the noreply anthropic address is accepted | - |
 
 ### .claude/test/bats/unit/install_git_hooks_spec.bats (3)
 
@@ -2242,9 +2247,9 @@ escaping, and the read-only `--check` gate.
 |------|----------|
 | in a fresh repo the install sets core.hooksPath and the hook then gates commits | - |
 | an existing commit-msg hook is left running, and the advertised chain line adds the check to it | - |
-| an existing pre-commit hook with no commit-msg hook is left running and the notice is printed | - |
+| an existing pre-commit hook with no commit-msg hook keeps running and the check gates commits | - |
 
-### .claude/test/bats/unit/deny_ai_attribution_commit_spec.bats (10)
+### .claude/test/bats/unit/deny_ai_attribution_commit_spec.bats (14)
 
 | Test | Scenario |
 |------|----------|
@@ -2257,4 +2262,8 @@ escaping, and the read-only `--check` gate.
 | gh pr merge with a clean explicit --body is silent even when the stored body is marked | - |
 | gh pr merge --body-file \<file> whose file is marked is denied even when the stored body is clean | - |
 | a PR lookup that prints a marked body and then fails is ignored (fail open) | - |
+| git -C \<dir> commit -F \<file> reads the file git reads, under \<dir> | - |
+| a quoted -F / --body-file path holding a space is read whole | - |
+| gh pr merge --merge \<n> looks up PR \<n>, not the current branch PR | - |
+| a --subject whose text names --body still has the stored PR body checked | - |
 | settings.json wires the guard as a PreToolUse Bash hook | - |
