@@ -7,7 +7,9 @@
 
 set -uo pipefail
 
-lib="$(dirname "$0")/../scripts/lib/attribution_marker.sh"
+# Resolved through a symlink: install-git-hooks.sh links this file into a
+# hooks dir that already holds other hooks.
+lib="$(dirname "$(readlink -f "$0")")/../scripts/lib/attribution_marker.sh"
 if [[ ! -f "${lib}" ]]; then
   echo "commit-msg: ${lib} not found; skipping the AI attribution check" >&2
   exit 0
@@ -17,10 +19,12 @@ source "${lib}"
 
 # git sets GIT_EDITOR=: for the hook when no editor ran; its default cleanup
 # then keeps '#' lines, so they are scanned. After an editor ran, the default
-# cleanup strips them as comments, so they are skipped.
-comment='^#'
-[[ "${GIT_EDITOR:-}" == ":" ]] && comment='^$'
-if match="$(grep -v "${comment}" "$1" | attribution_marker_find)"; then
+# cleanup strips them as comments, so they are skipped. Blank lines are kept
+# either way: they split the trailer block off for git's trailer parse.
+message() {
+  if [[ "${GIT_EDITOR:-}" == ":" ]]; then cat -- "$1"; else grep -v '^#' "$1"; fi
+}
+if match="$(message "$1" | attribution_marker_find)"; then
   echo "commit message carries an AI attribution marker: '${match}'. Remove it and commit again." >&2
   exit 1
 fi
