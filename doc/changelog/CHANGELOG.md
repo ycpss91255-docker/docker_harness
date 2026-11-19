@@ -20,7 +20,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   When an active `commit-msg` hook already exists there, the install leaves
   it in place, prints how to chain the tracked hook from it, and exits 0.
   A PreToolUse Bash hook, `.claude/hooks/deny_ai_attribution_commit.sh`,
-  denies a `git commit` whose command text carries a marker, naming the
+  denies a `git commit` whose command text, or whose `-F` / `--file` message
+  file (resolved against the hook's `cwd`), carries a marker, naming the
   marker, before the commit runs.
 
 ### Fixed

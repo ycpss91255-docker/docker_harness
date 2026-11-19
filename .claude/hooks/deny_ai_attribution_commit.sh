@@ -16,11 +16,35 @@ lib="${HOOK_DIR}/../scripts/lib/attribution_marker.sh"
 # shellcheck source=SCRIPTDIR/../scripts/lib/attribution_marker.sh
 source "${lib}"
 
+# message_files <cmd> -- print each path passed with -F / --file, one per line.
+message_files() {
+  local -a words
+  read -ra words <<< "$1"
+  local i
+  for ((i = 0; i < ${#words[@]}; i++)); do
+    case "${words[i]}" in
+      -F | --file) printf '%s\n' "${words[i + 1]:-}" ;;
+      --file=*) printf '%s\n' "${words[i]#--file=}" ;;
+    esac
+  done
+}
+
 main() {
-  local cmd match
-  cmd="$(jq -r '.tool_input.command // empty' 2>/dev/null)" || return 0
+  local input cmd cwd match f
+  input="$(cat)"
+  cmd="$(jq -r '.tool_input.command // empty' <<< "${input}" 2>/dev/null)" || return 0
   [[ "${cmd}" =~ git.*commit ]] || return 0
-  match="$(printf '%s\n' "${cmd}" | attribution_marker_find)" || return 0
+  cwd="$(jq -r '.cwd // empty' <<< "${input}" 2>/dev/null)" || cwd=""
+  match="$(
+    {
+      printf '%s\n' "${cmd}"
+      while IFS= read -r f; do
+        f="${f%\"}"; f="${f#\"}"; f="${f%\'}"; f="${f#\'}"
+        [[ -n "${f}" && "${f}" != /* && -n "${cwd}" ]] && f="${cwd}/${f}"
+        [[ -f "${f}" ]] && cat -- "${f}" 2>/dev/null
+      done < <(message_files "${cmd}") || true
+    } | attribution_marker_find
+  )" || return 0
   local msg="AI attribution gate (base#1988): the commit message carries an AI attribution marker: '${match}'. Remove it and commit again."
   jq -n --arg m "${msg}" '{
     systemMessage: $m,
