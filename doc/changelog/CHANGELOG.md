@@ -10,7 +10,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **A tracked `commit-msg` hook refuses AI attribution markers (refs
   ycpss91255-docker/base#1988).** `.claude/githooks/commit-msg` reads the
   commit message and, when it carries a marker such as a co-author trailer
-  naming the AI, prints the marker and exits 1, so the commit is refused and
+  naming the AI or a "Generated with" line in any letter case, prints the
+  marker and exits 1, so the commit is refused and
   HEAD stays where it was. The matcher lives in one sourced library,
   `.claude/scripts/lib/attribution_marker.sh`. A repo opts in with
   `core.hooksPath=.claude/githooks`.
