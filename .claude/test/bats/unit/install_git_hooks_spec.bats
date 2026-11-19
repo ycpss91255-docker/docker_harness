@@ -21,6 +21,8 @@ setup() {
     "${REPO}/.claude/scripts/" 2>/dev/null || true
   git -C "${REPO}" -c user.name=t -c user.email=t@example.invalid \
     commit -q --allow-empty -m init
+  HOOKS="${REPO}/.git/hooks"
+  TRAILER="Co-Authored-By: $(printf '%s' Cla ude) <bot@example.invalid>"
 }
 
 teardown() {
@@ -29,19 +31,22 @@ teardown() {
 
 # commit_in_repo <git commit args...> -- commit with a fixed identity.
 commit_in_repo() {
-  git -C "${REPO}" -c user.name=t -c user.email=t@example.invalid \
+  env -u GIT_EDITOR git -C "${REPO}" -c user.name=t -c user.email=t@example.invalid \
     commit --allow-empty "$@"
 }
 
-@test "in a fresh repo the install sets core.hooksPath and the hook then gates commits" {
+install_hooks() {
   run bash -c 'cd "$1" && bash .claude/scripts/install-git-hooks.sh' _ "${REPO}"
+}
+
+@test "in a fresh repo the install sets core.hooksPath and the hook then gates commits" {
+  install_hooks
   assert_success
   assert_equal "$(git -C "${REPO}" config --get core.hooksPath)" ".claude/githooks"
 
-  local before trailer
+  local before
   before="$(git -C "${REPO}" rev-parse HEAD)"
-  trailer="Co-Authored-By: $(printf '%s' Cla ude) <noreply@$(printf '%s' anth ropic).com>"
-  run commit_in_repo -m feat -m "${trailer}"
+  run commit_in_repo -m feat -m "${TRAILER}"
   assert_failure
   assert_output --partial "AI attribution marker"
   assert_equal "$(git -C "${REPO}" rev-parse HEAD)" "${before}"
@@ -51,17 +56,39 @@ commit_in_repo() {
   [[ "$(git -C "${REPO}" rev-parse HEAD)" != "${before}" ]]
 }
 
-@test "with an active commit-msg hook already in place the install leaves it and prints how to chain" {
-  local existing="${REPO}/.git/hooks/commit-msg"
-  printf '#!/bin/sh\nexit 0\n' > "${existing}"
-  chmod +x "${existing}"
-  cp "${existing}" "${TMPDIR}/commit-msg.orig"
+@test "an existing commit-msg hook is left running, and the advertised chain line adds the check to it" {
+  printf '#!/bin/sh\nif grep -q WIP "$1"; then echo "existing hook: no WIP" >&2; exit 1; fi\n' \
+    > "${HOOKS}/commit-msg"
+  chmod +x "${HOOKS}/commit-msg"
 
-  run bash -c 'cd "$1" && bash .claude/scripts/install-git-hooks.sh' _ "${REPO}"
+  install_hooks
   assert_success
-  assert_output --partial "commit-msg"
+  # Follow the notice: append the line it prints after its last ': '.
+  printf '%s\n' "${output##*: }" >> "${HOOKS}/commit-msg"
+  run git -C "${REPO}" config --get core.hooksPath
+  assert_failure
+
+  run commit_in_repo -m "WIP: x"
+  assert_failure
+  assert_output --partial "existing hook: no WIP"
+  run commit_in_repo -m feat -m "${TRAILER}"
+  assert_failure
+  assert_output --partial "AI attribution marker"
+  run commit_in_repo -m "feat: a clean subject"
+  assert_success
+}
+
+@test "an existing pre-commit hook with no commit-msg hook is left running and the notice is printed" {
+  printf '#!/bin/sh\ntouch "%s/pre-commit-ran"\n' "${TMPDIR}" > "${HOOKS}/pre-commit"
+  chmod +x "${HOOKS}/pre-commit"
+
+  install_hooks
+  assert_success
   assert_output --partial ".claude/githooks/commit-msg"
   run git -C "${REPO}" config --get core.hooksPath
   assert_failure
-  cmp "${existing}" "${TMPDIR}/commit-msg.orig"
+
+  run commit_in_repo -m "feat: a clean subject"
+  assert_success
+  [[ -f "${TMPDIR}/pre-commit-ran" ]]
 }
