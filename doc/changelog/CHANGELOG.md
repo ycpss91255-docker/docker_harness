@@ -15,7 +15,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   HEAD stays where it was. Lines starting with `#` are skipped, since git
   strips them from an edited message. The matcher lives in one sourced library,
   `.claude/scripts/lib/attribution_marker.sh`. A repo opts in with
-  `core.hooksPath=.claude/githooks`.
+  `core.hooksPath=.claude/githooks`, which
+  `.claude/scripts/install-git-hooks.sh` sets when run from the repo root.
 
 ### Fixed
 - **The base stamp runs `just test go` and attests `config-gen` (refs
