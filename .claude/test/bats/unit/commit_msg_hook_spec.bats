@@ -46,3 +46,12 @@ commit_in_repo() {
   assert_output --partial "AI attribution marker"
   assert_equal "$(git -C "${REPO}" rev-parse HEAD)" "${BEFORE}"
 }
+
+@test "a commit with a trailer using the noreply anthropic address is refused" {
+  local trailer
+  trailer="Signed-off-by: X <noreply@$(printf '%s' anth ropic).com>"
+  run commit_in_repo -m feat -m "${trailer}"
+  assert_failure
+  assert_output --partial "AI attribution marker"
+  assert_equal "$(git -C "${REPO}" rev-parse HEAD)" "${BEFORE}"
+}
