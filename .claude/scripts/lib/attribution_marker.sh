@@ -6,7 +6,7 @@
 #   attribution_marker_find   reads stdin, prints the first marker found;
 #                             exits 0 on a match, 1 when there is none.
 
-ATTRIBUTION_MARKER_ERE='Generated with (\[)?Claude Code|Co-Authored-By:[[:space:]]*Claude'
+ATTRIBUTION_MARKER_ERE='Generated with (\[)?Claude Code|Co-Authored-By:[[:space:]]*Claude|[[:alnum:]-]+:[^<]*<noreply@anthropic\.com>'
 
 attribution_marker_find() {
   grep -oiE -m1 "${ATTRIBUTION_MARKER_ERE}" | head -n 1 | grep .
