@@ -15,7 +15,8 @@ fi
 # shellcheck source=SCRIPTDIR/../scripts/lib/attribution_marker.sh
 source "${lib}"
 
-if match="$(attribution_marker_find < "$1")"; then
+# Lines starting with '#' are comments git strips from an edited message.
+if match="$(grep -v '^#' "$1" | attribution_marker_find)"; then
   echo "commit message carries an AI attribution marker: '${match}'. Remove it and commit again." >&2
   exit 1
 fi

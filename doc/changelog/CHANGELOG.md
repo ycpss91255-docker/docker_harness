@@ -12,7 +12,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   commit message and, when it carries a marker such as a co-author trailer
   naming the AI, a trailer using the noreply Anthropic address, or a
   "Generated with" line in any letter case, prints the marker and exits 1, so the commit is refused and
-  HEAD stays where it was. The matcher lives in one sourced library,
+  HEAD stays where it was. Lines starting with `#` are skipped, since git
+  strips them from an edited message. The matcher lives in one sourced library,
   `.claude/scripts/lib/attribution_marker.sh`. A repo opts in with
   `core.hooksPath=.claude/githooks`.
 
