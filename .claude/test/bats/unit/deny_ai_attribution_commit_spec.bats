@@ -153,6 +153,13 @@ EOF
   assert_denied_naming "Co-Authored-By: ${AI}"
 }
 
+@test "git commit -m with a trailer whose only marker is the noreply address is denied naming it" {
+  local addr
+  addr="noreply@$(printf '%s' anth ropic).com"
+  run_hook "git commit -m feat -m \"Signed-off-by: X <${addr}>\""
+  assert_denied_naming "Signed-off-by: X <${addr}>"
+}
+
 @test "settings.json wires the guard as a PreToolUse Bash hook" {
   run jq -r '.hooks.PreToolUse[]? | select(.matcher == "Bash") | .hooks[].command' \
     "${PROJECT_ROOT}/.claude/settings.json"

@@ -1,6 +1,6 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1380 tests** across 92 specs
+Unit level (ISTQB): one hook or script in isolation. **1381 tests** across 92 specs
 under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
@@ -2250,7 +2250,7 @@ escaping, and the read-only `--check` gate.
 | an existing commit-msg hook is left running, and the advertised chain line adds the check to it | - |
 | an existing pre-commit hook with no commit-msg hook keeps running and the check gates commits | - |
 
-### .claude/test/bats/unit/deny_ai_attribution_commit_spec.bats (14)
+### .claude/test/bats/unit/deny_ai_attribution_commit_spec.bats (15)
 
 | Test | Scenario |
 |------|----------|
@@ -2267,4 +2267,5 @@ escaping, and the read-only `--check` gate.
 | a quoted -F / --body-file path holding a space is read whole | - |
 | gh pr merge --merge \<n> looks up PR \<n>, not the current branch PR | - |
 | a --subject whose text names --body still has the stored PR body checked | - |
+| git commit -m with a trailer whose only marker is the noreply address is denied naming it | - |
 | settings.json wires the guard as a PreToolUse Bash hook | - |
