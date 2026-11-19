@@ -81,7 +81,8 @@ t_test() {
 
 # lint_targets <root> -- print, one per line and repo-relative, the shell
 # scripts the lint gate covers: the git-TRACKED *.sh under .claude/hooks
-# and .claude/scripts (lib/ included).
+# and .claude/scripts (lib/ included), plus every tracked git hook under
+# .claude/githooks (no .sh suffix; refs base#1988).
 #
 # WHY tracked and not a glob: the local run bind-mounts the live worktree
 # (deliberately, refs #214) while CI checks out a clean one, so a glob
@@ -98,6 +99,7 @@ lint_targets() {
   local root="$1" f
   git -C "${root}" ls-files -z -- \
     '.claude/hooks/*.sh' '.claude/scripts/*.sh' '.claude/scripts/lib/*.sh' \
+    '.claude/githooks/*' \
     | while IFS= read -r -d '' f; do
         [[ -f "${root}/${f}" ]] || continue
         printf '%s\n' "${f}"
