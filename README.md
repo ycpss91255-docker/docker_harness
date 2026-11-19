@@ -33,6 +33,9 @@ claude
 Hook configuration lives in `.claude/settings.json`. Personal
 permissions go in `.claude/settings.local.json` (gitignored).
 
+Run `.claude/scripts/install-git-hooks.sh` once from the repo root so the
+tracked `commit-msg` hook refuses commits that carry an AI attribution marker.
+
 ## Agent skills
 
 Skills live canonically under `.agents/skills/<name>/`, surfaced to

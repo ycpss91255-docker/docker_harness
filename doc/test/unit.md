@@ -1,7 +1,7 @@
 # Unit Tests
 
-Unit level (ISTQB): one hook or script in isolation. **1348 tests** across
-78 specs under `.claude/test/bats/unit/`. These were the former
+Unit level (ISTQB): one hook or script in isolation. **1381 tests** across 92 specs
+under `.claude/test/bats/unit/`. These were the former
 `test/smoke/` specs -- each drives a single hook with a sample JSON
 tool-input and asserts one behaviour -- which are Unit-level (a component
 in isolation), not the Smoke *type* (see [smoke.md](smoke.md)).
@@ -2023,11 +2023,12 @@ escaping, and the read-only `--check` gate.
 | no issue argument exits 2 with usage | - |
 | --help exits 0 with usage | - |
 
-### .claude/test/bats/unit/ci_sh_lint_targets_spec.bats (5)
+### .claude/test/bats/unit/ci_sh_lint_targets_spec.bats (6)
 
 | Test | Scenario |
 |------|----------|
 | lint targets are the tracked hook, script and lib shell scripts | - |
+| a tracked git hook under .claude/githooks is a lint target (base#1988) | - |
 | an untracked script is not a lint target | - |
 | a tracked non-shell file is not a lint target | - |
 | a tracked script deleted in the working tree is not a lint target | - |
@@ -2221,3 +2222,50 @@ escaping, and the read-only `--check` gate.
 | refuses when there is no doc/changelog directory at all | - |
 | changelog_files lists the markdown in the directory and nothing else | - |
 | a trailing slash on the root does not double up in the path | - |
+
+### .claude/test/bats/unit/commit_msg_hook_spec.bats (14)
+
+| Test | Scenario |
+|------|----------|
+| a -m co-author trailer naming the AI is refused naming the marker, and HEAD is unchanged | - |
+| a clean subject naming the .claude/hooks path is accepted | - |
+| a lower-case 'generated with' line in a -F message file is refused naming the marker | - |
+| a trailer whose value is the bare upper-case noreply anthropic address is refused | - |
+| a marker only in a '#' comment line of an edited message is accepted | - |
+| a '#' heading in an unedited -F message, which git keeps, is refused when it carries a marker | - |
+| a long message with a marker near the top is refused | - |
+| a git merge --no-ff -m carrying a marker is refused and HEAD is unchanged | - |
+| a marked trailer an editor adds to an edited message is refused naming the marker | - |
+| git commit --amend --no-edit keeping a marked message is refused and HEAD is unchanged | - |
+| git commit -C reusing a marked message is refused and HEAD is unchanged | - |
+| a trailer whose noreply address sits on an indented continuation line is refused | - |
+| a trailer whose address only starts with the noreply anthropic address is accepted | - |
+| a co-author trailer for a person whose name only starts with the AI name is accepted | - |
+
+### .claude/test/bats/unit/install_git_hooks_spec.bats (3)
+
+| Test | Scenario |
+|------|----------|
+| in a fresh repo the install sets core.hooksPath and the hook then gates commits | - |
+| an existing commit-msg hook is left running, and the advertised chain line adds the check to it | - |
+| an existing pre-commit hook with no commit-msg hook keeps running and the check gates commits | - |
+
+### .claude/test/bats/unit/deny_ai_attribution_commit_spec.bats (15)
+
+| Test | Scenario |
+|------|----------|
+| git commit -m with a co-author trailer is denied naming the marker; a clean one is silent | - |
+| git commit -F \<file> whose file carries a generated-with line is denied naming the marker | - |
+| a read-only git log --grep whose search text names commit and a marker is silent | - |
+| gh pr merge \<n> looks up PR \<n> from the command's cwd: a marked body is denied, other PRs are silent | - |
+| gh pr merge with a clean stored body is silent | - |
+| gh pr merge --repo OWNER/REPO passes the repo to the PR lookup | - |
+| gh pr merge with a clean explicit --body is silent even when the stored body is marked | - |
+| gh pr merge --body-file \<file> whose file is marked is denied even when the stored body is clean | - |
+| a PR lookup that prints a marked body and then fails is ignored (fail open) | - |
+| git -C \<dir> commit -F \<file> reads the file git reads, under \<dir> | - |
+| a quoted -F / --body-file path holding a space is read whole | - |
+| gh pr merge --merge \<n> looks up PR \<n>, not the current branch PR | - |
+| a --subject whose text names --body still has the stored PR body checked | - |
+| git commit -m with a trailer whose only marker is the noreply address is denied naming it | - |
+| settings.json wires the guard as a PreToolUse Bash hook of type command | - |

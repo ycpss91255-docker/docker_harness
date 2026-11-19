@@ -57,8 +57,10 @@ RUN git clone --depth 1 --branch "${BATS_SUPPORT_VERSION}" \
 
 WORKDIR /work
 COPY .claude/hooks/ /work/.claude/hooks/
+COPY .claude/githooks/ /work/.claude/githooks/
 COPY .claude/scripts/ /work/.claude/scripts/
 COPY .claude/test/ /work/.claude/test/
+COPY .claude/settings.json /work/.claude/settings.json
 
 # bats/bats image already has ENTRYPOINT ["bats"]; CMD becomes its args.
 # Specs live under .claude/test/bats/<level>/ (ISTQB layout, ADR-00000013).

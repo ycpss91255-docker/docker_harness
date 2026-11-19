@@ -52,6 +52,18 @@ mk_repo() {
   assert_line ".claude/scripts/lib/a-lib.sh"
 }
 
+@test "a tracked git hook under .claude/githooks is a lint target (base#1988)" {
+  local repo
+  repo="$(mk_repo)"
+  mkdir -p "${repo}/.claude/githooks"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "${repo}/.claude/githooks/commit-msg"
+  git -C "${repo}" add -A
+  git -C "${repo}" commit -q -m hook
+  targets "${repo}"
+  assert_success
+  assert_line ".claude/githooks/commit-msg"
+}
+
 @test "an untracked script is not a lint target" {
   local repo
   repo="$(mk_repo)"

@@ -6,6 +6,40 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **A tracked `commit-msg` hook refuses AI attribution markers (refs
+  ycpss91255-docker/base#1988).** `.claude/githooks/commit-msg` reads the
+  commit or merge message and, when it carries a marker such as a co-author
+  trailer naming the AI (the name ends at whitespace, `<` or the end of the
+  line, so a person whose name only starts with it passes), a trailer whose address is the noreply Anthropic
+  address (with or without angle brackets, also on an indented continuation
+  line, which git's trailer parse joins onto the trailer), or a "Generated
+  with" line in any letter case,
+  prints the marker and exits 1, so the commit is refused and HEAD stays
+  where it was. Lines starting with `#` are skipped only after an editor ran,
+  since git's default cleanup strips them then and keeps them otherwise. The
+  matcher lives in one sourced library,
+  `.claude/scripts/lib/attribution_marker.sh`. A repo opts in with
+  `core.hooksPath=.claude/githooks`, which
+  `.claude/scripts/install-git-hooks.sh` sets when run from the repo root.
+  When any active hook already exists in the hooks dir, the install leaves
+  `core.hooksPath` unchanged and links the tracked `commit-msg` into the hooks
+  dir; when a `commit-msg` already exists it is left as it is, and the
+  install prints the line to add to it to chain the tracked hook, placed on
+  its success path before any explicit `exit 0`.
+  A PreToolUse Bash hook, `.claude/hooks/deny_ai_attribution_commit.sh`,
+  denies a `git commit` or `gh pr merge` whose command text, or whose `-F` /
+  `--file` / `--body-file` file (resolved against the hook's `cwd` and any
+  `git -C <dir>`), carries a marker, naming the marker, before the command
+  runs. It tokenises the command the way the shell does, so a quoted path
+  stays whole and a `git log --grep` is not a commit. For a
+  `gh pr merge [<n>]` without `--body` / `--body-file` it also checks the PR
+  body from `gh pr view [<n>] [--repo R] --json body -q .body`, run from the
+  hook's `cwd` under a 10-second timeout; a failed lookup is ignored.
+  `.claude/settings.json` wires it as a PreToolUse Bash hook next to
+  `remind_no_ai_attribution.sh`. `ci.sh lint` covers `.claude/githooks`, and
+  the test image copies `.claude/githooks` and `.claude/settings.json`.
+
 ### Fixed
 - **The base stamp runs `just test go` and attests `config-gen` (refs
   ycpss91255-docker/base#1474).** Base's `ci-rollup` now needs `config-gen`,
