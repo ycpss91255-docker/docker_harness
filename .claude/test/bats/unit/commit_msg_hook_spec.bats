@@ -107,3 +107,48 @@ assert_refused() {
     merge --no-ff -m "merge side" -m "Co-Authored-By: ${AI} <bot@example.invalid>" side
   assert_refused "Co-Authored-By: ${AI}"
 }
+
+@test "a marked trailer an editor adds to an edited message is refused naming the marker" {
+  # The editor appends a real (non-comment) trailer line; git keeps it, so
+  # the hook must check an edited message, not only an unedited one.
+  local trailer="Co-Authored-By: ${AI} <bot@example.invalid>"
+  printf '#!/usr/bin/env bash\nprintf "\\n%%s\\n" "%s" >> "$1"\n' "${trailer}" \
+    > "${TMPDIR}/editor"
+  chmod +x "${TMPDIR}/editor"
+  GIT_EDITOR="${TMPDIR}/editor" run git -C "${REPO}" -c user.name=t \
+    -c user.email=t@example.invalid commit --allow-empty -e -m feat
+  assert_refused "Co-Authored-By: ${AI}"
+}
+
+# marked_commit -- a commit carrying a co-author trailer, made with
+# --no-verify; BEFORE moves to it and its sha is printed.
+marked_commit() {
+  commit_in_repo -q --no-verify -m feat -m "Co-Authored-By: ${AI} <bot@example.invalid>"
+  git -C "${REPO}" rev-parse HEAD
+}
+
+@test "git commit --amend --no-edit keeping a marked message is refused and HEAD is unchanged" {
+  BEFORE="$(marked_commit)"
+  run commit_in_repo --amend --no-edit
+  assert_refused "Co-Authored-By: ${AI}"
+}
+
+@test "git commit -C reusing a marked message is refused and HEAD is unchanged" {
+  local marked
+  marked="$(marked_commit)"
+  git -C "${REPO}" reset -q --soft HEAD~1
+  run commit_in_repo -C "${marked}"
+  assert_refused "Co-Authored-By: ${AI}"
+}
+
+@test "a trailer whose noreply address sits on an indented continuation line is refused" {
+  printf 'feat\n\nReviewed-by: Some Bot\n  <%s>\n' "${ADDR}" > "${TMPDIR}/msg"
+  run commit_in_repo -F "${TMPDIR}/msg"
+  assert_refused "Reviewed-by: Some Bot <${ADDR}>"
+}
+
+@test "a trailer whose address only starts with the noreply anthropic address is accepted" {
+  run commit_in_repo -m feat -m "Signed-off-by: X <${ADDR}.example>"
+  assert_success
+  [[ "$(git -C "${REPO}" rev-parse HEAD)" != "${BEFORE}" ]]
+}
