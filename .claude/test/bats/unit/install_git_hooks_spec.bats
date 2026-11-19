@@ -63,6 +63,7 @@ install_hooks() {
 
   install_hooks
   assert_success
+  assert_output --partial "on its success path, before any explicit exit 0"
   # Follow the notice: append the line it prints after its last ': '.
   printf '%s\n' "${output##*: }" >> "${HOOKS}/commit-msg"
   run git -C "${REPO}" config --get core.hooksPath
