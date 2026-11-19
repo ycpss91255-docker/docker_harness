@@ -22,7 +22,9 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   A PreToolUse Bash hook, `.claude/hooks/deny_ai_attribution_commit.sh`,
   denies a `git commit` whose command text, or whose `-F` / `--file` message
   file (resolved against the hook's `cwd`), carries a marker, naming the
-  marker, before the commit runs.
+  marker, before the commit runs. It also denies a `gh pr merge [<n>]`
+  whose PR body, read with `gh pr view [<n>] --json body -q .body` under a
+  10-second timeout, carries a marker.
 
 ### Fixed
 - **The base stamp runs `just test go` and attests `config-gen` (refs
